@@ -9,7 +9,6 @@ public sealed class RegistrationImportPageViewModel
     public string ImportStatus { get; set; } = "Pending";
     public bool CourseRequiresAcademicDetails { get; set; }
     public List<RegistrationImportCourseOption> Courses { get; set; } = new();
-    public string? PreviewToken { get; set; }
     public RegistrationImportPreview? Preview { get; set; }
 }
 

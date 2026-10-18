@@ -2,10 +2,10 @@ using System.Data;
 using ECert.Data;
 using ECert.Models;
 using ECert.Models.ViewModels;
+using ECert.Services.Excel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using ClosedXML.Excel;
 
 namespace ECert.Controllers;
 
@@ -117,51 +117,35 @@ public class ReportsController : Controller
         }
         finally { if (shouldClose) await conn.CloseAsync(); }
 
-        using var wb = new XLWorkbook();
-        var ws = wb.Worksheets.Add("إيرادات الدورات");
-        ws.RightToLeft = true;
-        ws.Cell(1, 1).Value = "الدورة";
-        ws.Cell(1, 2).Value = "عدد المسجلين";
-        ws.Cell(1, 3).Value = "الرسوم الأصلية";
-        ws.Cell(1, 4).Value = "الإعفاءات";
-        ws.Cell(1, 5).Value = "الإيراد المتوقع";
-        ws.Cell(1, 6).Value = "المدفوع";
-        ws.Cell(1, 7).Value = "المتبقي";
-        ws.Cell(1, 8).Value = "سداد كامل";
-        ws.Cell(1, 9).Value = "جزئي";
-        ws.Cell(1, 10).Value = "غير مسدد";
-        ws.Cell(1, 11).Value = "نقدي";
-        ws.Cell(1, 12).Value = "محافظ إلكترونية";
-        ws.Cell(1, 13).Value = "مرحَّل للصندوق";
-        ws.Cell(1, 14).Value = "قابل للترحيل";
-        int row = 2;
+        using var export = new ExcelExport("إيرادات الدورات",
+            "الدورة", "عدد المسجلين", "الرسوم الأصلية", "الإعفاءات", "الإيراد المتوقع", "المدفوع",
+            "المتبقي", "سداد كامل", "جزئي", "غير مسدد", "نقدي", "محافظ إلكترونية",
+            "مرحَّل للصندوق", "قابل للترحيل");
+
         foreach (var c in courses)
         {
             var invoices = c.Registrations.Where(r => r.Invoice != null).Select(r => r.Invoice!).ToList();
             var payments = invoices.SelectMany(i => i.Payments).Where(p => !p.IsCancelled).ToList();
             var paid = payments.Sum(p => p.Amount);
             var transferred = transferredByCourse.TryGetValue(c.CourseId, out var v) ? v : 0m;
-            ws.Cell(row, 1).Value = c.CourseName;
-            ws.Cell(row, 2).Value = c.Registrations.Count(r => r.Status == "Accepted");
-            ws.Cell(row, 3).Value = (double)invoices.Sum(i => i.OriginalAmount);
-            ws.Cell(row, 4).Value = (double)invoices.Sum(i => i.ExemptionAmount);
-            ws.Cell(row, 5).Value = (double)invoices.Sum(i => i.TotalAmount);
-            ws.Cell(row, 6).Value = (double)paid;
-            ws.Cell(row, 7).Value = (double)(invoices.Sum(i => i.TotalAmount) - paid);
-            ws.Cell(row, 8).Value = invoices.Count(i => i.Status == "Paid");
-            ws.Cell(row, 9).Value = invoices.Count(i => i.Status == "PartiallyPaid");
-            ws.Cell(row, 10).Value = invoices.Count(i => i.Status == "Unpaid");
-            ws.Cell(row, 11).Value = (double)payments.Where(p => p.PaymentMethod == "Cash").Sum(p => p.Amount);
-            ws.Cell(row, 12).Value = (double)payments.Where(p => p.PaymentMethod != "Cash").Sum(p => p.Amount);
-            ws.Cell(row, 13).Value = (double)transferred;
-            ws.Cell(row, 14).Value = (double)(paid - transferred);
-            row++;
+
+            export.WriteRow(
+                c.CourseName,
+                c.Registrations.Count(r => r.Status == "Accepted"),
+                invoices.Sum(i => i.OriginalAmount),
+                invoices.Sum(i => i.ExemptionAmount),
+                invoices.Sum(i => i.TotalAmount),
+                paid,
+                invoices.Sum(i => i.TotalAmount) - paid,
+                invoices.Count(i => i.Status == "Paid"),
+                invoices.Count(i => i.Status == "PartiallyPaid"),
+                invoices.Count(i => i.Status == "Unpaid"),
+                payments.Where(p => p.PaymentMethod == "Cash").Sum(p => p.Amount),
+                payments.Where(p => p.PaymentMethod != "Cash").Sum(p => p.Amount),
+                transferred,
+                paid - transferred);
         }
-        ws.Columns().AdjustToContents();
-        var stream = new MemoryStream();
-        wb.SaveAs(stream);
-        stream.Position = 0;
-        return File(stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            $"course_revenue_{DateTime.Now:yyyyMMdd}.xlsx");
+
+        return export.Build("course_revenue");
     }
 }

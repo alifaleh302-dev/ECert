@@ -1,9 +1,9 @@
 using System.Net.Http.Json;
-using ClosedXML.Excel;
 using ECert.Data;
 using ECert.Models;
 using ECert.Models.ViewModels;
 using ECert.Services;
+using ECert.Services.Excel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -381,59 +381,26 @@ public class CertificatesController : Controller
 
     private FileResult BuildExcelExport(List<Certificate> certificates, string scope)
     {
-        using var workbook = new XLWorkbook();
-        var worksheet = workbook.Worksheets.Add("Certificates");
-        worksheet.RightToLeft = true;
+        using var export = new ExcelExport("الشهادات",
+            "رقم الشهادة", "اسم الطالب (العربية)", "اسم الطالب (English)", "الدورة (English)",
+            "الدورة (العربية)", "تاريخ الإصدار", "الحالة", "المعرف العام", "رمز التحقق", "رابط QR");
 
-        var headers = new[]
+        foreach (var certificate in certificates)
         {
-            "رقم الشهادة",
-            "اسم الطالب (العربية)",
-            "اسم الطالب (English)",
-            "الدورة (English)",
-            "الدورة (العربية)",
-            "تاريخ الإصدار",
-            "الحالة",
-            "المعرف العام",
-            "رمز التحقق",
-            "رابط QR"
-        };
-
-        for (var i = 0; i < headers.Length; i++)
-        {
-            var cell = worksheet.Cell(1, i + 1);
-            cell.Value = headers[i];
-            cell.Style.Font.Bold = true;
-            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#DCEBFF");
-            cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            export.WriteRow(
+                certificate.CertificateNumber,
+                certificate.TraineeNameArabic ?? certificate.TraineeName,
+                certificate.TraineeNameEnglish ?? certificate.TraineeName,
+                certificate.CourseNameEnglish,
+                certificate.CourseNameArabic,
+                certificate.IssueDate.ToString("yyyy-MM-dd"),
+                ExcelLabels.CertificateStatus(certificate.Status),
+                certificate.PublicId,
+                certificate.VerificationCode,
+                BuildVerificationUrl(certificate));
         }
 
-        for (var row = 0; row < certificates.Count; row++)
-        {
-            var certificate = certificates[row];
-            var excelRow = row + 2;
-
-            worksheet.Cell(excelRow, 1).Value = certificate.CertificateNumber;
-            worksheet.Cell(excelRow, 2).Value = certificate.TraineeNameArabic ?? certificate.TraineeName;
-            worksheet.Cell(excelRow, 3).Value = certificate.TraineeNameEnglish ?? certificate.TraineeName;
-            worksheet.Cell(excelRow, 4).Value = certificate.CourseNameEnglish;
-            worksheet.Cell(excelRow, 5).Value = certificate.CourseNameArabic;
-            worksheet.Cell(excelRow, 6).Value = certificate.IssueDate.ToString("yyyy-MM-dd");
-            worksheet.Cell(excelRow, 7).Value = MapCertificateStatus(certificate.Status);
-            worksheet.Cell(excelRow, 8).Value = certificate.PublicId;
-            worksheet.Cell(excelRow, 9).Value = certificate.VerificationCode;
-            worksheet.Cell(excelRow, 10).Value = BuildVerificationUrl(certificate);
-        }
-
-        worksheet.Columns().AdjustToContents();
-        worksheet.SheetView.FreezeRows(1);
-
-        using var stream = new MemoryStream();
-        workbook.SaveAs(stream);
-        stream.Position = 0;
-
-        var fileName = $"certificates_{scope}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
-        return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        return export.Build("certificates", scope);
     }
 
     private async Task<IActionResult> BuildVerifyResultAsync(Certificate? certificate, string? searchCode)
@@ -602,12 +569,6 @@ public class CertificatesController : Controller
     private static string NormalizeLookupCode(string? value)
         => (value ?? string.Empty).Trim().ToUpperInvariant();
 
-    private static string MapCertificateStatus(string? status)
-        => status?.Trim().ToLowerInvariant() switch
-        {
-            "valid" => "سارية",
-            "revoked" => "ملغية",
-            _ => "غير معروفة"
-        };
+    private static string MapCertificateStatus(string? status) => ExcelLabels.CertificateStatus(status);
 
 }

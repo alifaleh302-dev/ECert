@@ -2,10 +2,10 @@ using ECert.Data;
 using ECert.Models;
 using ECert.Models.ViewModels;
 using ECert.Services;
+using ECert.Services.Excel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using ClosedXML.Excel;
 
 namespace ECert.Controllers;
 
@@ -183,33 +183,23 @@ public class PaymentsController : Controller
         if (!string.IsNullOrEmpty(method)) query = query.Where(p => p.PaymentMethod == method);
         var list = await query.OrderByDescending(p => p.PaymentDate).ToListAsync();
 
-        using var wb = new XLWorkbook();
-        var ws = wb.Worksheets.Add("الدفعات");
-        ws.Cell(1, 1).Value = "رقم الفاتورة";
-        ws.Cell(1, 2).Value = "اسم الطالب بالعربية";
-        ws.Cell(1, 3).Value = "اسم الطالب بالإنجليزية";
-        ws.Cell(1, 4).Value = "المبلغ";
-        ws.Cell(1, 5).Value = "طريقة الدفع";
-        ws.Cell(1, 6).Value = "التاريخ";
-        ws.Cell(1, 7).Value = "الموظف";
-        ws.Cell(1, 8).Value = "ملاحظات";
-        int row = 2;
+        using var export = new ExcelExport("الدفعات",
+            "رقم الفاتورة", "اسم الطالب بالعربية", "اسم الطالب بالإنجليزية", "المبلغ",
+            "طريقة الدفع", "التاريخ", "الموظف", "ملاحظات");
+
         foreach (var p in list)
         {
-            ws.Cell(row, 1).Value = p.Invoice?.InvoiceNumber ?? "";
-            ws.Cell(row, 2).Value = p.Invoice?.TraineeNameArabic ?? p.Invoice?.TraineeName ?? "";
-            ws.Cell(row, 3).Value = p.Invoice?.TraineeNameEnglish ?? p.Invoice?.TraineeName ?? "";
-            ws.Cell(row, 4).Value = (double)p.Amount;
-            ws.Cell(row, 5).Value = p.PaymentMethod;
-            ws.Cell(row, 6).Value = p.PaymentDate.ToString("yyyy-MM-dd");
-            ws.Cell(row, 7).Value = p.RecordedBy ?? "";
-            ws.Cell(row, 8).Value = p.Notes ?? "";
-            row++;
+            export.WriteRow(
+                p.Invoice?.InvoiceNumber,
+                p.Invoice?.TraineeNameArabic ?? p.Invoice?.TraineeName,
+                p.Invoice?.TraineeNameEnglish ?? p.Invoice?.TraineeName,
+                p.Amount,
+                ExcelLabels.PaymentMethod(p.PaymentMethod),
+                p.PaymentDate.ToString("yyyy-MM-dd"),
+                p.RecordedBy,
+                p.Notes);
         }
-        ws.Columns().AdjustToContents();
-        var stream = new MemoryStream();
-        wb.SaveAs(stream);
-        stream.Position = 0;
-        return File(stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"payments_{DateTime.Now:yyyyMMdd}.xlsx");
+
+        return export.Build("payments");
     }
 }

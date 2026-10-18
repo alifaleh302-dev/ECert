@@ -2,13 +2,11 @@ using ECert.Data;
 using ECert.Models;
 using ECert.Models.ViewModels;
 using ECert.Services;
+using ECert.Services.Excel;
+using ECert.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using ClosedXML.Excel;
-using ECert.ViewModels;
-using System.Globalization;
-using System.Text.Json;
 
 namespace ECert.Controllers;
 
@@ -396,44 +394,24 @@ public class RegistrationsController : Controller
             : null;
         var requiresAcademic = course?.RequiresAcademicDetails == true;
 
-        using var workbook = new XLWorkbook();
-        var sheet = workbook.Worksheets.Add("Registrations");
         var headers = new List<string>
         {
-            "FullNameArabic", "FullNameEnglish", "Gender", "Phone", "Country", "Email", "HeardFrom"
+            "الاسم بالعربية", "الاسم بالإنجليزية", "الجنس", "الهاتف", "الدولة", "البريد الإلكتروني", "كيف سمعت عنا"
         };
         if (requiresAcademic)
-            headers.AddRange(new[] { "University", "College", "Specialization", "AcademicLevel" });
+            headers.AddRange(["الجامعة", "الكلية", "التخصص", "المستوى الدراسي"]);
 
-        for (var i = 0; i < headers.Count; i++)
-            sheet.Cell(1, i + 1).Value = headers[i];
+        using var export = new ExcelExport("التسجيلات", [.. headers]);
+        export.WriteSampleRow(
+            "محمد أحمد", "Mohammed Ahmed", "ذكر", "0551234567", "السعودية",
+            "m.ahmed@example.com", "تسجيل حضوري");
 
-        sheet.Row(1).Style.Font.Bold = true;
-        sheet.Row(1).Style.Fill.BackgroundColor = XLColor.FromHtml("#2563eb");
-        sheet.Row(1).Style.Font.FontColor = XLColor.White;
-        sheet.Cell(2, 1).Value = "محمد أحمد";
-        sheet.Cell(2, 2).Value = "Mohammed Ahmed";
-        sheet.Cell(2, 3).Value = "Male";
-        sheet.Cell(2, 4).Value = "0551234567";
-        sheet.Cell(2, 5).Value = "السعودية";
-        sheet.Cell(2, 6).Value = "m.ahmed@example.com";
-        sheet.Cell(2, 7).Value = "تسجيل حضوري";
         if (requiresAcademic)
-        {
-            sheet.Cell(2, 8).Value = "اسم الجامعة كما هو في النظام";
-            sheet.Cell(2, 9).Value = "اسم الكلية كما هو في النظام";
-            sheet.Cell(2, 10).Value = "اسم التخصص كما هو في النظام";
-            sheet.Cell(2, 11).Value = "المستوى الدراسي كما هو في النظام";
-        }
-        sheet.Row(2).Style.Font.FontColor = XLColor.Gray;
-        sheet.SheetView.FreezeRows(1);
-        sheet.Columns().AdjustToContents();
-        using var stream = new MemoryStream();
-        workbook.SaveAs(stream);
-        var fileName = course == null
-            ? "registrations-import-template.xlsx"
-            : $"registrations-import-template-course-{course.CourseId}.xlsx";
-        return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            export.WriteSampleRow("", "", "", "", "", "", "",
+                "اسم الجامعة كما هو في النظام", "اسم الكلية كما هو في النظام",
+                "اسم التخصص كما هو في النظام", "المستوى الدراسي كما هو في النظام");
+
+        return export.Build("registrations-import-template", course is null ? null : $"course-{course.CourseId}");
     }
 
     [HttpPost]
@@ -463,35 +441,24 @@ public class RegistrationsController : Controller
             return View(model);
         }
 
-        if (model.File == null || model.File.Length == 0)
+        if (ExcelImport.ValidateUpload(model.File) is { } uploadError)
         {
-            ModelState.AddModelError(nameof(model.File), "اختر ملف XLSX صالحاً.");
-            return View(model);
-        }
-
-        if (!string.Equals(Path.GetExtension(model.File.FileName), ".xlsx", StringComparison.OrdinalIgnoreCase) || model.File.Length > 10_000_000)
-        {
-            ModelState.AddModelError(nameof(model.File), "يسمح فقط بملفات XLSX بحجم لا يتجاوز 10 ميجابايت.");
+            ModelState.AddModelError(nameof(model.File), uploadError);
             return View(model);
         }
 
         try
         {
-            await using var stream = model.File.OpenReadStream();
+            await using var stream = model.File!.OpenReadStream();
             var preview = await BuildRegistrationImportPreviewAsync(stream, course, model.ImportStatus);
-            var token = Guid.NewGuid().ToString("N");
-            preview.Token = token;
             preview.CreatedAtUtc = DateTime.UtcNow;
-            var previewDir = Path.Combine(Path.GetTempPath(), "ecert-registration-imports");
-            Directory.CreateDirectory(previewDir);
-            await System.IO.File.WriteAllTextAsync(Path.Combine(previewDir, token + ".json"), JsonSerializer.Serialize(preview));
-            model.PreviewToken = token;
+            preview.Token = ExcelPreviewStore.Save("ecert-registration-imports", preview);
             model.Preview = preview;
             return View(model);
         }
-        catch (Exception)
+        catch (ExcelImportException ex)
         {
-            ModelState.AddModelError(nameof(model.File), "تعذر قراءة الملف. تأكد أنه ملف XLSX سليم وغير محمي بكلمة مرور.");
+            ModelState.AddModelError(nameof(model.File), ex.Message);
             return View(model);
         }
     }
@@ -501,26 +468,15 @@ public class RegistrationsController : Controller
     public async Task<IActionResult> ConfirmImport(string token)
     {
         if (!HasPermission("manage-registrations")) return Forbid();
-        if (string.IsNullOrWhiteSpace(token) || token.Length != 32) return BadRequest("رمز المعاينة غير صالح.");
 
-        var previewPath = Path.Combine(Path.GetTempPath(), "ecert-registration-imports", token + ".json");
-        if (!System.IO.File.Exists(previewPath))
+        var preview = ExcelPreviewStore.Take<RegistrationImportPreview>("ecert-registration-imports", token);
+        if (preview is null)
         {
             TempData["Error"] = "انتهت صلاحية المعاينة. ارفع الملف مرة أخرى.";
             return RedirectToAction(nameof(Import));
         }
 
-        RegistrationImportPreview? preview;
-        try
-        {
-            preview = JsonSerializer.Deserialize<RegistrationImportPreview>(await System.IO.File.ReadAllTextAsync(previewPath));
-        }
-        finally
-        {
-            try { System.IO.File.Delete(previewPath); } catch { }
-        }
-
-        if (preview == null || preview.CreatedAtUtc < DateTime.UtcNow.AddHours(-1) || preview.InvalidRows > 0 || preview.ValidRows == 0)
+        if (ExcelPreviewStore.IsExpired(preview.CreatedAtUtc) || preview.InvalidRows > 0 || preview.ValidRows == 0)
         {
             TempData["Error"] = "لا يمكن اعتماد الملف. يجب معالجة جميع الأخطاء أولاً.";
             return RedirectToAction(nameof(Import));
@@ -649,16 +605,10 @@ public class RegistrationsController : Controller
             CourseRequiresAcademicDetails = course.RequiresAcademicDetails
         };
 
-        using var workbook = new XLWorkbook(stream);
-        var sheet = workbook.Worksheets.FirstOrDefault() ?? throw new InvalidDataException();
-        var used = sheet.RangeUsed() ?? throw new InvalidDataException();
-        if (used.RowCount() < 2 || used.ColumnCount() < 4) throw new InvalidDataException();
-        if (used.RowCount() > 5001) throw new InvalidDataException("The workbook exceeds the 5000-row limit.");
-
-        var headers = Enumerable.Range(1, used.ColumnCount()).ToDictionary(i => CanonicalRegistrationHeader(sheet.Cell(1, i).GetString()), i => i);
-        var required = new[] { "fullnamearabic", "fullnameenglish", "gender", "phone" };
-        var missing = required.Where(h => !headers.ContainsKey(h)).ToList();
-        if (missing.Count > 0) throw new InvalidDataException($"Missing columns: {string.Join(",", missing)}");
+        using var import = ExcelImport.Open(stream, ExcelColumns.RegistrationAliases);
+        var missing = import.MissingColumns([ExcelColumns.FullNameArabic, ExcelColumns.FullNameEnglish, ExcelColumns.Gender, ExcelColumns.Phone]);
+        if (missing.Count > 0)
+            throw new ExcelImportException($"أعمدة مفقودة في الملف: {string.Join("، ", missing.Select(DisplayRegistrationColumn))}");
 
         var countries = await _db.PhoneCountries.Where(c => c.IsActive).ToListAsync();
         var countryByName = countries.ToDictionary(c => NormalizeLookup(c.CountryName), c => c);
@@ -670,26 +620,26 @@ public class RegistrationsController : Controller
         var levelOptions = await _db.AcademicLevelOptions.Where(l => l.IsActive).ToListAsync();
 
         var seenPhones = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        for (var rowNumber = 2; rowNumber <= used.LastRow().RowNumber(); rowNumber++)
+        for (var rowNumber = ExcelImport.FirstDataRow; rowNumber <= import.LastRow; rowNumber++)
         {
             var row = new RegistrationImportRow { RowNumber = rowNumber };
-            row.FullNameArabic = RegistrationText(sheet, headers, rowNumber, "fullnamearabic");
-            row.FullNameEnglish = RegistrationText(sheet, headers, rowNumber, "fullnameenglish");
-            row.Gender = RegistrationOptionalText(sheet, headers, rowNumber, "gender");
-            row.Phone = RegistrationText(sheet, headers, rowNumber, "phone");
-            row.Country = RegistrationOptionalText(sheet, headers, rowNumber, "country");
-            row.Email = RegistrationOptionalText(sheet, headers, rowNumber, "email");
-            row.HeardFrom = RegistrationOptionalText(sheet, headers, rowNumber, "heardfrom");
-            row.University = RegistrationOptionalText(sheet, headers, rowNumber, "university");
-            row.College = RegistrationOptionalText(sheet, headers, rowNumber, "college");
-            row.Specialization = RegistrationOptionalText(sheet, headers, rowNumber, "specialization");
-            row.AcademicLevel = RegistrationOptionalText(sheet, headers, rowNumber, "academiclevel");
+            row.FullNameArabic = import.Text(rowNumber, ExcelColumns.FullNameArabic);
+            row.FullNameEnglish = import.Text(rowNumber, ExcelColumns.FullNameEnglish);
+            row.Gender = ExcelLabels.ParseGender(import.OptionalText(rowNumber, ExcelColumns.Gender));
+            row.Phone = import.Text(rowNumber, ExcelColumns.Phone);
+            row.Country = import.OptionalText(rowNumber, ExcelColumns.Country);
+            row.Email = import.OptionalText(rowNumber, ExcelColumns.Email);
+            row.HeardFrom = import.OptionalText(rowNumber, ExcelColumns.HeardFrom);
+            row.University = import.OptionalText(rowNumber, ExcelColumns.University);
+            row.College = import.OptionalText(rowNumber, ExcelColumns.College);
+            row.Specialization = import.OptionalText(rowNumber, ExcelColumns.Specialization);
+            row.AcademicLevel = import.OptionalText(rowNumber, ExcelColumns.AcademicLevel);
 
-            if (string.IsNullOrWhiteSpace(row.FullNameArabic)) row.Errors.Add("الاسم بالعربية مطلوب");
-            if (string.IsNullOrWhiteSpace(row.FullNameEnglish)) row.Errors.Add("الاسم بالإنجليزية مطلوب");
-            if (row.FullNameArabic.Length > 100) row.Errors.Add("الاسم بالعربية يتجاوز 100 حرف");
-            if (row.FullNameEnglish.Length > 100) row.Errors.Add("الاسم بالإنجليزية يتجاوز 100 حرف");
-            if (row.Gender is not ("Male" or "Female" or "ذكر" or "أنثى")) row.Errors.Add("الجنس يجب أن يكون Male أو Female");
+            if (string.IsNullOrWhiteSpace(row.FullNameArabic)) row.Errors.Add("الاسم بالعربية مطلوب.");
+            if (string.IsNullOrWhiteSpace(row.FullNameEnglish)) row.Errors.Add("الاسم بالإنجليزية مطلوب.");
+            if (row.FullNameArabic.Length > 100) row.Errors.Add("الاسم بالعربية يتجاوز 100 حرف.");
+            if (row.FullNameEnglish.Length > 100) row.Errors.Add("الاسم بالإنجليزية يتجاوز 100 حرف.");
+            if (row.Gender is not ("Male" or "Female")) row.Errors.Add("الجنس يجب أن يكون ذكر أو أنثى.");
 
             var phoneResult = NormalizeImportedPhone(row.Phone, row.Country, countryByName, countryByCode);
             if (!phoneResult.IsValid)
@@ -783,34 +733,14 @@ public class RegistrationsController : Controller
         return $"REG-{DateTime.Now:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..36];
     }
 
-    private static string CanonicalRegistrationHeader(string value)
+    private static string DisplayRegistrationColumn(string key) => key switch
     {
-        var header = NormalizeLookup(value).Replace(" ", string.Empty).Replace("_", string.Empty);
-        return header switch
-        {
-            "الاسمالعربي" or "اسمالمتدرببالعربية" or "fullnamearabic" => "fullnamearabic",
-            "الاسمالانجليزي" or "اسمالمتدرببالانجليزية" or "fullnameenglish" => "fullnameenglish",
-            "الجنس" or "gender" => "gender",
-            "الهاتف" or "رقمالهاتف" or "phone" => "phone",
-            "الدولة" or "مفتاحالدولة" or "country" or "countrycode" => "country",
-            "البريدالالكتروني" or "email" => "email",
-            "كيفسمعتعنا" or "heardfrom" => "heardfrom",
-            "الجامعة" or "university" => "university",
-            "الكلية" or "college" => "college",
-            "التخصص" or "specialization" => "specialization",
-            "المستوىالدراسي" or "academiclevel" => "academiclevel",
-            _ => header
-        };
-    }
-
-    private static string RegistrationText(IXLWorksheet sheet, Dictionary<string, int> headers, int row, string key)
-        => headers.TryGetValue(key, out var col) ? sheet.Cell(row, col).GetString().Trim() : string.Empty;
-
-    private static string? RegistrationOptionalText(IXLWorksheet sheet, Dictionary<string, int> headers, int row, string key)
-    {
-        var value = RegistrationText(sheet, headers, row, key);
-        return string.IsNullOrWhiteSpace(value) ? null : value;
-    }
+        ExcelColumns.FullNameArabic => "الاسم بالعربية",
+        ExcelColumns.FullNameEnglish => "الاسم بالإنجليزية",
+        ExcelColumns.Gender => "الجنس",
+        ExcelColumns.Phone => "الهاتف",
+        _ => key
+    };
 
     private static string NormalizeLookup(string? value)
         => (value ?? string.Empty).Trim().ToUpperInvariant();
@@ -874,35 +804,25 @@ public class RegistrationsController : Controller
         if (dateTo.HasValue) query = query.Where(r => r.RegistrationDate <= dateTo.Value.AddDays(1));
         var list = await query.OrderByDescending(r => r.RegistrationDate).ToListAsync();
 
-        using var wb = new XLWorkbook();
-        var ws = wb.Worksheets.Add("التسجيلات");
-        ws.Cell(1, 1).Value = "رقم الطلب";
-        ws.Cell(1, 2).Value = "الاسم بالعربية";
-        ws.Cell(1, 3).Value = "الاسم بالإنجليزية";
-        ws.Cell(1, 4).Value = "الجنس";
-        ws.Cell(1, 5).Value = "الهاتف";
-        ws.Cell(1, 6).Value = "الدورة";
-        ws.Cell(1, 7).Value = "التاريخ";
-        ws.Cell(1, 8).Value = "الحالة";
-        ws.Cell(1, 9).Value = "الموظف";
-        int row = 2;
+        using var export = new ExcelExport("التسجيلات",
+            "رقم الطلب", "الاسم بالعربية", "الاسم بالإنجليزية", "الجنس", "الهاتف",
+            "البريد الإلكتروني", "الدورة", "تاريخ التسجيل", "الحالة", "الموظف");
+
         foreach (var r in list)
         {
-            ws.Cell(row, 1).Value = r.RequestNumber;
-            ws.Cell(row, 2).Value = r.FullNameArabic ?? r.FullName;
-            ws.Cell(row, 3).Value = r.FullNameEnglish ?? r.FullName;
-            ws.Cell(row, 4).Value = r.Gender == "Male" ? "ذكر" : r.Gender == "Female" ? "أنثى" : "";
-            ws.Cell(row, 5).Value = r.Phone;
-            ws.Cell(row, 6).Value = r.Course?.CourseName ?? "";
-            ws.Cell(row, 7).Value = r.RegistrationDate.ToString("yyyy-MM-dd");
-            ws.Cell(row, 8).Value = r.Status;
-            ws.Cell(row, 9).Value = r.ProcessedBy ?? "";
-            row++;
+            export.WriteRow(
+                r.RequestNumber,
+                r.FullNameArabic ?? r.FullName,
+                r.FullNameEnglish ?? r.FullName,
+                ExcelLabels.Gender(r.Gender),
+                r.Phone,
+                r.Email,
+                r.Course?.CourseName,
+                r.RegistrationDate.ToString("yyyy-MM-dd"),
+                ExcelLabels.RegistrationStatus(r.Status),
+                r.ProcessedBy);
         }
-        ws.Columns().AdjustToContents();
-        var stream = new MemoryStream();
-        wb.SaveAs(stream);
-        stream.Position = 0;
-        return File(stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"registrations_{DateTime.Now:yyyyMMdd}.xlsx");
+
+        return export.Build("registrations");
     }
 }
