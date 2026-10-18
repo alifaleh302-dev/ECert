@@ -14,19 +14,19 @@
     </div>
 </div>
 
-<div class="card shadow-sm mb-3">
-    <div class="card-body py-2">
-        <form method="get" class="row g-2 align-items-center">
-            <div class="col-md-8">
-                <input type="text" name="search" value="@ViewBag.Search" class="form-control" placeholder="بحث باسم الدورة..." />
-            </div>
-            <div class="col-md-4">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> بحث</button>
-                @if (!string.IsNullOrEmpty(ViewBag.Search)) { <a asp-action="Index" class="btn btn-outline-secondary">مسح</a> }
-            </div>
-        </form>
+<form method="get" class="a-toolbar" role="search">
+    <div class="a-toolbar__field a-toolbar__field--grow">
+        <label class="a-field__label visually-hidden" for="courseSearch">بحث</label>
+        <div class="a-search">
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <input id="courseSearch" type="search" name="search" value="@ViewBag.Search" class="form-control" placeholder="بحث باسم الدورة..." />
+        </div>
     </div>
-</div>
+    <div class="a-toolbar__actions">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-search" aria-hidden="true"></i> بحث</button>
+        @if (!string.IsNullOrEmpty(ViewBag.Search)) { <a asp-action="Index" class="btn btn-outline-secondary">مسح</a> }
+    </div>
+</form>
 
 <div class="card shadow-sm border-0">
     <div class="card-body">
@@ -101,7 +101,11 @@
                     }
                     else
                     {
-                        <tr><td colspan="7" class="text-center text-muted py-4">لا توجد دورات</td></tr>
+                        <tr>
+                            <td colspan="7" class="p-0">
+                                <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-journal-bookmark", Title = "لا توجد دورات", Text = "لم تُضف أي دورة مطابقة. جرّب تعديل البحث أو أضف دورة جديدة.", ActionText = "إضافة دورة", ActionHref = Url.Action("Create") })" />
+                            </td>
+                        </tr>
                     }
                 </tbody>
             </table>

@@ -76,43 +76,37 @@ else
     </div>
 }
 
-<div class="card shadow-sm border-0 mb-4">
-    <div class="card-body">
-        <form method="get" class="row g-2 align-items-end">
-            <div class="col-md-3">
-                <label class="form-label">نوع العنصر</label>
-                <select name="entityType" class="form-select">
-                    <option value="">الكل</option>
-                    @foreach (var et in availableEntities)
-                    {
-                        var label = entityLabel.TryGetValue(et, out var l) ? l : et;
-                        <option value="@et" selected="@(string.Equals(entityType, et, StringComparison.OrdinalIgnoreCase))">@label</option>
-                    }
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">العملية</label>
-                <select name="action" class="form-select">
-                    <option value="">الكل</option>
-                    @foreach (var a in availableActions)
-                    {
-                        var label = actionLabel.TryGetValue(a, out var l) ? l : a;
-                        <option value="@a" selected="@(string.Equals(action, a, StringComparison.OrdinalIgnoreCase))">@label</option>
-                    }
-                </select>
-            </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-filter"></i> تصفية</button>
-            </div>
-            @if (!string.IsNullOrEmpty(entityType) || !string.IsNullOrEmpty(action))
+<form method="get" class="a-toolbar" role="search" aria-label="تصفية سجل العمليات">
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="auditEntity">نوع العنصر</label>
+        <select id="auditEntity" name="entityType" class="form-select">
+            <option value="">الكل</option>
+            @foreach (var et in availableEntities)
             {
-                <div class="col-md-2">
-                    <a asp-action="Index" class="btn btn-outline-secondary w-100"><i class="bi bi-x-circle"></i> إعادة تعيين</a>
-                </div>
+                var label = entityLabel.TryGetValue(et, out var l) ? l : et;
+                <option value="@et" selected="@(string.Equals(entityType, et, StringComparison.OrdinalIgnoreCase))">@label</option>
             }
-        </form>
+        </select>
     </div>
-</div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="auditAction">العملية</label>
+        <select id="auditAction" name="action" class="form-select">
+            <option value="">الكل</option>
+            @foreach (var a in availableActions)
+            {
+                var label = actionLabel.TryGetValue(a, out var l) ? l : a;
+                <option value="@a" selected="@(string.Equals(action, a, StringComparison.OrdinalIgnoreCase))">@label</option>
+            }
+        </select>
+    </div>
+    <div class="a-toolbar__actions">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-funnel" aria-hidden="true"></i> تصفية</button>
+        @if (!string.IsNullOrEmpty(entityType) || !string.IsNullOrEmpty(action))
+        {
+            <a asp-action="Index" class="btn btn-outline-secondary">إعادة تعيين</a>
+        }
+    </div>
+</form>
 
 <div class="card shadow-sm border-0">
     <div class="card-body">
@@ -170,14 +164,19 @@ else
                     }
                     else if (totalCount > 0)
                     {
-                        <tr><td colspan="6" class="text-center text-muted py-4">
-                            لا توجد سجلات مطابقة للفلتر الحالي (الإجمالي في الجدول: @totalCount).
-                            <a asp-action="Index" class="btn btn-sm btn-link">إعادة تعيين الفلتر</a>
-                        </td></tr>
+                        <tr>
+                            <td colspan="6" class="p-0">
+                                <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-funnel", Title = "لا توجد سجلات مطابقة", Text = $"لا يوجد سجل مطابق للفلتر الحالي (الإجمالي في الجدول: {totalCount}). جرّب توسيع نطاق الفلتر.", ActionText = "إعادة تعيين الفلتر", ActionHref = Url.Action("Index") })" />
+                            </td>
+                        </tr>
                     }
                     else
                     {
-                        <tr><td colspan="6" class="text-center text-muted py-4">لا توجد سجلات حتى الآن</td></tr>
+                        <tr>
+                            <td colspan="6" class="p-0">
+                                <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-journal-text", Title = "لا توجد سجلات حتى الآن", Text = "ستظهر عمليات النظام هنا فور تنفيذها." })" />
+                            </td>
+                        </tr>
                     }
                 </tbody>
             </table>

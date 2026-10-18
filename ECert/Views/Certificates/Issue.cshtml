@@ -20,10 +20,10 @@
 
 <div class="card shadow-sm mb-3 border-0">
     <div class="card-body">
-        <form method="get" class="row g-3 align-items-end">
-            <div class="col-lg-4">
-                <label class="form-label">الدورة</label>
-                <select name="courseId" class="form-select">
+        <form method="get" class="a-toolbar" role="search" aria-label="تصفية المؤهلين لإصدار الشهادات">
+            <div class="a-toolbar__field a-toolbar__field--grow">
+                <label class="a-field__label" for="issueCourse">الدورة</label>
+                <select id="issueCourse" name="courseId" class="form-select">
                     <option value="">كل الدورات المكتملة</option>
                     @foreach (var course in Model.Courses)
                     {
@@ -38,21 +38,19 @@
                     }
                 </select>
             </div>
-            <div class="col-lg-3">
-                <label class="form-label">تاريخ التسجيل من</label>
-                <input type="date" name="registrationFrom" value="@(Model.RegistrationFrom?.ToString("yyyy-MM-dd"))" class="form-control" />
+            <div class="a-toolbar__field">
+                <label class="a-field__label" for="issueFrom">تاريخ التسجيل من</label>
+                <input id="issueFrom" type="date" name="registrationFrom" value="@(Model.RegistrationFrom?.ToString("yyyy-MM-dd"))" class="form-control" />
             </div>
-            <div class="col-lg-3">
-                <label class="form-label">إلى</label>
-                <input type="date" name="registrationTo" value="@(Model.RegistrationTo?.ToString("yyyy-MM-dd"))" class="form-control" />
+            <div class="a-toolbar__field">
+                <label class="a-field__label" for="issueTo">إلى</label>
+                <input id="issueTo" type="date" name="registrationTo" value="@(Model.RegistrationTo?.ToString("yyyy-MM-dd"))" class="form-control" />
             </div>
-            <div class="col-lg-2 d-grid">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> تطبيق</button>
+            <div class="a-toolbar__actions">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-funnel" aria-hidden="true"></i> تطبيق</button>
+                <a asp-action="Issue" class="btn btn-outline-secondary">مسح الفلاتر</a>
             </div>
-            <div class="col-12 d-flex flex-wrap gap-2">
-                <a asp-action="Issue" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-circle"></i> مسح الفلاتر</a>
-                <span class="small text-muted align-self-center">عدد المؤهلين حالياً: <strong>@Model.EligibleRegistrations.Count</strong></span>
-            </div>
+            <p class="a-toolbar__meta">عدد المؤهلين حالياً: <strong>@Model.EligibleRegistrations.Count</strong></p>
         </form>
     </div>
 </div>

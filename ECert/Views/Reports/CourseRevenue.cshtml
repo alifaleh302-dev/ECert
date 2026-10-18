@@ -32,29 +32,25 @@
     </div>
 }
 
-<div class="card shadow-sm mb-3">
-    <div class="card-body py-2">
-        <form method="get" class="row g-2 align-items-end">
-            <div class="col-md-5">
-                <label class="form-label small mb-1">اسم الدورة</label>
-                <select name="courseId" class="form-select">
-                    <option value="">كل الدورات</option>
-                    @if (courses != null)
-                    {
-                        @foreach (var c in courses)
-                        {
-                            <option value="@c.CourseId" selected="@(ViewBag.CourseId == c.CourseId)">@c.CourseName</option>
-                        }
-                    }
-                </select>
-            </div>
-            <div class="col-md-3">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> تصفية</button>
-                <a asp-action="CourseRevenue" class="btn btn-outline-secondary">مسح</a>
-            </div>
-        </form>
+<form method="get" class="a-toolbar" role="search" aria-label="تصفية تقارير الإيرادات">
+    <div class="a-toolbar__field a-toolbar__field--grow">
+        <label class="a-field__label" for="revenueCourse">اسم الدورة</label>
+        <select id="revenueCourse" name="courseId" class="form-select">
+            <option value="">كل الدورات</option>
+            @if (courses != null)
+            {
+                @foreach (var c in courses)
+                {
+                    <option value="@c.CourseId" selected="@(ViewBag.CourseId == c.CourseId)">@c.CourseName</option>
+                }
+            }
+        </select>
     </div>
-</div>
+    <div class="a-toolbar__actions">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-funnel" aria-hidden="true"></i> تصفية</button>
+        <a asp-action="CourseRevenue" class="btn btn-outline-secondary">مسح</a>
+    </div>
+</form>
 
 <div class="card shadow-sm">
     <div class="card-body">

@@ -17,38 +17,37 @@
     </div>
 </div>
 
-<div class="card shadow-sm mb-3">
-    <div class="card-body py-2">
-        <form method="get" class="row g-2 align-items-end">
-            <div class="col-md-4">
-                <label class="form-label small mb-1">بحث</label>
-                <input type="text" name="search" value="@ViewBag.Search" class="form-control" placeholder="الاسم أو البريد أو اسم المستخدم..." />
-            </div>
-            <div class="col-md-3">
-                <label class="form-label small mb-1">الدور</label>
-                <select name="roleId" class="form-select">
-                    <option value="">كل الأدوار</option>
-                    @foreach (var r in roles)
-                    {
-                        <option value="@r.RoleId" selected="@(ViewBag.RoleId == r.RoleId)">@r.RoleName</option>
-                    }
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label small mb-1">الحالة</label>
-                <select name="status" class="form-select">
-                    <option value="">الكل</option>
-                    <option value="active" selected="@(ViewBag.Status == "active")">نشط</option>
-                    <option value="inactive" selected="@(ViewBag.Status == "inactive")">معطل</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> تصفية</button>
-                <a asp-action="Index" class="btn btn-outline-secondary">مسح</a>
-            </div>
-        </form>
+<form method="get" class="a-toolbar" role="search" aria-label="بحث وتصفية المستخدمين">
+    <div class="a-toolbar__field a-toolbar__field--grow">
+        <label class="a-field__label" for="userSearch">بحث</label>
+        <div class="a-search">
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <input id="userSearch" type="search" name="search" value="@ViewBag.Search" class="form-control" placeholder="الاسم أو البريد أو اسم المستخدم..." />
+        </div>
     </div>
-</div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="userRole">الدور</label>
+        <select id="userRole" name="roleId" class="form-select">
+            <option value="">كل الأدوار</option>
+            @foreach (var r in roles)
+            {
+                <option value="@r.RoleId" selected="@(ViewBag.RoleId == r.RoleId)">@r.RoleName</option>
+            }
+        </select>
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="userStatus">الحالة</label>
+        <select id="userStatus" name="status" class="form-select">
+            <option value="">الكل</option>
+            <option value="active" selected="@(ViewBag.Status == "active")">نشط</option>
+            <option value="inactive" selected="@(ViewBag.Status == "inactive")">معطل</option>
+        </select>
+    </div>
+    <div class="a-toolbar__actions">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-funnel" aria-hidden="true"></i> تصفية</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">مسح</a>
+    </div>
+</form>
 
 <div class="card shadow-sm border-0">
     <div class="card-body">
@@ -135,7 +134,11 @@
                     }
                     else
                     {
-                        <tr><td colspan="7" class="text-center text-muted py-4">لا يوجد مستخدمون</td></tr>
+                        <tr>
+                            <td colspan="7" class="p-0">
+                                <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-people", Title = "لا يوجد مستخدمون", Text = "لم يُعثر على أي حساب مطابق. جرّب تعديل الفلاتر أو أضف مستخدمًا جديدًا." })" />
+                            </td>
+                        </tr>
                     }
                 </tbody>
             </table>

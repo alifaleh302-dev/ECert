@@ -9,59 +9,51 @@
     <partial name="_PageHeader" />
 </div>
 
-<div class="card shadow-sm mb-3">
-    <div class="card-body py-3">
-        <form method="get" class="row g-2 align-items-end">
-            <div class="col-md-3">
-                <label class="form-label small">اسم الطالب</label>
-                <input type="text" name="studentName" value="@ViewBag.StudentName" class="form-control form-control-sm" placeholder="اسم الطالب..." />
-            </div>
-            <div class="col-md-3">
-                <label class="form-label small">اسم الدورة</label>
-                <input type="text" name="courseName" value="@ViewBag.CourseName" class="form-control form-control-sm" placeholder="اسم الدورة..." />
-            </div>
-            <div class="col-md-2">
-                <label class="form-label small">رقم الفاتورة</label>
-                <input type="text" name="invoiceNumber" value="@ViewBag.InvoiceNumber" class="form-control form-control-sm" placeholder="INV-..." />
-            </div>
-            <div class="col-md-2">
-                <label class="form-label small">طريقة الدفع</label>
-                <select name="method" class="form-select form-select-sm">
-                    <option value="">الكل</option>
-                    <option value="Cash" selected="@(ViewBag.Method == "Cash")">نقد</option>
-                    <option value="BankTransfer" selected="@(ViewBag.Method == "BankTransfer")">محافظ إلكترونية</option>
-                    <option value="EWallet" selected="@(ViewBag.Method == "EWallet")">محفظة إلكترونية</option>
-                    <option value="Card" selected="@(ViewBag.Method == "Card")">محافظ إلكترونية</option>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label small">حالة الدفعة</label>
-                <select name="status" class="form-select form-select-sm">
-                    <option value="">الكل</option>
-                    <option value="Active" selected="@(ViewBag.Status == "Active")">نشطة</option>
-                    <option value="Cancelled" selected="@(ViewBag.Status == "Cancelled")">ملغية</option>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label small">من تاريخ</label>
-                <input type="date" name="dateFrom" value="@(((DateTime?)ViewBag.DateFrom)?.ToString("yyyy-MM-dd"))" class="form-control form-control-sm" />
-            </div>
-            <div class="col-md-2">
-                <label class="form-label small">إلى تاريخ</label>
-                <input type="date" name="dateTo" value="@(((DateTime?)ViewBag.DateTo)?.ToString("yyyy-MM-dd"))" class="form-control form-control-sm" />
-            </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary btn-sm w-100"><i class="bi bi-search"></i> بحث</button>
-            </div>
-            <div class="col-md-2">
-                <a asp-action="Index" class="btn btn-outline-secondary btn-sm w-100">مسح الفلاتر</a>
-            </div>
-        </form>
-        <div class="mt-2">
-            <a asp-action="ExportXlsx" asp-route-search="@ViewBag.Search" asp-route-method="@ViewBag.Method" asp-route-dateFrom="@(((DateTime?)ViewBag.DateFrom)?.ToString("yyyy-MM-dd"))" asp-route-dateTo="@(((DateTime?)ViewBag.DateTo)?.ToString("yyyy-MM-dd"))" class="btn btn-sm btn-success"><i class="bi bi-file-earmark-excel"></i> تصدير XLSX</a>
-        </div>
+<form method="get" class="a-toolbar" role="search" aria-label="بحث وتصفية الدفعات">
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="payStudent">اسم الطالب</label>
+        <input id="payStudent" type="text" name="studentName" value="@ViewBag.StudentName" class="form-control" placeholder="اسم الطالب..." />
     </div>
-</div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="payCourse">اسم الدورة</label>
+        <input id="payCourse" type="text" name="courseName" value="@ViewBag.CourseName" class="form-control" placeholder="اسم الدورة..." />
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="payInvoice">رقم الفاتورة</label>
+        <input id="payInvoice" type="text" name="invoiceNumber" value="@ViewBag.InvoiceNumber" class="form-control" placeholder="INV-..." />
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="payMethod">طريقة الدفع</label>
+        <select id="payMethod" name="method" class="form-select">
+            <option value="">الكل</option>
+            <option value="Cash" selected="@(ViewBag.Method == "Cash")">نقد</option>
+            <option value="BankTransfer" selected="@(ViewBag.Method == "BankTransfer")">محافظ إلكترونية</option>
+            <option value="EWallet" selected="@(ViewBag.Method == "EWallet")">محفظة إلكترونية</option>
+            <option value="Card" selected="@(ViewBag.Method == "Card")">محافظ إلكترونية</option>
+        </select>
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="payStatus">حالة الدفعة</label>
+        <select id="payStatus" name="status" class="form-select">
+            <option value="">الكل</option>
+            <option value="Active" selected="@(ViewBag.Status == "Active")">نشطة</option>
+            <option value="Cancelled" selected="@(ViewBag.Status == "Cancelled")">ملغية</option>
+        </select>
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="payFrom">من تاريخ</label>
+        <input id="payFrom" type="date" name="dateFrom" value="@(((DateTime?)ViewBag.DateFrom)?.ToString("yyyy-MM-dd"))" class="form-control" />
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="payTo">إلى تاريخ</label>
+        <input id="payTo" type="date" name="dateTo" value="@(((DateTime?)ViewBag.DateTo)?.ToString("yyyy-MM-dd"))" class="form-control" />
+    </div>
+    <div class="a-toolbar__actions">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-search" aria-hidden="true"></i> بحث</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">مسح</a>
+        <a asp-action="ExportXlsx" asp-route-search="@ViewBag.Search" asp-route-method="@ViewBag.Method" asp-route-dateFrom="@(((DateTime?)ViewBag.DateFrom)?.ToString("yyyy-MM-dd"))" asp-route-dateTo="@(((DateTime?)ViewBag.DateTo)?.ToString("yyyy-MM-dd"))" class="btn btn-outline-success"><i class="bi bi-file-earmark-excel" aria-hidden="true"></i> تصدير</a>
+    </div>
+</form>
 
 @if (payments.Any())
 {
@@ -134,8 +126,9 @@
 }
 else
 {
-    <div class="text-center py-5">
-        <i class="bi bi-cash-stack text-muted" style="font-size: 3rem;"></i>
-        <p class="text-muted mt-3">لا توجد دفعات مسجلة</p>
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-cash-stack", Title = "لا توجد دفعات", Text = "لا توجد دفعة مطابقة للبحث أو الفلتر الحالي." })" />
+        </div>
     </div>
 }

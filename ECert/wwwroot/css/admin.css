@@ -774,6 +774,7 @@ a.a-kpi:focus-visible {
 .a-kpi--warning { --a-kpi-accent: var(--a-warning); --a-kpi-soft: var(--a-warning-soft); }
 .a-kpi--danger { --a-kpi-accent: var(--a-danger); --a-kpi-soft: var(--a-danger-soft); }
 .a-kpi--info { --a-kpi-accent: var(--a-info); --a-kpi-soft: var(--a-info-soft); }
+.a-kpi--neutral { --a-kpi-accent: var(--a-text-2); --a-kpi-soft: var(--a-surface-3); }
 
 /* --------------------------------------------------------------------------
    8. Toolbar / filters
@@ -795,7 +796,17 @@ a.a-kpi:focus-visible {
 .a-toolbar__field--grow { flex: 2 1 280px; }
 .a-toolbar__actions { display: flex; align-items: center; gap: var(--a-2); }
 
-.a-field { display: block; }
+/* Full-width summary line inside a toolbar (e.g. "N results"). */
+.a-toolbar__meta {
+    flex: 1 0 100%;
+    margin: 0;
+    padding-top: var(--a-1);
+    font-size: 0.8rem;
+    color: var(--a-text-3);
+}
+.a-toolbar__meta strong { color: var(--a-text); }
+
+.a-field { display: block; margin-bottom: var(--a-4); }
 
 .a-field__label {
     display: block;
@@ -820,6 +831,66 @@ a.a-kpi:focus-visible {
 }
 
 .a-search > .form-control { padding-inline-start: 36px; }
+
+/* Segmented status filter — a row of pill links, one of them active. */
+.a-segmented {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 5px;
+    background: var(--a-surface-2);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-r-full);
+}
+
+.a-segmented__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--a-r-full);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--a-text-3);
+    text-decoration: none;
+    transition: background var(--a-t-fast), color var(--a-t-fast);
+}
+
+.a-segmented__item:hover { background: var(--a-surface); color: var(--a-text); }
+
+.a-segmented__item.is-active {
+    background: var(--a-surface);
+    color: var(--a-brand);
+    box-shadow: var(--a-e1);
+}
+
+.a-segmented__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: var(--a-r-full);
+    background: var(--a-surface-3);
+    color: var(--a-text-2);
+    font-size: 0.7rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.a-segmented__item.is-active .a-segmented__count { background: var(--a-brand-soft); color: var(--a-brand); }
+
+/* Result count line shown above a table */
+.a-result-count {
+    display: flex;
+    align-items: center;
+    gap: var(--a-2);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--a-text-3);
+}
+
+.a-result-count strong { color: var(--a-text); font-variant-numeric: tabular-nums; }
 
 /* --------------------------------------------------------------------------
    9. Tables
@@ -1085,8 +1156,6 @@ a.a-kpi:focus-visible {
 /* --------------------------------------------------------------------------
    17. Forms & utility building blocks
    -------------------------------------------------------------------------- */
-.a-field { margin-bottom: var(--a-4); }
-
 .a-label {
     display: block;
     margin-bottom: 6px;
@@ -1282,7 +1351,7 @@ a.a-kpi:focus-visible {
 }
 
 /* --------------------------------------------------------------------------
-   18. Responsive
+   19. Responsive
    -------------------------------------------------------------------------- */
 @media (min-width: 576px) {
     .admin-usermenu__meta { display: block; }

@@ -9,30 +9,30 @@
     <partial name="_PageHeader" />
 </div>
 
-<div class="card shadow-sm mb-3">
-    <div class="card-body py-2">
-        <form method="get" class="row g-2 align-items-center">
-            <div class="col-md-8">
-                <input type="text" name="search" value="@ViewBag.Search" class="form-control" placeholder="بحث برقم الفاتورة، اسم المتدرب، الهاتف، الدورة..." />
-            </div>
-            <div class="col-md-4">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> بحث</button>
-                @if (!string.IsNullOrEmpty(ViewBag.Search))
-                {
-                    <a asp-action="Index" class="btn btn-outline-secondary">مسح</a>
-                }
-            </div>
-        </form>
+<form method="get" class="a-toolbar" role="search">
+    <div class="a-toolbar__field a-toolbar__field--grow">
+        <label class="a-field__label visually-hidden" for="invoiceSearch">بحث</label>
+        <div class="a-search">
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <input id="invoiceSearch" type="search" name="search" value="@ViewBag.Search" class="form-control" placeholder="بحث برقم الفاتورة، اسم المتدرب، الهاتف، الدورة..." />
+        </div>
     </div>
-</div>
+    <div class="a-toolbar__actions">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-search" aria-hidden="true"></i> بحث</button>
+        @if (!string.IsNullOrEmpty(ViewBag.Search))
+        {
+            <a asp-action="Index" class="btn btn-outline-secondary">مسح</a>
+        }
+    </div>
+</form>
 
-<div class="mb-3">
-    <a asp-action="Index" class="btn btn-sm @(ViewBag.Status == null ? "btn-primary" : "btn-outline-primary")">الكل</a>
-    <a asp-action="Index" asp-route-status="Unpaid" class="btn btn-sm @(ViewBag.Status == "Unpaid" ? "btn-danger" : "btn-outline-danger")">غير مدفوعة</a>
-    <a asp-action="Index" asp-route-status="PartiallyPaid" class="btn btn-sm @(ViewBag.Status == "PartiallyPaid" ? "btn-warning" : "btn-outline-warning")">جزئية</a>
-    <a asp-action="Index" asp-route-status="Paid" class="btn btn-sm @(ViewBag.Status == "Paid" ? "btn-success" : "btn-outline-success")">مدفوعة</a>
-    <a asp-action="Index" asp-route-status="Cancelled" class="btn btn-sm @(ViewBag.Status == "Cancelled" ? "btn-secondary" : "btn-outline-secondary")">ملغية</a>
-</div>
+<nav class="a-segmented mb-3" aria-label="تصفية الفواتير حسب الحالة">
+    <a asp-action="Index" class="a-segmented__item @(ViewBag.Status == null ? "is-active" : "")">الكل</a>
+    <a asp-action="Index" asp-route-status="Unpaid" class="a-segmented__item @(ViewBag.Status == "Unpaid" ? "is-active" : "")">غير مدفوعة</a>
+    <a asp-action="Index" asp-route-status="PartiallyPaid" class="a-segmented__item @(ViewBag.Status == "PartiallyPaid" ? "is-active" : "")">جزئية</a>
+    <a asp-action="Index" asp-route-status="Paid" class="a-segmented__item @(ViewBag.Status == "Paid" ? "is-active" : "")">مدفوعة</a>
+    <a asp-action="Index" asp-route-status="Cancelled" class="a-segmented__item @(ViewBag.Status == "Cancelled" ? "is-active" : "")">ملغية</a>
+</nav>
 <div class="card shadow-sm">
     <div class="card-body">
         @if (invoices.Any())
@@ -89,6 +89,9 @@
                 </table>
             </div>
         }
-        else { <p class="text-center text-muted py-4">لا توجد فواتير</p> }
+        else
+        {
+            <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-receipt", Title = "لا توجد فواتير", Text = "لا توجد فاتورة مطابقة للبحث أو الفلتر الحالي." })" />
+        }
     </div>
 </div>
