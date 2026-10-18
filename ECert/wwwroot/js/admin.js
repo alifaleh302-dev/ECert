@@ -87,6 +87,7 @@
         nav.classList.add('is-open');
         if (scrim) { scrim.hidden = false; requestAnimationFrame(function () { scrim.classList.add('is-visible'); }); }
         if (navToggle) navToggle.setAttribute('aria-expanded', 'true');
+        document.body.classList.add('admin-nav-open');
     }
 
     function closeNav() {
@@ -94,11 +95,20 @@
         nav.classList.remove('is-open');
         if (scrim) { scrim.classList.remove('is-visible'); scrim.hidden = true; }
         if (navToggle) navToggle.setAttribute('aria-expanded', 'false');
+        document.body.classList.remove('admin-nav-open');
     }
 
     if (navToggle) navToggle.addEventListener('click', openNav);
     if (navClose) navClose.addEventListener('click', closeNav);
     if (scrim) scrim.addEventListener('click', closeNav);
+
+    // Navigating from the drawer should not leave it covering the destination page.
+    if (nav) {
+        nav.addEventListener('click', function (e) {
+            var link = e.target.closest('a[href]');
+            if (link && window.innerWidth <= 1100) closeNav();
+        });
+    }
 
     document.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape') return;

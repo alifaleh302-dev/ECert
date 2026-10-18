@@ -393,6 +393,9 @@
 
 .admin-scrim.is-visible { opacity: 1; visibility: visible; }
 
+/* Prevent the page behind the open mobile drawer from scrolling. */
+body.admin-nav-open { overflow: hidden; }
+
 /* --------------------------------------------------------------------------
    4. Topbar
    -------------------------------------------------------------------------- */
@@ -1679,8 +1682,26 @@ a.a-kpi:focus-visible {
 
 @media (max-width: 1100px) {
     .admin-main { margin-inline-end: 0; }
-    .admin-nav { transform: translateX(100%); box-shadow: var(--a-e4); }
-    .admin-nav.is-open { transform: translateX(0); }
+
+    /* The drawer is anchored to the inline-end edge, which in this RTL app is the
+       left side. Its closed state therefore has to translate toward negative X to
+       clear the viewport; translating positive X (as it did before) pushed it back
+       on screen and left a visible strip that could not be dismissed.
+       Visibility is flipped instantly when opening and only after the slide-out
+       finishes when closing, so the animation stays visible in both directions. */
+    .admin-nav {
+        transform: translateX(-100%);
+        visibility: hidden;
+        box-shadow: var(--a-e4);
+        transition: transform var(--a-t), visibility 0s linear var(--a-t);
+    }
+
+    .admin-nav.is-open {
+        transform: translateX(0);
+        visibility: visible;
+        transition: transform var(--a-t), visibility 0s;
+    }
+
     .admin-nav__close { display: inline-flex; }
     .admin-iconbtn--mobile { display: inline-flex; }
 }

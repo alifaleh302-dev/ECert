@@ -27,3 +27,6 @@ test_resp.html
 # OS files
 Thumbs.db
 desktop.ini
+
+# Agent memory / local workspace
+.openhands/

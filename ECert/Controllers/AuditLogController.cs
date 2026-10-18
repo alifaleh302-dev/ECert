@@ -21,7 +21,9 @@ public class AuditLogController : Controller
 
     private bool HasPermission(string perm) => User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
 
-    public async Task<IActionResult> Index(string? entityType, string? action)
+    // Bound from the query string only: a plain `action` parameter would otherwise
+    // bind the MVC route value ("Index"), so the filter silently became Action='Index'.
+    public async Task<IActionResult> Index(string? entityType, [FromQuery(Name = "action")] string? action)
     {
         var roleName = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value;
         if (!HasPermission("view-audit-log") && roleName != "SuperAdmin") return Forbid();
