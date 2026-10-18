@@ -1,0 +1,42 @@
+@*
+    KPI tile. Renders as a link when Href is set, otherwise a static card.
+    Usage:
+      <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard {
+          Label = "تسجيلات معلقة", Value = "12", Icon = "bi-hourglass-split",
+          Tone = "warning", Href = Url.Action("Index", "Registrations", new { status = "Pending" }),
+          Hint = "بحاجة إلى مراجعة"
+      })" />
+*@
+@model ECert.ViewModels.KpiCard
+@{
+    var toneClass = $"a-kpi--{Model.Tone}";
+}
+
+@if (string.IsNullOrEmpty(Model.Href))
+{
+    <div class="a-kpi @toneClass">
+        <span class="a-kpi__icon" aria-hidden="true"><i class="bi @Model.Icon"></i></span>
+        <span class="a-kpi__body">
+            <span class="a-kpi__label">@Model.Label</span>
+            <span class="a-kpi__value">@Model.Value</span>
+            @if (!string.IsNullOrEmpty(Model.Hint))
+            {
+                <span class="a-kpi__hint">@Model.Hint</span>
+            }
+        </span>
+    </div>
+}
+else
+{
+    <a class="a-kpi @toneClass" href="@Model.Href">
+        <span class="a-kpi__icon" aria-hidden="true"><i class="bi @Model.Icon"></i></span>
+        <span class="a-kpi__body">
+            <span class="a-kpi__label">@Model.Label</span>
+            <span class="a-kpi__value">@Model.Value</span>
+            @if (!string.IsNullOrEmpty(Model.Hint))
+            {
+                <span class="a-kpi__hint">@Model.Hint</span>
+            }
+        </span>
+    </a>
+}

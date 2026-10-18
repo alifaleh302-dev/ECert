@@ -1,16 +1,16 @@
-@* Unified page header: reads Title, PageIcon, PageDesc from ViewData *@
-<div class="d-flex align-items-start gap-3 flex-grow-1">
+@* Unified page header. Reads from ViewData: Title, PageIcon, PageDesc. *@
+<div class="page-header__title-row">
     @if (!string.IsNullOrEmpty(ViewData["PageIcon"]?.ToString()))
     {
-        <div class="page-header-icon">
+        <div class="page-header-icon" aria-hidden="true">
             <i class="bi @ViewData["PageIcon"]"></i>
         </div>
     }
     <div>
-        <h2 class="mb-1">@ViewData["Title"]</h2>
+        <h1 class="page-header__title">@ViewData["Title"]</h1>
         @if (!string.IsNullOrEmpty(ViewData["PageDesc"]?.ToString()))
         {
-            <p class="page-desc mb-0">@ViewData["PageDesc"]</p>
+            <p class="page-desc">@ViewData["PageDesc"]</p>
         }
     </div>
 </div>

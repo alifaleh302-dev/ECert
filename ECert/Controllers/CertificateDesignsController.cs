@@ -53,6 +53,9 @@ public class CertificateDesignsController : Controller
 
         selected ??= CertificateDesignService.CreateDefault(User.Identity?.Name);
         ViewData["Title"] = "مصمم الشهادات";
+        ViewData["PageIcon"] = "bi-palette";
+        ViewData["PageDesc"] = "حرّك العناصر وأضف الحقول ثم احفظ التصميم";
+        ViewData["FullWidth"] = true;
         return View(new CertificateDesignEditorViewModel
         {
             Design = selected,

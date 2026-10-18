@@ -1,174 +1,166 @@
 @model DashboardViewModel
 @{
     ViewData["Title"] = "لوحة التحكم";
+    ViewData["PageIcon"] = "bi-speedometer2";
+    ViewData["PageDesc"] = "نظرة شاملة على التسجيلات والمالية والدورات في مكان واحد";
     Layout = "_AdminLayout";
+
+    var kpis = new List<KpiCard>
+    {
+        new() { Label = "تسجيلات معلقة", Value = Model.PendingRegistrations.ToString("N0"), Icon = "bi-hourglass-split", Tone = "warning", Hint = "بحاجة إلى مراجعة", Href = Url.Action("Index", "Registrations", new { status = "Pending" }) },
+        new() { Label = "فواتير غير مدفوعة", Value = Model.UnpaidInvoices.ToString("N0"), Icon = "bi-receipt", Tone = "danger", Hint = "تحتاج إلى متابعة", Href = Url.Action("Index", "Invoices") },
+        new() { Label = "إجمالي الإيرادات", Value = Model.TotalRevenue.ToString("N0"), Icon = "bi-cash-stack", Tone = "success", Hint = "ريال سعودي", Href = Url.Action("CourseRevenue", "Reports") },
+        new() { Label = "دورات نشطة", Value = Model.ActiveCourses.ToString("N0"), Icon = "bi-book", Tone = "brand", Hint = "متاحة للتسجيل", Href = Url.Action("Index", "CoursesManage") },
+        new() { Label = "المتدربون", Value = Model.TotalTrainees.ToString("N0"), Icon = "bi-people", Tone = "info", Hint = "مقبولون", Href = Url.Action("Index", "Registrations", new { status = "Accepted" }) },
+        new() { Label = "منشورات جديدة", Value = Model.NewPosts.ToString("N0"), Icon = "bi-newspaper", Tone = "neutral", Hint = "بانتظار النشر", Href = Url.Action("Index", "PostsManage") },
+    };
+
+    var quickLinks = new (string Ctrl, string Action, string Label, string Icon)[]
+    {
+        ("Registrations", "Index", "التسجيلات", "bi-clipboard-check"),
+        ("Invoices", "Index", "الفواتير", "bi-receipt"),
+        ("Payments", "Index", "الدفعات", "bi-cash-stack"),
+        ("CoursesManage", "Index", "الدورات", "bi-book"),
+        ("Certificates", "Index", "الشهادات", "bi-award"),
+        ("Reports", "CourseRevenue", "التقارير", "bi-graph-up"),
+    };
 }
-<h2 class="mb-4"><i class="bi bi-speedometer2"></i> لوحة التحكم</h2>
 
-<!-- Dashboard Cards -->
-<div class="row g-3 mb-4">
-    <div class="col-md-4 col-lg-2">
-        <a asp-controller="Registrations" asp-action="Index" asp-route-status="Pending" class="text-decoration-none">
-            <div class="card border-0 shadow-sm bg-warning text-dark h-100">
-                <div class="card-body text-center">
-                    <h3>@Model.PendingRegistrations</h3>
-                    <small><i class="bi bi-hourglass-split"></i> تسجيلات معلقة</small>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-4 col-lg-2">
-        <a asp-controller="Invoices" asp-action="Index" class="text-decoration-none">
-            <div class="card border-0 shadow-sm bg-danger text-white h-100">
-                <div class="card-body text-center">
-                    <h3>@Model.UnpaidInvoices</h3>
-                    <small><i class="bi bi-receipt"></i> فواتير غير مدفوعة</small>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-4 col-lg-2">
-        <a asp-controller="CoursesManage" asp-action="Index" class="text-decoration-none">
-            <div class="card border-0 shadow-sm bg-success text-white h-100">
-                <div class="card-body text-center">
-                    <h3>@Model.ActiveCourses</h3>
-                    <small><i class="bi bi-book"></i> دورات نشطة</small>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-4 col-lg-2">
-        <a asp-controller="PostsManage" asp-action="Index" class="text-decoration-none">
-            <div class="card border-0 shadow-sm bg-info text-white h-100">
-                <div class="card-body text-center">
-                    <h3>@Model.NewPosts</h3>
-                    <small><i class="bi bi-newspaper"></i> منشورات جديدة</small>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-4 col-lg-2">
-        <a asp-controller="Reports" asp-action="CourseRevenue" class="text-decoration-none">
-            <div class="card border-0 shadow-sm bg-primary text-white h-100">
-                <div class="card-body text-center">
-                    <h3>@Model.TotalRevenue.ToString("N0")</h3>
-                    <small><i class="bi bi-cash-stack"></i> إجمالي الإيرادات</small>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-4 col-lg-2">
-        <a asp-controller="Registrations" asp-action="Index" asp-route-status="Accepted" class="text-decoration-none">
-            <div class="card border-0 shadow-sm bg-secondary text-white h-100">
-                <div class="card-body text-center">
-                    <h3>@Model.TotalTrainees</h3>
-                    <small><i class="bi bi-people"></i> المتدربين</small>
-                </div>
-            </div>
-        </a>
-    </div>
+<div class="page-header">
+    <partial name="_PageHeader" />
 </div>
 
-<!-- Quick Actions -->
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h6 class="mb-3">إجراءات سريعة</h6>
-                <a asp-controller="Registrations" asp-action="Index" class="btn btn-outline-primary btn-sm me-1"><i class="bi bi-clipboard-check"></i> التسجيلات</a>
-                <a asp-controller="Invoices" asp-action="Index" class="btn btn-outline-success btn-sm me-1"><i class="bi bi-receipt"></i> الفواتير</a>
-                <a asp-controller="CoursesManage" asp-action="Index" class="btn btn-outline-info btn-sm me-1"><i class="bi bi-book"></i> الدورات</a>
-                <a asp-controller="Certificates" asp-action="Index" class="btn btn-outline-warning btn-sm me-1"><i class="bi bi-award"></i> الشهادات</a>
-                <a asp-controller="PostsManage" asp-action="Index" class="btn btn-outline-secondary btn-sm me-1"><i class="bi bi-newspaper"></i> المنشورات</a>
-                <a asp-controller="Reports" asp-action="CourseRevenue" class="btn btn-outline-dark btn-sm me-1"><i class="bi bi-graph-up"></i> التقارير</a>
-            </div>
-        </div>
-    </div>
-</div>
+<section class="a-kpis" aria-label="المؤشرات الرئيسية">
+    @foreach (var kpi in kpis)
+    {
+        <partial name="_KpiCard" model="kpi" />
+    }
+</section>
 
-<!-- Recent Activity -->
-<div class="row g-4">
-    <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-clock-history"></i> أحدث التسجيلات</h6></div>
-            <div class="card-body">
-                @if (Model.RecentRegistrations.Any())
-                {
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead><tr><th>الاسم</th><th>الدورة</th><th>الحالة</th><th>التاريخ</th></tr></thead>
-                            <tbody>
-                                @foreach (var r in Model.RecentRegistrations)
-                                {
-                                    <tr>
-                                        <td>@r.FullName</td>
-                                        <td>@r.Course?.CourseName</td>
-                                        <td>
-                                            @switch (r.Status)
-                                            {
-                                                case "Pending":
-                                                    @:<span class="badge bg-warning text-dark">معلق</span>
-                                                    break;
-                                                case "Accepted":
-                                                    @:<span class="badge bg-success">مقبول</span>
-                                                    break;
-                                                case "Rejected":
-                                                    @:<span class="badge bg-danger">مرفوض</span>
-                                                    break;
-                                            }
-                                        </td>
-                                        <td>@r.RegistrationDate.ToString("MM-dd")</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
-                else { <p class="text-muted text-center">لا توجد تسجيلات</p> }
-            </div>
+<section class="a-card mb-4" aria-label="إجراءات سريعة">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-lightning-charge" aria-hidden="true"></i> إجراءات سريعة</h2>
+    </div>
+    <div class="a-card__body">
+        <div class="a-quicklinks">
+            @foreach (var link in quickLinks)
+            {
+                <a class="a-quicklink" asp-controller="@link.Ctrl" asp-action="@link.Action">
+                    <i class="bi @link.Icon" aria-hidden="true"></i>
+                    <span>@link.Label</span>
+                </a>
+            }
         </div>
     </div>
-    <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-receipt"></i> أحدث الفواتير</h6></div>
-            <div class="card-body">
-                @if (Model.RecentInvoices.Any())
-                {
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead><tr><th>الرقم</th><th>المتدرب</th><th>المبلغ</th><th>الحالة</th></tr></thead>
-                            <tbody>
-                                @foreach (var inv in Model.RecentInvoices)
-                                {
-                                    <tr>
-                                        <td><code>@inv.InvoiceNumber</code></td>
-                                        <td>@inv.TraineeName</td>
-                                        <td>@inv.TotalAmount.ToString("N0") ريال</td>
-                                        <td>
-                                            @switch (inv.Status)
-                                            {
-                                                case "Unpaid":
-                                                    @:<span class="badge bg-danger">غير مدفوعة</span>
-                                                    break;
-                                                case "PartiallyPaid":
-                                                    @:<span class="badge bg-warning text-dark">مدفوعة جزئياً</span>
-                                                    break;
-                                                case "Paid":
-                                                    @:<span class="badge bg-success">مدفوعة</span>
-                                                    break;
-                                                case "Cancelled":
-                                                    @:<span class="badge bg-secondary">ملغية</span>
-                                                    break;
-                                            }
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
-                else { <p class="text-muted text-center">لا توجد فواتير</p> }
-            </div>
+</section>
+
+<div class="a-grid-2">
+    <section class="a-card" aria-label="أحدث التسجيلات">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-clock-history" aria-hidden="true"></i> أحدث التسجيلات</h2>
+            <a class="btn btn-sm btn-outline-primary" asp-controller="Registrations" asp-action="Index">عرض الكل</a>
         </div>
-    </div>
+        @if (Model.RecentRegistrations.Any())
+        {
+            <div class="a-table-wrap">
+                <table class="a-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">المتدرب</th>
+                            <th scope="col">الدورة</th>
+                            <th scope="col">الحالة</th>
+                            <th scope="col">التاريخ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in Model.RecentRegistrations)
+                        {
+                            <tr>
+                                <td class="a-table__primary">@r.FullName</td>
+                                <td>@r.Course?.CourseName</td>
+                                <td>
+                                    @switch (r.Status)
+                                    {
+                                        case "Pending":
+                                            <span class="a-badge a-badge--warning">معلق</span>
+                                            break;
+                                        case "Accepted":
+                                            <span class="a-badge a-badge--success">مقبول</span>
+                                            break;
+                                        case "Rejected":
+                                            <span class="a-badge a-badge--danger">مرفوض</span>
+                                            break;
+                                        default:
+                                            <span class="a-badge a-badge--neutral">@r.Status</span>
+                                            break;
+                                    }
+                                </td>
+                                <td class="a-table__num">@r.RegistrationDate.ToString("yyyy-MM-dd")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-clipboard-x", Title = "لا توجد تسجيلات بعد", Text = "ستظهر أحدث الطلبات هنا فور وصولها." })" />
+        }
+    </section>
+
+    <section class="a-card" aria-label="أحدث الفواتير">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-receipt" aria-hidden="true"></i> أحدث الفواتير</h2>
+            <a class="btn btn-sm btn-outline-primary" asp-controller="Invoices" asp-action="Index">عرض الكل</a>
+        </div>
+        @if (Model.RecentInvoices.Any())
+        {
+            <div class="a-table-wrap">
+                <table class="a-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">الرقم</th>
+                            <th scope="col">المتدرب</th>
+                            <th scope="col">المبلغ</th>
+                            <th scope="col">الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var inv in Model.RecentInvoices)
+                        {
+                            <tr>
+                                <td><span class="a-code">@inv.InvoiceNumber</span></td>
+                                <td class="a-table__primary">@inv.TraineeName</td>
+                                <td class="a-table__num">@inv.TotalAmount.ToString("N0") ريال</td>
+                                <td>
+                                    @switch (inv.Status)
+                                    {
+                                        case "Unpaid":
+                                            <span class="a-badge a-badge--danger">غير مدفوعة</span>
+                                            break;
+                                        case "PartiallyPaid":
+                                            <span class="a-badge a-badge--warning">مدفوعة جزئياً</span>
+                                            break;
+                                        case "Paid":
+                                            <span class="a-badge a-badge--success">مدفوعة</span>
+                                            break;
+                                        case "Cancelled":
+                                            <span class="a-badge a-badge--neutral">ملغية</span>
+                                            break;
+                                        default:
+                                            <span class="a-badge a-badge--neutral">@inv.Status</span>
+                                            break;
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-receipt-cutoff", Title = "لا توجد فواتير بعد", Text = "ستظهر أحدث الفواتير هنا فور إنشائها." })" />
+        }
+    </section>
 </div>

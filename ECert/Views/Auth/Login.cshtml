@@ -1,29 +1,263 @@
 @model LoginViewModel
 @{
     ViewData["Title"] = "تسجيل الدخول";
+    Layout = null;
 }
-<div class="row justify-content-center">
-    <div class="col-md-5">
-        <div class="card shadow-sm border-0 mt-5">
-            <div class="card-body p-4">
-                <h3 class="text-center mb-4"><i class="bi bi-box-arrow-in-right"></i> دخول الموظفين</h3>
-                <div asp-validation-summary="All" class="text-danger"></div>
-                <form asp-action="Login" method="post">
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>تسجيل الدخول - لوحة الإدارة</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
+    <link href="~/lib/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/site.css" rel="stylesheet" />
+    <link href="~/css/admin.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        .auth-page {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            background: var(--a-canvas);
+        }
+
+        /* Brand panel */
+        .auth-brand {
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 48px;
+            color: #fff;
+            background: linear-gradient(150deg, #0f1d38 0%, #16305e 45%, #1d4ed8 130%);
+        }
+
+        .auth-brand::before,
+        .auth-brand::after {
+            content: '';
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.07);
+        }
+
+        .auth-brand::before { width: 420px; height: 420px; inset-block-start: -140px; inset-inline-end: -120px; }
+        .auth-brand::after { width: 280px; height: 280px; inset-block-end: -90px; inset-inline-start: -70px; background: rgba(255,255,255,0.05); }
+
+        .auth-brand__inner { position: relative; z-index: 1; }
+
+        .auth-brand__logo {
+            width: 56px; height: 56px;
+            display: grid; place-items: center;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            font-size: 1.7rem;
+            margin-bottom: 28px;
+            backdrop-filter: blur(6px);
+        }
+
+        .auth-brand h1 { font-size: 2rem; font-weight: 800; line-height: 1.35; margin-bottom: 14px; }
+        .auth-brand p { color: rgba(255, 255, 255, 0.75); font-size: 1rem; max-width: 42ch; line-height: 1.8; }
+
+        .auth-brand__points { list-style: none; padding: 0; margin: 32px 0 0; display: grid; gap: 14px; }
+
+        .auth-brand__points li {
+            display: flex; align-items: center; gap: 12px;
+            font-size: 0.92rem; color: rgba(255, 255, 255, 0.9);
+        }
+
+        .auth-brand__points i {
+            width: 30px; height: 30px;
+            display: grid; place-items: center;
+            border-radius: 9px;
+            background: rgba(255, 255, 255, 0.12);
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+
+        .auth-brand__footer { position: relative; z-index: 1; font-size: 0.8rem; color: rgba(255, 255, 255, 0.55); }
+
+        /* Form panel */
+        .auth-form-panel {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 24px;
+        }
+
+        .auth-card { width: 100%; max-width: 400px; }
+
+        .auth-card__mark {
+            width: 52px; height: 52px;
+            display: none;
+            place-items: center;
+            border-radius: 15px;
+            background: linear-gradient(135deg, var(--a-brand), var(--a-brand-strong));
+            color: #fff;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+
+        .auth-card h2 { font-size: 1.6rem; font-weight: 800; color: var(--a-text); margin-bottom: 6px; }
+        .auth-card__sub { color: var(--a-text-3); font-size: 0.9rem; margin-bottom: 28px; }
+
+        .auth-card .form-label { font-size: 0.85rem; font-weight: 700; color: var(--a-text-2); }
+
+        .auth-input { position: relative; }
+
+        .auth-input > i {
+            position: absolute;
+            inset-block-start: 50%;
+            inset-inline-start: 13px;
+            transform: translateY(-50%);
+            color: var(--a-text-3);
+            font-size: 0.95rem;
+            pointer-events: none;
+        }
+
+        .auth-input .form-control {
+            height: 46px;
+            padding-inline-start: 40px;
+            border-radius: var(--a-r-sm);
+            border: 1px solid var(--a-border-strong);
+            background: var(--a-surface);
+            color: var(--a-text);
+        }
+
+        .auth-input .form-control:focus {
+            border-color: var(--a-brand);
+            box-shadow: 0 0 0 3px var(--a-brand-ring);
+        }
+
+        .auth-input__toggle {
+            position: absolute;
+            inset-block-start: 50%;
+            inset-inline-end: 8px;
+            transform: translateY(-50%);
+            width: 32px; height: 32px;
+            display: grid; place-items: center;
+            border: 0; border-radius: 8px;
+            background: transparent;
+            color: var(--a-text-3);
+            cursor: pointer;
+        }
+
+        .auth-input__toggle:hover { background: var(--a-surface-3); color: var(--a-text); }
+
+        .auth-submit {
+            height: 46px;
+            width: 100%;
+            font-weight: 700;
+            border-radius: var(--a-r-sm);
+            background: var(--a-brand);
+            border: 0;
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background var(--a-t-fast), transform var(--a-t-fast);
+        }
+
+        .auth-submit:hover { background: var(--a-brand-strong); transform: translateY(-1px); }
+
+        .auth-alert {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: 12px 14px;
+            border-radius: var(--a-r-sm);
+            background: var(--a-danger-soft);
+            color: var(--a-danger);
+            border: 1px solid color-mix(in srgb, var(--a-danger) 25%, transparent);
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .auth-back { text-align: center; margin-top: 24px; }
+        .auth-back a { color: var(--a-text-3); font-size: 0.85rem; text-decoration: none; }
+        .auth-back a:hover { color: var(--a-brand); }
+
+        @@media (max-width: 900px) {
+            .auth-page { grid-template-columns: 1fr; }
+            .auth-brand { display: none; }
+            .auth-card__mark { display: grid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-page">
+        <aside class="auth-brand" aria-hidden="true">
+            <div class="auth-brand__inner">
+                <div class="auth-brand__logo"><i class="bi bi-mortarboard-fill"></i></div>
+                <h1>مركز التدريب<br />نظام إدارة متكامل</h1>
+                <p>منصة واحدة لإدارة التسجيلات والدورات والمدربين والشهادات والشؤون المالية.</p>
+                <ul class="auth-brand__points">
+                    <li><i class="bi bi-clipboard-check"></i> متابعة التسجيلات واتخاذ القرار بسرعة</li>
+                    <li><i class="bi bi-cash-coin"></i> إدارة الفواتير والدفعات والصندوق</li>
+                    <li><i class="bi bi-award"></i> إصدار الشهادات والتحقق منها</li>
+                </ul>
+            </div>
+            <p class="auth-brand__footer">© @DateTime.Now.Year مركز التدريب — جميع الحقوق محفوظة</p>
+        </aside>
+
+        <main class="auth-form-panel">
+            <div class="auth-card">
+                <div class="auth-card__mark"><i class="bi bi-mortarboard-fill"></i></div>
+                <h2>تسجيل الدخول</h2>
+                <p class="auth-card__sub">أدخل بيانات حسابك للوصول إلى لوحة الإدارة.</p>
+
+                @if (!ViewData.ModelState.IsValid && ViewData.ModelState.ErrorCount > 0)
+                {
+                    <div class="auth-alert" role="alert">
+                        <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
+                        <div asp-validation-summary="All"></div>
+                    </div>
+                }
+
+                <form asp-action="Login" method="post" novalidate>
                     @Html.AntiForgeryToken()
                     <div class="mb-3">
-                        <label asp-for="Username" class="form-label"></label>
-                        <input asp-for="Username" class="form-control" placeholder="اسم المستخدم" />
-                        <span asp-validation-for="Username" class="text-danger"></span>
+                        <label asp-for="Username" class="form-label">اسم المستخدم</label>
+                        <div class="auth-input">
+                            <i class="bi bi-person" aria-hidden="true"></i>
+                            <input asp-for="Username" class="form-control" placeholder="أدخل اسم المستخدم" autocomplete="username" autofocus />
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label asp-for="Password" class="form-label"></label>
-                        <input asp-for="Password" type="password" class="form-control" placeholder="كلمة المرور" />
-                        <span asp-validation-for="Password" class="text-danger"></span>
+                    <div class="mb-4">
+                        <label asp-for="Password" class="form-label">كلمة المرور</label>
+                        <div class="auth-input">
+                            <i class="bi bi-lock" aria-hidden="true"></i>
+                            <input asp-for="Password" type="password" class="form-control" id="passwordInput" placeholder="أدخل كلمة المرور" autocomplete="current-password" />
+                            <button type="button" class="auth-input__toggle" id="passwordToggle" aria-label="إظهار كلمة المرور">
+                                <i class="bi bi-eye" aria-hidden="true"></i>
+                            </button>
+                        </div>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">دخول</button>
+                    <button type="submit" class="auth-submit">
+                        <i class="bi bi-box-arrow-in-left" aria-hidden="true"></i> دخول
+                    </button>
                 </form>
 
+                <p class="auth-back">
+                    <a asp-controller="Home" asp-action="Index"><i class="bi bi-arrow-right-short"></i> العودة إلى الموقع العام</a>
+                </p>
             </div>
-        </div>
+        </main>
     </div>
-</div>
+
+    <script>
+        (function () {
+            var toggle = document.getElementById('passwordToggle');
+            var input = document.getElementById('passwordInput');
+            if (!toggle || !input) return;
+            toggle.addEventListener('click', function () {
+                var show = input.type === 'password';
+                input.type = show ? 'text' : 'password';
+                toggle.innerHTML = '<i class="bi ' + (show ? 'bi-eye-slash' : 'bi-eye') + '" aria-hidden="true"></i>';
+                toggle.setAttribute('aria-label', show ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور');
+            });
+        })();
+    </script>
+</body>
+</html>

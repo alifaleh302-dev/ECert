@@ -1,0 +1,18 @@
+@*
+    Empty state for tables and lists.
+    Usage: <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState {
+        Icon = "bi-inbox", Title = "لا توجد نتائج", Text = "جرّب تعديل الفلاتر." })" />
+*@
+@model ECert.ViewModels.EmptyState
+<div class="a-empty">
+    <span class="a-empty__icon" aria-hidden="true"><i class="bi @Model.Icon"></i></span>
+    <p class="a-empty__title">@Model.Title</p>
+    @if (!string.IsNullOrEmpty(Model.Text))
+    {
+        <p class="a-empty__text">@Model.Text</p>
+    }
+    @if (!string.IsNullOrEmpty(Model.ActionText) && !string.IsNullOrEmpty(Model.ActionHref))
+    {
+        <a class="btn btn-primary btn-sm mt-2" href="@Model.ActionHref">@Model.ActionText</a>
+    }
+</div>

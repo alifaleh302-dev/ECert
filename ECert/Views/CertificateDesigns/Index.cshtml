@@ -3,6 +3,7 @@
 
 @{
     ViewData["Title"] = "مصمم الشهادات";
+    Layout = "_AdminLayout";
     // Serialize only editor-safe scalar fields; CertificateDesignElement.Design is a back-reference
     // and must never be sent to the browser because it creates a circular EF object graph.
     var templateJson = JsonSerializer.Serialize(Model.Design.Elements
@@ -38,165 +39,10 @@
     };
 }
 
-<style>
-    :root {
-        --ped-accent: #4f6ef7;
-        --ped-accent-2: #6d8bff;
-        --ped-ink: #0f172a;
-        --ped-muted: #64748b;
-        --ped-line: #e2e8f0;
-        --ped-panel: #ffffff;
-        --ped-toolbar: #0d1b33;
-        --ped-toolbar-2: #152742;
-        --ped-danger: #ef4444;
-    }
 
-    .ped-app { color: var(--ped-ink); display: flex; flex-direction: column; height: calc(100vh - 78px); min-height: 620px; border-radius: 20px; overflow: hidden; background: #eef2f7; box-shadow: 0 24px 70px rgba(15, 23, 42, .18); border: 1px solid #dbe3ee; }
-
-    /* ---------- Toolbar ---------- */
-    .ped-toolbar { background: linear-gradient(180deg, var(--ped-toolbar) 0%, var(--ped-toolbar-2) 100%); color: #e6edf7; display: flex; align-items: center; gap: .5rem; padding: .55rem .8rem; flex-wrap: wrap; border-bottom: 1px solid rgba(255,255,255,.06); }
-    .ped-toolbar .tb-group { display: flex; align-items: center; gap: 3px; padding-inline: .45rem; border-inline-start: 1px solid rgba(255,255,255,.12); }
-    .ped-toolbar .tb-group:first-child { border-inline-start: 0; }
-    .ped-tbtn { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; border: 0; background: transparent; color: #cdd9ea; font-size: 1rem; cursor: pointer; transition: .14s ease; }
-    .ped-tbtn:hover:not(:disabled) { background: rgba(255,255,255,.12); color: #fff; }
-    .ped-tbtn:disabled { opacity: .35; cursor: not-allowed; }
-    .ped-tbtn.on { background: var(--ped-accent); color: #fff; }
-    .ped-tbtn.danger:hover { background: rgba(239,68,68,.22); color: #ffb4b4; }
-    .ped-tbtn-label { display: inline-flex; align-items: center; gap: .4rem; }
-    .ped-name-input { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); color: #fff; border-radius: 9px; padding: .34rem .7rem; font-size: .9rem; width: 240px; }
-    .ped-name-input:focus { outline: 2px solid var(--ped-accent); border-color: transparent; }
-    .ped-zoom-label { min-width: 44px; text-align: center; font-size: .78rem; color: #b9c7da; font-variant-numeric: tabular-nums; }
-    .ped-btn-primary, .ped-btn-success, .ped-btn-ghost { border: 0; border-radius: 10px; padding: .45rem .95rem; font-weight: 700; font-size: .85rem; display: inline-flex; align-items: center; gap: .45rem; cursor: pointer; transition: .14s ease; }
-    .ped-btn-primary { background: var(--ped-accent); color: #fff; }
-    .ped-btn-primary:hover { background: #3d5ae0; }
-    .ped-btn-success { background: #16a34a; color: #fff; }
-    .ped-btn-success:hover { background: #15803d; }
-    .ped-btn-ghost { background: rgba(255,255,255,.08); color: #dbe5f2; }
-    .ped-btn-ghost:hover { background: rgba(255,255,255,.16); }
-
-    /* designs dropdown */
-    .ped-designs { position: relative; }
-    .ped-designs-menu { position: absolute; top: calc(100% + 8px); inset-inline-start: 0; z-index: 60; min-width: 290px; max-height: 380px; overflow-y: auto; background: #fff; color: var(--ped-ink); border-radius: 14px; box-shadow: 0 22px 55px rgba(2, 10, 25, .35); padding: .4rem; display: none; }
-    .ped-designs-menu.open { display: block; }
-    .ped-designs-menu .ds-item { display: flex; align-items: center; gap: .6rem; padding: .55rem .7rem; border-radius: 10px; cursor: pointer; text-decoration: none; color: inherit; }
-    .ped-designs-menu .ds-item:hover { background: #eef3ff; }
-    .ped-designs-menu .ds-item.active { background: #e7edff; box-shadow: inset 0 0 0 1px #c7d4ff; }
-    .ped-designs-menu .ds-divider { height: 1px; background: var(--ped-line); margin: .3rem .4rem; }
-    .ped-badge { font-size: .68rem; font-weight: 800; padding: .13rem .5rem; border-radius: 999px; }
-    .ped-badge.live { background: #dcfce7; color: #15803d; }
-    .ped-badge.draft { background: #e5e9f0; color: #64748b; }
-
-    /* ---------- Body ---------- */
-    .ped-body { flex: 1; display: flex; min-height: 0; }
-    .ped-panel { background: var(--ped-panel); width: 292px; flex-shrink: 0; overflow-y: auto; display: flex; flex-direction: column; }
-    .ped-panel.right { border-inline-start: 1px solid var(--ped-line); }
-    .ped-panel.left { border-inline-end: 1px solid var(--ped-line); }
-    .ped-panel-head { font-size: .76rem; font-weight: 800; color: var(--ped-muted); letter-spacing: .02em; padding: .8rem .9rem .45rem; }
-    .ped-panel-section { padding: .15rem .9rem .85rem; border-bottom: 1px solid #f1f5f9; }
-    .ped-panel-section:last-child { border-bottom: 0; }
-
-    .ped-canvas-area { flex: 1; overflow: auto; position: relative; background: #e7ecf3; background-image: radial-gradient(#c3cede 1px, transparent 1px); background-size: 22px 22px; }
-    .ped-canvas-area.ped-preview { background: #f4f6fa; }
-    .ped-stage { position: relative; margin: 46px auto 70px; width: 1px; height: 1px; }
-    .ped-canvas { position: absolute; top: 0; left: 0; transform-origin: top left; direction: rtl; overflow: hidden; background: #fffdf7; box-shadow: 0 28px 80px rgba(15, 23, 42, .32); border-radius: 6px; }
-
-    /* grid overlay */
-    .ped-grid { position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(79,110,247,.10) 1px, transparent 1px), linear-gradient(90deg, rgba(79,110,247,.10) 1px, transparent 1px); background-size: 28px 28px; display: none; }
-    .ped-app.grid-on .ped-grid { display: block; }
-
-    /* elements */
-    .ped-el { position: absolute; display: flex; align-items: center; justify-content: center; padding: 6px 10px; overflow: hidden; white-space: pre-wrap; line-height: 1.3; user-select: none; cursor: grab; word-break: break-word; box-sizing: border-box; }
-    .ped-el:active { cursor: grabbing; }
-    .ped-el.el-divider { cursor: grab; padding: 0; border-top: 2px solid currentColor; height: 0 !important; background: transparent !important; }
-    .ped-el.el-divider .ped-el-inner { display: none; }
-
-    /* selection overlay */
-    .ped-overlay { position: absolute; pointer-events: none; z-index: 9999; }
-    .ped-overlay .ped-box { position: absolute; inset: 0; border: 1.5px solid var(--ped-accent); border-radius: 2px; background: rgba(79,110,247,.06); }
-    .ped-overlay .ped-handle { position: absolute; width: 13px; height: 13px; background: #fff; border: 2px solid var(--ped-accent); border-radius: 4px; pointer-events: all; }
-    .ped-overlay .ped-handle.h-nw { top: -7px; left: -7px; cursor: nwse-resize; }
-    .ped-overlay .ped-handle.h-n { top: -7px; left: calc(50% - 6px); cursor: ns-resize; }
-    .ped-overlay .ped-handle.h-ne { top: -7px; right: -7px; cursor: nesw-resize; }
-    .ped-overlay .ped-handle.h-e { top: calc(50% - 6px); right: -7px; cursor: ew-resize; }
-    .ped-overlay .ped-handle.h-se { bottom: -7px; right: -7px; cursor: nwse-resize; }
-    .ped-overlay .ped-handle.h-s { bottom: -7px; left: calc(50% - 6px); cursor: ns-resize; }
-    .ped-overlay .ped-handle.h-sw { bottom: -7px; left: -7px; cursor: nesw-resize; }
-    .ped-overlay .ped-handle.h-w { top: calc(50% - 6px); left: -7px; cursor: ew-resize; }
-    .ped-overlay .ped-rotate { position: absolute; top: -34px; left: calc(50% - 9px); width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 2px solid var(--ped-accent); display: flex; align-items: center; justify-content: center; font-size: 9px; color: var(--ped-accent); pointer-events: all; cursor: grab; }
-    .ped-overlay .ped-rotate-line { position: absolute; top: -27px; left: 50%; width: 1.5px; height: 20px; background: var(--ped-accent); opacity: .55; }
-    .ped-overlay .ped-dim { position: absolute; bottom: -26px; left: 50%; transform: translateX(-50%); background: var(--ped-toolbar); color: #fff; font-size: .7rem; font-weight: 800; padding: .12rem .5rem; border-radius: 7px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-
-    /* snap guides */
-    .ped-guide { position: absolute; pointer-events: none; z-index: 9998; display: none; }
-    .ped-guide.g-x { top: 0; bottom: 0; width: 1px; background: #ef4444; box-shadow: 0 0 0 1px rgba(255,255,255,.7); }
-    .ped-guide.g-y { left: 0; right: 0; height: 1px; background: #ef4444; box-shadow: 0 0 0 1px rgba(255,255,255,.7); }
-
-    /* library */
-    .ped-field-chip { display: flex; align-items: center; gap: .5rem; width: 100%; text-align: start; border: 1px solid var(--ped-line); background: #f8fafc; border-radius: 10px; padding: .45rem .6rem; font-size: .8rem; color: #334155; cursor: pointer; margin-bottom: .4rem; transition: .13s ease; }
-    .ped-field-chip:hover { background: #eef3ff; border-color: #bcd0ff; color: var(--ped-accent); }
-    .ped-field-chip i { color: var(--ped-accent-2); }
-    .ped-group-title { font-size: .7rem; font-weight: 800; color: var(--ped-muted); margin: .5rem 0 .35rem; }
-    .ped-add-row { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; margin-bottom: .5rem; }
-    .ped-add-btn { border: 1.5px dashed #b9c8e8; background: #fbfdff; color: #3b5bd6; border-radius: 10px; padding: .55rem .3rem; font-size: .8rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: .35rem; transition: .13s ease; }
-    .ped-add-btn:hover { background: #eef3ff; border-color: var(--ped-accent); }
-
-    /* layers */
-    .ped-layer { display: flex; align-items: center; gap: .5rem; border: 1px solid transparent; border-radius: 9px; padding: .4rem .5rem; cursor: pointer; margin-bottom: 2px; }
-    .ped-layer:hover { background: #f1f5f9; }
-    .ped-layer.active { background: #e7edff; border-color: #c7d4ff; }
-    .ped-layer .ly-icon { width: 26px; height: 26px; border-radius: 8px; background: #eef2f7; display: flex; align-items: center; justify-content: center; color: #4b6bd6; font-size: .85rem; flex-shrink: 0; }
-    .ped-layer .ly-name { flex: 1; font-size: .8rem; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .ped-layer .ly-btn { border: 0; background: transparent; color: #94a3b8; font-size: .9rem; padding: .15rem .2rem; border-radius: 6px; cursor: pointer; }
-    .ped-layer .ly-btn:hover { color: var(--ped-accent); background: #dbe6ff; }
-    .ped-layer .ly-btn.danger:hover { color: var(--ped-danger); background: #fee2e2; }
-    .ped-layer .ly-eye.off { color: #cbd5e1; }
-    .ped-empty { text-align: center; color: #94a3b8; font-size: .78rem; padding: 1rem .4rem; }
-
-    /* properties */
-    .ped-prop { margin-bottom: .65rem; }
-    .ped-prop label { font-size: .72rem; font-weight: 800; color: var(--ped-muted); display: flex; justify-content: space-between; align-items: center; margin-bottom: .25rem; }
-    .ped-prop .pv { font-size: .7rem; color: #94a3b8; font-weight: 600; font-variant-numeric: tabular-nums; }
-    .ped-input, .ped-select, .ped-textarea { width: 100%; border: 1px solid var(--ped-line); border-radius: 9px; padding: .42rem .55rem; font-size: .82rem; color: #1e293b; background: #fff; }
-    .ped-input:focus, .ped-select:focus, .ped-textarea:focus { outline: 2px solid #cdd9ff; border-color: var(--ped-accent); }
-    .ped-color-row { display: flex; align-items: center; gap: .45rem; }
-    .ped-color-input { width: 44px; height: 34px; padding: 2px; border: 1px solid var(--ped-line); border-radius: 9px; background: #fff; cursor: pointer; }
-    .ped-color-hex { flex: 1; font-size: .78rem; font-variant-numeric: tabular-nums; color: #475569; text-transform: lowercase; }
-    .ped-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
-    .ped-size-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: .35rem; margin-top: .4rem; }
-    .ped-size-presets button { border: 1px solid var(--ped-line); background: #f8fafc; font-size: .68rem; font-weight: 700; color: #475569; border-radius: 8px; padding: .35rem .2rem; cursor: pointer; }
-    .ped-size-presets button:hover, .ped-size-presets button.on { background: #e7edff; border-color: var(--ped-accent); color: var(--ped-accent); }
-    .ped-switch { display: flex; align-items: center; gap: .5rem; cursor: pointer; font-size: .8rem; color: #334155; }
-    .ped-switch input { width: 17px; height: 17px; accent-color: var(--ped-accent); cursor: pointer; }
-    .ped-seg { display: flex; background: #eef2f7; border-radius: 9px; padding: 3px; gap: 3px; }
-    .ped-seg button { flex: 1; border: 0; background: transparent; border-radius: 7px; padding: .32rem 0; font-size: .82rem; color: #64748b; cursor: pointer; }
-    .ped-seg button.on { background: #fff; color: var(--ped-accent); font-weight: 800; box-shadow: 0 1px 4px rgba(15,23,42,.12); }
-    .ped-help { font-size: .7rem; color: #94a3b8; line-height: 1.7; }
-    .ped-kbd { display: inline-block; background: #eef2f7; border: 1px solid #dce3ee; border-bottom-width: 2px; border-radius: 5px; padding: 0 .3rem; font-size: .68rem; font-weight: 800; color: #475569; }
-
-    /* preview mode */
-    .ped-app.preview-mode .ped-panel { display: none; }
-    .ped-app.preview-mode .ped-canvas-area { background: #273449; background-image: none; }
-    .ped-app.preview-mode .ped-el { cursor: default; }
-    .ped-app.preview-mode .ped-overlay, .ped-app.preview-mode .ped-guide, .ped-app.preview-mode .ped-grid { display: none; }
-
-    /* toolbar responsive */
-    @@media (max-width: 1199.98px) {
-        .ped-panel { width: 258px; }
-        .ped-name-input { width: 170px; }
-    }
-    @@media (max-width: 991.98px) {
-        .ped-app { height: auto; min-height: 0; border-radius: 14px; }
-        .ped-body { flex-direction: column; }
-        .ped-panel { width: 100%; max-height: 260px; order: 3; border: 0 !important; border-top: 1px solid var(--ped-line) !important; }
-        .ped-canvas-area { order: 1; min-height: 480px; }
-        .ped-name-input { width: 150px; }
-    }
-    @@media (max-width: 575.98px) {
-        .ped-toolbar { padding: .45rem; }
-        .ped-tbtn-label span.txt { display: none; }
-        .ped-canvas-area { min-height: 400px; }
-    }
-</style>
+@section Styles {
+    <link href="~/css/certificate-design-editor.css" rel="stylesheet" asp-append-version="true" />
+}
 
 <div class="ped-app" id="pedApp">
     <!-- ============ Toolbar ============ -->

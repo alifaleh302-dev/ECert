@@ -1,9 +1,9 @@
+@using System.Security.Claims
 @{
-    var roleName = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+    var roleName = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value ?? "";
     bool HasPerm(string p) => User.HasClaim(c => c.Type == "Permission" && c.Value == p);
     bool IsSuperAdmin = roleName == "SuperAdmin";
 
-    // Dashboard link per role
     string dashController = roleName switch
     {
         "SuperAdmin" => "Dashboard",
@@ -13,506 +13,251 @@
         _ => "Dashboard"
     };
 
+    string roleLabel = roleName switch
+    {
+        "SuperAdmin" => "مدير عام",
+        "Admin" => "إداري",
+        "Media" => "إعلامي",
+        "Finance" => "مالي",
+        _ => "مستخدم"
+    };
+
     string currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
-    string IsActive(string controller) => currentController == controller ? "active" : "";
+    bool IsActive(string controller) => string.Equals(currentController, controller, StringComparison.OrdinalIgnoreCase);
+
+    var displayName = User.Identity?.Name ?? "مستخدم";
+    var initial = string.IsNullOrWhiteSpace(displayName) ? "?" : displayName.Trim().Substring(0, 1);
+    var pageTitle = ViewData["Title"]?.ToString() ?? "";
+
+    // Navigation is declared as data so the markup below stays readable and the
+    // permission rules live in one place instead of being duplicated per link.
+    var groups = new List<(string Key, string Label, string Icon, List<(string Ctrl, string Label, string Icon)> Items)>
+    {
+        ("training", "إدارة التدريب", "bi-mortarboard", new()
+        {
+            ("Registrations", "التسجيلات", "bi-clipboard-check"),
+            ("CoursesManage", "الدورات", "bi-book"),
+            ("CategoriesManage", "الفئات", "bi-grid-3x3-gap"),
+            ("Instructors", "المدربون", "bi-person-badge"),
+            ("Certificates", "الشهادات", "bi-award"),
+            ("CertificateDesigns", "تصاميم الشهادات", "bi-palette"),
+        }),
+        ("finance", "الإدارة المالية", "bi-wallet2", new()
+        {
+            ("Invoices", "الفواتير", "bi-receipt"),
+            ("Payments", "الدفعات", "bi-cash-stack"),
+            ("Cashbox", "الصندوق", "bi-safe"),
+            ("Reports", "تقارير الإيرادات", "bi-graph-up-arrow"),
+        }),
+        ("content", "المحتوى الإعلامي", "bi-megaphone", new()
+        {
+            ("PostsManage", "المنشورات", "bi-journal-richtext"),
+            ("NewsManage", "الأخبار", "bi-newspaper"),
+            ("HomepageManage", "الصفحة الرئيسية", "bi-house-gear"),
+        }),
+        ("system", "إدارة النظام", "bi-gear", new()
+        {
+            ("Users", "المستخدمون", "bi-people"),
+            ("Roles", "الأدوار والصلاحيات", "bi-shield-lock"),
+            ("AuditLog", "سجل العمليات", "bi-journal-text"),
+            ("AcademicCatalog", "البيانات الجامعية", "bi-mortarboard"),
+            ("PhoneCountries", "مفاتيح الهواتف", "bi-phone"),
+        }),
+    };
+
+    // Only render a link when the signed-in role actually holds the permission.
+    bool CanSee(string ctrl) => ctrl switch
+    {
+        "Registrations" => IsSuperAdmin || HasPerm("manage-registrations"),
+        "CoursesManage" => IsSuperAdmin || HasPerm("manage-courses"),
+        "CategoriesManage" => IsSuperAdmin || HasPerm("manage-courses"),
+        "Instructors" => IsSuperAdmin || HasPerm("manage-instructors"),
+        "Certificates" => IsSuperAdmin || HasPerm("manage-certificates"),
+        "CertificateDesigns" => IsSuperAdmin || HasPerm("manage-certificate-designs"),
+        "Invoices" => IsSuperAdmin || HasPerm("view-invoices") || HasPerm("manage-finance"),
+        "Payments" => IsSuperAdmin || HasPerm("manage-payments"),
+        "Cashbox" => IsSuperAdmin || HasPerm("manage-cashbox"),
+        "Reports" => IsSuperAdmin || HasPerm("view-reports"),
+        "PostsManage" => IsSuperAdmin || HasPerm("manage-posts"),
+        "NewsManage" => IsSuperAdmin || HasPerm("manage-news"),
+        "HomepageManage" => IsSuperAdmin,
+        "Users" => IsSuperAdmin || HasPerm("manage-users"),
+        "Roles" => IsSuperAdmin,
+        "AuditLog" => IsSuperAdmin || HasPerm("view-audit-log"),
+        "AcademicCatalog" => IsSuperAdmin,
+        "PhoneCountries" => IsSuperAdmin,
+        _ => IsSuperAdmin
+    };
+
+    var visibleGroups = groups
+        .Select(g => (g.Key, g.Label, g.Icon, Items: g.Items.Where(i => CanSee(i.Ctrl)).ToList()))
+        .Where(g => g.Items.Count > 0)
+        .ToList();
 }
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" data-theme="light">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - مركز التدريب</title>
+    <title>@ViewData["Title"] - لوحة الإدارة</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
     <link href="~/lib/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" asp-append-version="true" />
     <link href="~/css/site.css" rel="stylesheet" />
-    <style>
-        .admin-wrapper { display: flex; min-height: 100vh; }
-        .admin-sidebar {
-            width: 264px;
-            background: linear-gradient(180deg, #111c30 0%, #16233c 60%, #1a2b4a 100%);
-            color: #fff;
-            position: fixed;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            overflow-y: auto;
-            z-index: 1030;
-            transition: transform 0.3s;
-            box-shadow: -2px 0 12px rgba(0,0,0,0.15);
-        }
-        .admin-sidebar::-webkit-scrollbar { width: 4px; }
-        .admin-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
-        .admin-sidebar .sidebar-header {
-            padding: 22px 18px;
-            border-bottom: 1px solid rgba(255,255,255,0.08);
-            text-align: center;
-            background: rgba(255,255,255,0.03);
-        }
-        .admin-sidebar .sidebar-header .logo-icon {
-            width: 48px; height: 48px;
-            background: linear-gradient(135deg, #2563eb, #3b82f6);
-            border-radius: 14px;
-            display: inline-flex; align-items: center; justify-content: center;
-            font-size: 1.4rem;
-            margin-bottom: 10px;
-            box-shadow: 0 4px 14px rgba(37,99,235,0.4);
-        }
-        .admin-sidebar .sidebar-header h5 { margin: 0; font-size: 1.05rem; font-weight: 800; }
-        .admin-sidebar .sidebar-header small { color: #8fa3c0; font-size: 0.75rem; }
-        .admin-sidebar .nav-link {
-            color: #b8c5d9;
-            padding: 10px 18px;
-            margin: 2px 10px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            border-radius: 10px;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-        }
-        .admin-sidebar .nav-link:hover {
-            color: #fff;
-            background: rgba(255,255,255,0.08);
-        }
-        .admin-sidebar .nav-link.active {
-            color: #fff;
-            background: linear-gradient(90deg, rgba(37,99,235,0.35), rgba(37,99,235,0.15));
-            box-shadow: inset 3px 0 0 #60a5fa;
-        }
-        .admin-sidebar .nav-link i { width: 22px; margin-left: 10px; font-size: 1rem; }
-        .admin-sidebar .sidebar-section {
-            padding: 14px 22px 6px;
-            font-size: 0.68rem;
-            font-weight: 700;
-            color: #5d7191;
-            letter-spacing: 1.2px;
-        }
-        .admin-content {
-            flex: 1;
-            margin-right: 264px;
-            background: #f1f4f9;
-            min-width: 0;
-        }
-        .admin-topbar {
-            min-height: 72px;
-            background: #fff;
-            padding: 12px 28px;
-            border-bottom: 1px solid #e5e9f0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-            position: sticky;
-            top: 0;
-            z-index: 1020;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.03);
-        }
-        .admin-topbar__group {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .admin-icon-button {
-            width: 42px;
-            height: 42px;
-            padding: 0;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            background: #fff;
-            color: #475569;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
-            line-height: 1;
-            text-decoration: none;
-            cursor: pointer;
-            transition: transform .2s ease, background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease;
-        }
-        .admin-icon-button:hover {
-            color: #1d4ed8;
-            background: #eff6ff;
-            border-color: #bfdbfe;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(37,99,235,.12);
-        }
-        .admin-icon-button:focus-visible {
-            outline: 3px solid rgba(37,99,235,.32);
-            outline-offset: 2px;
-        }
-        .admin-icon-button--danger:hover {
-            color: #dc2626;
-            background: #fef2f2;
-            border-color: #fecaca;
-            box-shadow: 0 4px 12px rgba(220,38,38,.12);
-        }
-        .admin-user-indicator {
-            background: #f8fafc;
-            color: #64748b;
-            cursor: default;
-        }
-        .admin-user-indicator:hover {
-            color: #475569;
-            background: #f1f5f9;
-            border-color: #cbd5e1;
-            transform: none;
-            box-shadow: none;
-        }
-        .admin-body { padding: 28px; }
-        .admin-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(15, 23, 42, 0.55);
-            z-index: 1025;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.25s ease, visibility 0.25s;
-        }
-        .admin-overlay.show { opacity: 1; visibility: visible; }
-        .sidebar-close-btn {
-            position: absolute;
-            top: 14px;
-            left: 14px;
-            width: 36px;
-            height: 36px;
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 10px;
-            background: rgba(255,255,255,0.06);
-            color: #fff;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
-            cursor: pointer;
-        }
-        .sidebar-close-btn:hover { background: rgba(255,255,255,0.14); }
-        @@media (max-width: 992px) {
-            .admin-sidebar { width: min(280px, 88vw); transform: translateX(100%); }
-            .admin-sidebar.show { transform: translateX(0); }
-            .sidebar-close-btn { display: inline-flex; }
-            .admin-content { margin-right: 0; }
-            .admin-topbar { padding: 10px 16px; }
-            .admin-body { padding: 16px; }
-        }
-        @@media (max-width: 575.98px) {
-            .admin-topbar { min-height: 64px; padding: 10px 12px; gap: 8px; }
-            .admin-topbar__group { gap: 8px; }
-            .admin-icon-button { width: 42px; height: 42px; border-radius: 11px; }
-            .admin-body { padding: 12px; }
-        }
-    </style>
+    <link href="~/css/admin.css" rel="stylesheet" asp-append-version="true" />
+    @await RenderSectionAsync("Styles", required: false)
+    <script>
+        // Apply the saved theme before first paint to avoid a flash of the wrong palette.
+        (function () {
+            try {
+                var saved = localStorage.getItem('ecert-admin-theme');
+                if (saved) document.documentElement.setAttribute('data-theme', saved);
+            } catch (e) { /* storage unavailable — fall back to the default theme */ }
+        })();
+    </script>
 </head>
 <body>
-    <div class="admin-wrapper">
+    <div class="admin-shell">
+        <a href="#adminContent" class="visually-hidden-focusable position-absolute top-0 start-0 m-3 btn btn-primary btn-sm">تخطي إلى المحتوى</a>
+
         <!-- Sidebar -->
-        <nav class="admin-sidebar" id="sidebar">
-            <div class="sidebar-header position-relative">
-                <button type="button" id="sidebarClose" class="sidebar-close-btn" aria-label="إغلاق القائمة" title="إغلاق القائمة">
-                    <i class="bi bi-x-lg" aria-hidden="true"></i>
-                </button>
-                <div class="logo-icon"><i class="bi bi-mortarboard-fill"></i></div>
-                <h5>مركز التدريب</h5>
-                <small>
-                    @switch(roleName) {
-                        case "SuperAdmin":
-                            @:<span>لوحة المدير العام</span>
-                            break;
-                        case "Admin":
-                            @:<span>لوحة الإداري</span>
-                            break;
-                        case "Media":
-                            @:<span>لوحة الإعلامي</span>
-                            break;
-                        case "Finance":
-                            @:<span>لوحة المالي</span>
-                            break;
-                    }
-                </small>
+        <aside class="admin-nav" id="adminNav" aria-label="التنقل الرئيسي">
+            <button type="button" class="admin-nav__close" id="navClose" aria-label="إغلاق القائمة">
+                <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+
+            <div class="admin-nav__brand">
+                <span class="admin-nav__brand-mark" aria-hidden="true"><i class="bi bi-mortarboard-fill"></i></span>
+                <div class="admin-nav__brand-text">
+                    <p class="admin-nav__brand-title">مركز التدريب</p>
+                    <span class="admin-nav__brand-role">@roleLabel</span>
+                </div>
             </div>
-            <ul class="nav flex-column py-2">
-                <li class="nav-item">
-                    <a class="nav-link @IsActive(dashController)" asp-controller="@dashController" asp-action="Index">
-                        <i class="bi bi-speedometer2"></i> لوحة التحكم
-                    </a>
-                </li>
 
-                @* === إدارة التدريب === *@
-                @if (IsSuperAdmin || HasPerm("manage-registrations") || HasPerm("manage-courses") || HasPerm("manage-instructors"))
-                {
-                    <li class="sidebar-section">إدارة التدريب</li>
-                }
-                @if (IsSuperAdmin || HasPerm("manage-registrations"))
-                {
-                    <li class="nav-item">
-                        <a class="nav-link @IsActive("Registrations")" asp-controller="Registrations" asp-action="Index">
-                            <i class="bi bi-clipboard-check"></i> التسجيلات
-                        </a>
-                    </li>
-                }
-                @if (IsSuperAdmin || HasPerm("manage-courses"))
-                {
-                    <li class="nav-item">
-                        <a class="nav-link @IsActive("CoursesManage")" asp-controller="CoursesManage" asp-action="Index">
-                            <i class="bi bi-book"></i> الدورات
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link @IsActive("CategoriesManage")" asp-controller="CategoriesManage" asp-action="Index">
-                            <i class="bi bi-grid-3x3-gap"></i> الفئات
-                        </a>
-                    </li>
-                }
-                @if (IsSuperAdmin || HasPerm("manage-instructors"))
-                {
-                    <li class="nav-item">
-                        <a class="nav-link @IsActive("Instructors")" asp-controller="Instructors" asp-action="Index">
-                            <i class="bi bi-person-badge"></i> المدربون
-                        </a>
-                    </li>
-                }
+            <div class="admin-nav__scroll">
+                <a class="admin-nav__link @(IsActive(dashController) ? "is-active" : "")"
+                   asp-controller="@dashController" asp-action="Index">
+                    <i class="bi bi-speedometer2" aria-hidden="true"></i> لوحة التحكم
+                </a>
 
-                @* === الإدارة المالية === *@
-                @if (IsSuperAdmin || HasPerm("view-invoices") || HasPerm("manage-finance") || HasPerm("manage-payments") || HasPerm("view-reports"))
+                @foreach (var group in visibleGroups)
                 {
-                    <li class="sidebar-section">الإدارة المالية</li>
+                    bool groupActive = group.Items.Any(i => IsActive(i.Ctrl));
+                    <button type="button" class="admin-nav__toggle" data-nav-group="@group.Key"
+                            aria-expanded="@(groupActive ? "true" : "false")" aria-controls="navGroup-@group.Key">
+                        <i class="bi @group.Icon" aria-hidden="true"></i>
+                        <span>@group.Label</span>
+                        <i class="bi bi-chevron-down admin-nav__chevron" aria-hidden="true"></i>
+                    </button>
+                    <div class="admin-nav__submenu @(groupActive ? "is-open" : "")" id="navGroup-@group.Key">
+                        <div>
+                            @foreach (var item in group.Items)
+                            {
+                                <a class="admin-nav__link @(IsActive(item.Ctrl) ? "is-active" : "")"
+                                   asp-controller="@item.Ctrl" asp-action="Index">
+                                    <i class="bi @item.Icon" aria-hidden="true"></i> @item.Label
+                                </a>
+                            }
+                        </div>
+                    </div>
                 }
-                @if (IsSuperAdmin || HasPerm("view-invoices") || HasPerm("manage-finance"))
-                {
-                    <li class="nav-item">
-                        <a class="nav-link @IsActive("Invoices")" asp-controller="Invoices" asp-action="Index">
-                            <i class="bi bi-receipt"></i> الفواتير
-                        </a>
-                    </li>
-                }
-                @if (IsSuperAdmin || HasPerm("manage-payments"))
-                {
-                    <li class="nav-item">
-                        <a class="nav-link @IsActive("Payments")" asp-controller="Payments" asp-action="Index">
-                            <i class="bi bi-cash-stack"></i> الدفعات
-                        </a>
-                    </li>
-                }
-                @if (IsSuperAdmin || HasPerm("view-reports"))
-                {
-                    <li class="nav-item">
-                        <a class="nav-link @IsActive("Reports")" asp-controller="Reports" asp-action="CourseRevenue">
-                            <i class="bi bi-graph-up-arrow"></i> تقرير الإيرادات
-                        </a>
-                    </li>
-                }
-                @if (IsSuperAdmin || HasPerm("manage-cashbox"))
-                {
-                    <li class="nav-item">
-                        <a class="nav-link @IsActive("Cashbox")" asp-controller="Cashbox" asp-action="Index">
-                            <i class="bi bi-safe"></i> الصندوق
-                        </a>
-                    </li>
-                }
+            </div>
 
-                @* === الشهادات === *@
-                @if (IsSuperAdmin || HasPerm("issue-certificates") || HasPerm("manage-certificate-designs"))
-                {
-                    <li class="sidebar-section">الشهادات</li>
-                    @if (IsSuperAdmin || HasPerm("issue-certificates"))
-                    {
-                        <li class="nav-item">
-                            <a class="nav-link @IsActive("Certificates")" asp-controller="Certificates" asp-action="Index">
-                                <i class="bi bi-award"></i> الشهادات الصادرة
-                            </a>
-                        </li>
-                    }
-                    @if (IsSuperAdmin || HasPerm("manage-certificate-designs"))
-                    {
-                        <li class="nav-item">
-                            <a class="nav-link @IsActive("CertificateDesigns")" asp-controller="CertificateDesigns" asp-action="Index">
-                                <i class="bi bi-palette"></i> تصميم القالب العام
-                            </a>
-                        </li>
-                    }
-                }
+            <div class="admin-nav__footer">
+                <a class="admin-nav__link" asp-controller="Home" asp-action="Index">
+                    <i class="bi bi-globe2" aria-hidden="true"></i> عرض الموقع العام
+                </a>
+            </div>
+        </aside>
 
-                @* === المحتوى === *@
-                @if (IsSuperAdmin || HasPerm("manage-posts") || HasPerm("manage-news"))
-                {
-                    <li class="sidebar-section">المحتوى</li>
-                    @if (IsSuperAdmin || HasPerm("manage-posts"))
-                    {
-                        <li class="nav-item">
-                            <a class="nav-link @IsActive("PostsManage")" asp-controller="PostsManage" asp-action="Index">
-                                <i class="bi bi-newspaper"></i> المنشورات
-                            </a>
-                        </li>
-                    }
-                    @if (IsSuperAdmin || HasPerm("manage-news"))
-                    {
-                        <li class="nav-item">
-                            <a class="nav-link @IsActive("NewsManage")" asp-controller="NewsManage" asp-action="Index">
-                                <i class="bi bi-megaphone"></i> الأخبار
-                            </a>
-                        </li>
-                    }
-                    @if (IsSuperAdmin)
-                    {
-                        <li class="nav-item">
-                            <a class="nav-link @IsActive("HomepageManage")" asp-controller="HomepageManage" asp-action="Index">
-                                <i class="bi bi-house-gear"></i> إدارة الصفحة الرئيسية
-                            </a>
-                        </li>
-                    }
-                }
+        <div class="admin-scrim" id="navScrim" hidden></div>
 
-                @* === النظام === *@
-                @if (IsSuperAdmin || HasPerm("manage-users") || HasPerm("view-audit-log"))
-                {
-                    <li class="sidebar-section">النظام</li>
-                }
-                @if (IsSuperAdmin || HasPerm("manage-users"))
-                {
-                    <li class="nav-item">
-                        <a class="nav-link @IsActive("Users")" asp-controller="Users" asp-action="Index">
-                            <i class="bi bi-people"></i> المستخدمون
-                        </a>
-                    </li>
-                }
-                @if (IsSuperAdmin)
-                {
-                    <li class="nav-item">
-                        <a class="nav-link @IsActive("Roles")" asp-controller="Roles" asp-action="Index">
-                            <i class="bi bi-shield-lock"></i> الأدوار والصلاحيات
-                        </a>
-                    </li>
-                }
-                @if (IsSuperAdmin || HasPerm("view-audit-log"))
-                {
-                    <li class="nav-item">
-                        <a class="nav-link @IsActive("AuditLog")" asp-controller="AuditLog" asp-action="Index">
-                            <i class="bi bi-journal-text"></i> سجل العمليات
-                        </a>
-                    </li>
-                }
-                @if (IsSuperAdmin)
-                {
-                    <li class="nav-item">
-                        <a class="nav-link @IsActive("AcademicCatalog")" asp-controller="AcademicCatalog" asp-action="Index">
-                            <i class="bi bi-mortarboard"></i> البيانات الجامعية
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link @IsActive("PhoneCountries")" asp-controller="PhoneCountries" asp-action="Index">
-                            <i class="bi bi-phone"></i> مفاتيح الهواتف
-                        </a>
-                    </li>
-                }
-
-                <li class="nav-item mt-3">
-                    <a class="nav-link" asp-controller="Home" asp-action="Index">
-                        <i class="bi bi-globe"></i> عرض الموقع العام
-                    </a>
-                </li>
-            </ul>
-        </nav>
-
-        <div class="admin-overlay d-lg-none" id="sidebarOverlay" aria-hidden="true"></div>
-
-        <!-- Main Content -->
-        <div class="admin-content">
-            <header class="admin-topbar" aria-label="شريط إجراءات لوحة الإدارة">
-                <div class="admin-topbar__group">
-                    <button type="button" id="sidebarToggle" class="admin-icon-button d-lg-none" aria-controls="sidebar" aria-expanded="false" aria-label="فتح وإغلاق القائمة" title="القائمة">
+        <!-- Main -->
+        <div class="admin-main">
+            <header class="admin-topbar" aria-label="شريط أدوات لوحة الإدارة">
+                <div class="admin-topbar__start">
+                    <button type="button" class="admin-iconbtn admin-iconbtn--mobile" id="navToggle"
+                            aria-controls="adminNav" aria-expanded="false" aria-label="فتح القائمة">
                         <i class="bi bi-list" aria-hidden="true"></i>
                     </button>
-                    <a asp-controller="@dashController" asp-action="Index" class="admin-icon-button" aria-label="لوحة التحكم" title="لوحة التحكم">
-                        <i class="bi bi-house-door" aria-hidden="true"></i>
-                    </a>
+
+                    <nav class="admin-crumbs" aria-label="مسار التنقل">
+                        <a asp-controller="@dashController" asp-action="Index">الرئيسية</a>
+                        @if (!string.IsNullOrEmpty(pageTitle))
+                        {
+                            <i class="bi bi-chevron-left admin-crumbs__sep" aria-hidden="true"></i>
+                            <span class="admin-crumbs__current" aria-current="page">@pageTitle</span>
+                        }
+                    </nav>
                 </div>
-                <div class="admin-topbar__group">
-                    <span class="admin-icon-button admin-user-indicator" role="img" aria-label="المستخدم الحالي: @User.Identity?.Name" title="@User.Identity?.Name">
-                        <i class="bi bi-person-circle" aria-hidden="true"></i>
-                    </span>
-                    <a asp-controller="Auth" asp-action="Logout" class="admin-icon-button admin-icon-button--danger" aria-label="تسجيل الخروج" title="تسجيل الخروج">
-                        <i class="bi bi-box-arrow-left" aria-hidden="true"></i>
-                    </a>
+
+                <div class="admin-topbar__end">
+                    <button type="button" class="admin-iconbtn" id="themeToggle"
+                            aria-label="تبديل المظهر الليلي" title="تبديل المظهر">
+                        <i class="bi bi-moon-stars" aria-hidden="true"></i>
+                    </button>
+
+                    <span class="admin-topbar__divider" aria-hidden="true"></span>
+
+                    <div class="admin-usermenu">
+                        <button type="button" class="admin-usermenu__trigger" id="userMenuTrigger"
+                                aria-haspopup="true" aria-expanded="false" aria-controls="userMenuPanel">
+                            <span class="admin-avatar" aria-hidden="true">@initial</span>
+                            <span class="admin-usermenu__meta">
+                                <span class="admin-usermenu__name">@displayName</span>
+                                <span class="admin-usermenu__role">@roleLabel</span>
+                            </span>
+                            <i class="bi bi-chevron-down" aria-hidden="true" style="font-size:.7rem;opacity:.6"></i>
+                        </button>
+
+                        <div class="admin-usermenu__panel" id="userMenuPanel" role="menu">
+                            <div class="admin-usermenu__head">
+                                <strong>@displayName</strong>
+                                <span>@roleLabel</span>
+                            </div>
+                            <a class="admin-usermenu__item" role="menuitem" asp-controller="@dashController" asp-action="Index">
+                                <i class="bi bi-speedometer2" aria-hidden="true"></i> لوحة التحكم
+                            </a>
+                            <a class="admin-usermenu__item" role="menuitem" asp-controller="Auth" asp-action="ChangePassword">
+                                <i class="bi bi-key" aria-hidden="true"></i> تغيير كلمة المرور
+                            </a>
+                            <a class="admin-usermenu__item" role="menuitem" asp-controller="Home" asp-action="Index">
+                                <i class="bi bi-globe2" aria-hidden="true"></i> الموقع العام
+                            </a>
+                            <a class="admin-usermenu__item admin-usermenu__item--danger" role="menuitem"
+                               asp-controller="Auth" asp-action="Logout">
+                                <i class="bi bi-box-arrow-left" aria-hidden="true"></i> تسجيل الخروج
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </header>
 
-            <div class="admin-body">
+            <main class="admin-content" id="adminContent">
                 @if (TempData["Success"] != null)
                 {
-                    <div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle"></i> @TempData["Success"]<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+                    <div class="alert alert-success alert-dismissible fade show" role="status">
+                        <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                        <div class="flex-grow-1">@TempData["Success"]</div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="إغلاق"></button>
+                    </div>
                 }
                 @if (TempData["Error"] != null)
                 {
-                    <div class="alert alert-danger alert-dismissible fade show"><i class="bi bi-exclamation-circle"></i> @TempData["Error"]<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
+                        <div class="flex-grow-1">@TempData["Error"]</div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="إغلاق"></button>
+                    </div>
                 }
                 @RenderBody()
-            </div>
+            </main>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/api.js"></script>
     <script src="~/js/site.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const sidebar = document.getElementById('sidebar');
-            const sidebarToggle = document.getElementById('sidebarToggle');
-            const sidebarOverlay = document.getElementById('sidebarOverlay');
-            const sidebarClose = document.getElementById('sidebarClose');
-            if (!sidebar || !sidebarToggle) return;
-
-            function openSidebar() {
-                sidebar.classList.add('show');
-                if (sidebarOverlay) sidebarOverlay.classList.add('show');
-                sidebarToggle.setAttribute('aria-expanded', 'true');
-            }
-
-            function closeSidebar() {
-                sidebar.classList.remove('show');
-                if (sidebarOverlay) sidebarOverlay.classList.remove('show');
-                sidebarToggle.setAttribute('aria-expanded', 'false');
-            }
-
-            sidebarToggle.addEventListener('click', function (e) {
-                e.stopPropagation();
-                if (sidebar.classList.contains('show')) {
-                    closeSidebar();
-                } else {
-                    openSidebar();
-                }
-            });
-
-            if (sidebarOverlay) {
-                sidebarOverlay.addEventListener('click', closeSidebar);
-            }
-
-            if (sidebarClose) {
-                sidebarClose.addEventListener('click', closeSidebar);
-            }
-
-            // Close on outside click (mobile)
-            document.addEventListener('click', function (e) {
-                if (window.innerWidth >= 993 || !sidebar.classList.contains('show')) return;
-                if (!sidebar.contains(e.target) && !sidebarToggle.contains(e.target)) {
-                    closeSidebar();
-                }
-            });
-
-            // Close on Escape key
-            document.addEventListener('keydown', function (e) {
-                if (e.key === 'Escape' && sidebar.classList.contains('show')) {
-                    closeSidebar();
-                }
-            });
-
-            sidebar.querySelectorAll('a').forEach(function (link) {
-                link.addEventListener('click', function () {
-                    if (window.innerWidth < 993) {
-                        closeSidebar();
-                    }
-                });
-            });
-        });
-    </script>
+    <script src="~/js/admin.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
