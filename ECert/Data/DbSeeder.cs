@@ -29,6 +29,33 @@ public static class DbSeeder
         return generated;
     }
 
+    /// <summary>
+    /// Optional recovery hook. When <c>ECERT_RESET_ADMIN_PASSWORD</c> is set, the <c>admin</c>
+    /// account's password is reset to that value and it is flagged to change it at next
+    /// sign-in. Intended for the case where a database was seeded before the bootstrap password
+    /// was captured; unset the variable afterwards so the value does not stay in the config.
+    /// </summary>
+    private const string AdminPasswordResetVariable = "ECERT_RESET_ADMIN_PASSWORD";
+
+    private static void ApplyAdminPasswordReset(ECertDbContext db, ILogger? logger)
+    {
+        var requested = Environment.GetEnvironmentVariable(AdminPasswordResetVariable);
+        if (string.IsNullOrWhiteSpace(requested))
+            return;
+
+        var admin = db.Users.FirstOrDefault(u => u.Username == "admin");
+        if (admin == null)
+            return;
+
+        admin.PasswordHash = BCrypt.Net.BCrypt.HashPassword(requested);
+        admin.MustChangePassword = true;
+        admin.IsActive = true;
+        db.SaveChanges();
+        (logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance).LogWarning(
+            "{Variable} was set: the admin password was reset and must be changed at next sign-in. " +
+            "Remove the variable now.", AdminPasswordResetVariable);
+    }
+
     public static void Seed(ECertDbContext db, ILogger? logger = null)
     {
         EnsureCashboxPermissions(db);
@@ -36,6 +63,7 @@ public static class DbSeeder
         {
             EnsureCertificateDesignPermission(db);
             SeedHomepageCms(db);
+            ApplyAdminPasswordReset(db, logger);
             return;
         }
 
