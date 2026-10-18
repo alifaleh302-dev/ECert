@@ -59,20 +59,22 @@
 
 @if (!string.IsNullOrEmpty(errorMsg))
 {
-    <div class="alert alert-warning shadow-sm" role="alert">
-        <h6 class="alert-heading"><i class="bi bi-exclamation-triangle"></i> تعذّر جلب السجلات من قاعدة البيانات</h6>
-        <p class="mb-1 small">@errorMsg</p>
-        <hr />
-        <p class="mb-0 small text-muted">
-            إجمالي السجلات في الجدول: <strong>@totalCount</strong> — دورك: <strong>@actorRole</strong>.
-        </p>
+    <div class="a-note a-note--warning mb-4" role="alert">
+        <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+        <div>
+            <h6 class="alert-heading">تعذّر جلب السجلات من قاعدة البيانات</h6>
+            <p class="mb-1 small">@errorMsg</p>
+            <p class="mb-0 small">
+                إجمالي السجلات في الجدول: <strong>@totalCount</strong> — دورك: <strong>@actorRole</strong>.
+            </p>
+        </div>
     </div>
 }
 else
 {
-    <div class="alert alert-info py-2 px-3 shadow-sm small d-flex align-items-center gap-2" role="status">
-        <i class="bi bi-database-check"></i>
-        <span>عدد السجلات الظاهرة في الصفحة: <strong>@logs.Count</strong> من إجمالي <strong>@totalCount</strong> سجل في قاعدة البيانات.</span>
+    <div class="a-note a-note--info mb-4" role="status">
+        <i class="bi bi-database-check" aria-hidden="true"></i>
+        <div>عدد السجلات الظاهرة في الصفحة: <strong>@logs.Count</strong> من إجمالي <strong>@totalCount</strong> سجل في قاعدة البيانات.</div>
     </div>
 }
 
@@ -108,11 +110,11 @@ else
     </div>
 </form>
 
-<div class="card shadow-sm border-0">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle">
-                <thead class="table-light">
+<div class="a-card">
+    <div class="a-card__body a-card__body--flush">
+        <div class="a-table-wrap">
+            <table class="table a-table table-hover align-middle">
+                <thead>
                     <tr>
                         <th>التاريخ والوقت</th>
                         <th>المستخدم</th>
@@ -148,7 +150,7 @@ else
                                     }
                                     else
                                     {
-                                        <span class="badge bg-light text-dark">@log.Action</span>
+                                        <span class="a-badge a-badge--neutral">@log.Action</span>
                                     }
                                 </td>
                                 <td>
@@ -183,8 +185,9 @@ else
         </div>
         @if (logs.Count >= 200)
         {
-            <div class="alert alert-secondary small mt-3 mb-0">
-                <i class="bi bi-info-circle"></i> تم عرض أحدث 200 سجل. استخدم الفلاتر لتقريب البحث.
+            <div class="a-note a-note--neutral small mt-3 mb-0">
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                <div>تم عرض أحدث 200 سجل. استخدم الفلاتر لتقريب البحث.</div>
             </div>
         }
     </div>

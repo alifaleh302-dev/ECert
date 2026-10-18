@@ -1,53 +1,86 @@
 @model Instructor
 @{
     ViewData["Title"] = "إضافة مدرب";
+    ViewData["PageIcon"] = "bi-person-plus";
+    ViewData["PageDesc"] = "أضف بيانات المدرب وخبراته ليظهر في الدورات المرتبطة به";
     Layout = "_AdminLayout";
 }
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white"><h4 class="mb-0"><i class="bi bi-person-plus"></i> إضافة مدرب جديد</h4></div>
-            <div class="card-body p-4">
-                <form asp-action="Create" method="post" enctype="multipart/form-data">
-                    @Html.AntiForgeryToken()
-                    <div class="mb-3">
-                        <label asp-for="FullName" class="form-label"></label>
-                        <input asp-for="FullName" class="form-control" />
-                        <span asp-validation-for="FullName" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Specialization" class="form-label"></label>
-                        <input asp-for="Specialization" class="form-control" placeholder="مثال: تمريض، إسعافات أولية" />
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Bio" class="form-label"></label>
-                        <textarea asp-for="Bio" class="form-control" rows="4" placeholder="نبذة عن المدرب وخبراته"></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Phone" class="form-label"></label>
-                        <input asp-for="Phone" class="form-control" />
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Email" class="form-label"></label>
-                        <input asp-for="Email" type="email" class="form-control" />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">صورة المدرب</label>
-                        <input type="file" name="photo" accept="image/*" class="form-control" id="photoInput" onchange="previewPhoto(this)" />
-                        <div class="mt-2 text-center">
-                            <img id="photoPreview" src="" alt="" style="display:none; max-width:150px; max-height:150px; border-radius:50%; object-fit:cover; border:3px solid #ddd;" />
-                        </div>
-                    </div>
-                    <div class="form-check mb-3">
-                        <input asp-for="IsActive" class="form-check-input" checked />
-                        <label asp-for="IsActive" class="form-check-label">نشط</label>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ</button>
-                        <a asp-action="Index" class="btn btn-outline-secondary">إلغاء</a>
-                    </div>
-                </form>
-            </div>
-        </div>
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للمدربين</a>
     </div>
 </div>
+
+<div class="a-card a-card--narrow">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-person-plus" aria-hidden="true"></i> بيانات المدرب</h2>
+    </div>
+    <div class="a-card__body">
+        <form asp-action="Create" method="post" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="a-error mb-3"></div>
+
+            <div class="a-field">
+                <label asp-for="FullName" class="a-label a-label--required"></label>
+                <input asp-for="FullName" class="form-control" />
+                <span asp-validation-for="FullName" class="a-error"></span>
+            </div>
+            <div class="a-field">
+                <label asp-for="Specialization" class="a-label"></label>
+                <input asp-for="Specialization" class="form-control" placeholder="مثال: تمريض، إسعافات أولية" />
+                <span asp-validation-for="Specialization" class="a-error"></span>
+            </div>
+            <div class="a-field">
+                <label asp-for="Bio" class="a-label"></label>
+                <textarea asp-for="Bio" class="form-control" rows="4" placeholder="نبذة عن المدرب وخبراته"></textarea>
+                <span asp-validation-for="Bio" class="a-error"></span>
+            </div>
+            <div class="a-form__grid a-form__grid--2">
+                <div class="a-field">
+                    <label asp-for="Phone" class="a-label"></label>
+                    <input asp-for="Phone" class="form-control" />
+                    <span asp-validation-for="Phone" class="a-error"></span>
+                </div>
+                <div class="a-field">
+                    <label asp-for="Email" class="a-label"></label>
+                    <input asp-for="Email" type="email" class="form-control" />
+                    <span asp-validation-for="Email" class="a-error"></span>
+                </div>
+            </div>
+
+            <div class="a-field">
+                <label class="a-label" for="photoInput">صورة المدرب</label>
+                <input type="file" name="photo" accept="image/*" class="form-control" id="photoInput" onchange="previewPhoto(this)" />
+                <span class="a-hint">صورة اختيارية، تُعرض في صفحة المدرب.</span>
+                <img id="photoPreview" class="a-media-preview a-media-preview--avatar" src="" alt="معاينة صورة المدرب" hidden />
+            </div>
+
+            <div class="form-check mb-0">
+                <input asp-for="IsActive" class="form-check-input" checked />
+                <label asp-for="IsActive" class="form-check-label">نشط</label>
+            </div>
+
+            <div class="a-form__actions">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">إلغاء</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function previewPhoto(input) {
+        const preview = document.getElementById('photoPreview');
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function (e) { preview.src = e.target.result; preview.hidden = false; };
+            reader.readAsDataURL(input.files[0]);
+        } else {
+            preview.hidden = true;
+        }
+    }
+</script>
+}

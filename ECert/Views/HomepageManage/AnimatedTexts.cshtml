@@ -14,11 +14,11 @@
 
 <div class="row">
     <div class="col-md-7">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white"><strong>النصوص الحالية</strong></div>
-            <div class="card-body p-0">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
+        <div class="a-card">
+            <div class="a-card__header"><strong>النصوص الحالية</strong></div>
+            <div class="a-card__body a-card__body--flush">
+                <table class="table a-table table-hover align-middle mb-0">
+                    <thead>
                         <tr><th>النص</th><th>الحالة</th><th>إجراءات</th></tr>
                     </thead>
                     <tbody>
@@ -29,11 +29,11 @@
                                 <td>
                                     @if (t.IsActive)
                                     {
-                                        <span class="badge bg-success">فعال</span>
+                                        <span class="a-badge a-badge--success">فعال</span>
                                     }
                                     else
                                     {
-                                        <span class="badge bg-secondary">معطل</span>
+                                        <span class="a-badge a-badge--neutral">معطل</span>
                                     }
                                 </td>
                                 <td>
@@ -54,9 +54,9 @@
         </div>
     </div>
     <div class="col-md-5">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white"><strong>إضافة نص جديد</strong></div>
-            <div class="card-body">
+        <div class="a-card">
+            <div class="a-card__header"><strong>إضافة نص جديد</strong></div>
+            <div class="a-card__body">
                 <form method="post" action="/HomepageManage/AddAnimatedText">
                     <div class="mb-3">
                         <label class="form-label">النص</label>

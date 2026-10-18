@@ -13,20 +13,20 @@
     <partial name="_PageHeader" />
 </div>
 
-<div class="alert alert-info d-flex align-items-start gap-2">
-    <i class="bi bi-info-circle fs-5"></i>
+<div class="a-note a-note--info mb-4" role="note">
+    <i class="bi bi-info-circle" aria-hidden="true"></i>
     <div>
         <strong>مهم:</strong> محتوى <strong>من نحن</strong> والتحكم في أعمدة <strong>الفوتر</strong> لم يعدا ضمن هذه الصفحة.
-        انتقل إلى <a asp-action="AboutFooter" class="alert-link">من نحن والفوتر</a> لإدارتهما بشكل مباشر.
+        انتقل إلى <a asp-action="AboutFooter" class="a-note__link">من نحن والفوتر</a> لإدارتهما بشكل مباشر.
     </div>
 </div>
 
 <form method="post" action="/HomepageManage/SaveSiteSettings" enctype="multipart/form-data">
     <div class="row g-4">
         <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white"><strong>معلومات عامة</strong></div>
-                <div class="card-body">
+            <div class="a-card">
+                <div class="a-card__header"><strong>معلومات عامة</strong></div>
+                <div class="a-card__body">
                     <div class="mb-3">
                         <label class="form-label">اسم المركز</label>
                         <input type="text" name="siteName" value="@GetVal("SiteName")" class="form-control" />
@@ -57,9 +57,9 @@
             </div>
         </div>
         <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white"><strong>تحسين محركات البحث (SEO)</strong></div>
-                <div class="card-body">
+            <div class="a-card">
+                <div class="a-card__header"><strong>تحسين محركات البحث (SEO)</strong></div>
+                <div class="a-card__body">
                     <div class="mb-3">
                         <label class="form-label">وصف الموقع (Meta Description)</label>
                         <textarea name="metaDescription" class="form-control" rows="3">@GetVal("MetaDescription")</textarea>

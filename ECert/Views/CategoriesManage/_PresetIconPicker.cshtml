@@ -4,10 +4,10 @@
     var currentIcon = ViewData["CurrentIcon"] as string;
 }
 
-<div class="mb-4">
+<div class="a-field">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-        <label class="form-label fw-semibold mb-0" for="presetIcon">اختر أيقونة جاهزة</label>
-        <span class="small text-muted">اختيارية — يمكنك دائماً رفع صورة بدلاً منها</span>
+        <label class="a-label mb-0" for="presetIcon">اختر أيقونة جاهزة</label>
+        <span class="a-hint">اختيارية — يمكنك دائماً رفع صورة بدلاً منها</span>
     </div>
     <div class="preset-icon-grid" role="radiogroup" aria-label="الأيقونات الجاهزة للفئة">
         @foreach (var icon in icons)
@@ -20,15 +20,15 @@
             </label>
         }
     </div>
-    <div class="form-text">سيظهر اختيارك مباشرة في الموقع. عند رفع صورة مخصصة، تكون الصورة هي المعتمدة تلقائياً.</div>
+    <span class="a-hint">سيظهر اختيارك مباشرة في الموقع. عند رفع صورة مخصصة، تكون الصورة هي المعتمدة تلقائياً.</span>
 </div>
 
 <style>
-    .preset-icon-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(115px,1fr)); gap:.65rem; }
-    .preset-icon-option { min-height:94px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.35rem; padding:.65rem .4rem; border:1px solid #dee2e6; border-radius:.75rem; background:#fff; color:#495057; cursor:pointer; text-align:center; transition:all .18s ease; }
-    .preset-icon-option:hover { border-color:#0d6efd; color:#0d6efd; transform:translateY(-2px); box-shadow:0 .25rem .75rem rgba(13,110,253,.12); }
-    .preset-icon-option:has(input:focus-visible) { outline:3px solid rgba(13,110,253,.35); outline-offset:2px; }
-    .preset-icon-option.is-selected { border-color:#0d6efd; background:#eef5ff; color:#0d6efd; box-shadow:0 .25rem .75rem rgba(13,110,253,.14); }
+    .preset-icon-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(115px,1fr)); gap:var(--a-3); }
+    .preset-icon-option { min-height:94px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.35rem; padding:.65rem .4rem; border:1px solid var(--a-border); border-radius:var(--a-r); background:var(--a-surface-2); color:var(--a-text-2); cursor:pointer; text-align:center; transition:all .18s ease; }
+    .preset-icon-option:hover { border-color:var(--a-brand); color:var(--a-brand); transform:translateY(-2px); box-shadow:var(--a-e2); }
+    .preset-icon-option:has(input:focus-visible) { outline:3px solid var(--a-brand-ring); outline-offset:2px; }
+    .preset-icon-option.is-selected { border-color:var(--a-brand); background:var(--a-brand-soft); color:var(--a-brand); box-shadow:var(--a-e2); }
     .preset-icon-option i { font-size:1.55rem; line-height:1; }
     .preset-icon-option span { font-size:.75rem; line-height:1.15; }
     @@media (max-width:575.98px) { .preset-icon-grid { grid-template-columns:repeat(3,1fr); } }

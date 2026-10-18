@@ -1,42 +1,73 @@
 @model ECert.Models.Post
 @{
     ViewData["Title"] = "إضافة خبر";
+    ViewData["PageIcon"] = "bi-megaphone";
+    ViewData["PageDesc"] = "انشر خبراً جديداً ليظهر في الموقع العام";
     Layout = "_AdminLayout";
 }
-<h2 class="mb-4"><i class="bi bi-plus-circle"></i> إضافة خبر جديد</h2>
 
-<div class="card shadow-sm">
-    <div class="card-body">
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للأخبار</a>
+    </div>
+</div>
+
+<div class="a-card">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-megaphone" aria-hidden="true"></i> بيانات الخبر</h2>
+    </div>
+    <div class="a-card__body">
         <form asp-action="Create" method="post" enctype="multipart/form-data">
             @Html.AntiForgeryToken()
-            <div class="mb-3">
-                <label asp-for="Title" class="form-label">العنوان</label>
+            <div asp-validation-summary="ModelOnly" class="a-error mb-3"></div>
+
+            <div class="a-field">
+                <label asp-for="Title" class="a-label a-label--required">العنوان</label>
                 <input asp-for="Title" class="form-control" required />
-                <span asp-validation-for="Title" class="text-danger"></span>
+                <span asp-validation-for="Title" class="a-error"></span>
             </div>
-            <div class="mb-3">
-                <label asp-for="Content" class="form-label">المحتوى</label>
+            <div class="a-field">
+                <label asp-for="Content" class="a-label a-label--required">المحتوى</label>
                 <textarea asp-for="Content" class="form-control" rows="8" required></textarea>
-                <span asp-validation-for="Content" class="text-danger"></span>
+                <span asp-validation-for="Content" class="a-error"></span>
             </div>
-            <div class="mb-3">
-                <label class="form-label">الصورة الرئيسية</label>
-                <input type="file" name="image" accept="image/*" class="form-control" onchange="previewPhoto(this)" />
-                <div class="mt-2 text-center">
-                    <img id="photoPreview" src="" alt="" style="display:none; max-width:300px; max-height:200px; object-fit:cover; border-radius:8px; border:2px solid #ddd;" />
+            <div class="a-form__grid a-form__grid--2">
+                <div class="a-field">
+                    <label class="a-label" for="newsImage">الصورة الرئيسية</label>
+                    <input id="newsImage" type="file" name="image" accept="image/*" class="form-control" onchange="previewPhoto(this)" />
+                    <span class="a-hint">صورة اختيارية تظهر أعلى الخبر.</span>
+                    <img id="photoPreview" class="a-media-preview" src="" alt="معاينة الصورة" hidden />
+                </div>
+                <div class="a-field">
+                    <label asp-for="Status" class="a-label">الحالة</label>
+                    <select asp-for="Status" class="form-select">
+                        <option value="Draft">مسودة</option>
+                        <option value="Published">نشر مباشرة</option>
+                    </select>
+                    <span asp-validation-for="Status" class="a-error"></span>
                 </div>
             </div>
-            <div class="mb-3">
-                <label asp-for="Status" class="form-label">الحالة</label>
-                <select asp-for="Status" class="form-select">
-                    <option value="Draft">مسودة</option>
-                    <option value="Published">نشر مباشرة</option>
-                </select>
-            </div>
-            <div class="d-flex gap-2">
+
+            <div class="a-form__actions">
                 <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> حفظ الخبر</button>
                 <a asp-action="Index" class="btn btn-outline-secondary">إلغاء</a>
             </div>
         </form>
     </div>
 </div>
+
+@section Scripts {
+<script>
+    function previewPhoto(input) {
+        const preview = document.getElementById('photoPreview');
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function (e) { preview.src = e.target.result; preview.hidden = false; };
+            reader.readAsDataURL(input.files[0]);
+        } else {
+            preview.hidden = true;
+        }
+    }
+</script>
+}

@@ -1,120 +1,169 @@
 @model Registration
 @{
     ViewData["Title"] = "تفاصيل التسجيل";
+    ViewData["PageIcon"] = "bi-clipboard-check";
+    ViewData["PageDesc"] = "بيانات المتدرب والفاتورة والإعفاء المالي";
     Layout = "_AdminLayout";
 }
-<h2 class="mb-4"><i class="bi bi-clipboard-check"></i> تفاصيل التسجيل #@Model.RequestNumber</h2>
-<div class="row g-4">
-    <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-header bg-white"><h6 class="mb-0">بيانات المتدرب</h6></div>
-            <div class="card-body">
-                <table class="table table-borderless">
-                    <tr><th class="w-50">الاسم بالعربية</th><td>@(Model.FullNameArabic ?? Model.FullName)</td></tr>
-                    <tr><th>الاسم بالإنجليزية</th><td dir="ltr">@(Model.FullNameEnglish ?? Model.FullName)</td></tr>
-                    <tr><th>الجنس</th><td>@(Model.Gender == "Male" ? "ذكر" : Model.Gender == "Female" ? "أنثى" : "-")</td></tr>
-                    <tr><th>الهاتف</th><td>@Model.Phone</td></tr>
-                    <tr><th>البريد</th><td>@(Model.Email ?? "-")</td></tr>
-                    <tr><th>كيف سمع عنا</th><td>@(Model.HeardFrom ?? "-")</td></tr>
-                    <tr><th>الدورة</th><td>@Model.Course?.CourseName</td></tr>
-                    <tr><th>تاريخ التسجيل</th><td>@Model.RegistrationDate.ToString("yyyy-MM-dd HH:mm")</td></tr>
-                    <tr><th>الحالة</th><td>
-                        @switch (Model.Status)
-                        {
-                            case "Pending":
-                                @:<span class="badge bg-warning text-dark">معلق</span>
-                                break;
-                            case "Accepted":
-                                @:<span class="badge bg-success">مقبول</span>
-                                break;
-                            case "Rejected":
-                                @:<span class="badge bg-danger">مرفوض</span>
-                                break;
-                        }
-                    </td></tr>
-                    @if (Model.Status == "Accepted")
-                    {
-                        <tr><th>تاريخ القبول</th><td>@Model.AcceptedDate?.ToString("yyyy-MM-dd")</td></tr>
-                        <tr><th>الموظف</th><td>@Model.ProcessedBy</td></tr>
-                    }
-                    @if (Model.Status == "Rejected")
-                    {
-                        <tr><th>سبب الرفض</th><td class="text-danger">@Model.RejectionReason</td></tr>
-                        <tr><th>الموظف</th><td>@Model.ProcessedBy</td></tr>
-                    }
-                </table>
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للتسجيلات</a>
+    </div>
+</div>
+
+<div class="a-grid-2">
+    <section class="a-card">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-person-vcard" aria-hidden="true"></i> بيانات المتدرب</h2>
+            <span class="a-badge @(Model.Status switch { "Accepted" => "a-badge--success", "Pending" => "a-badge--warning", "Rejected" => "a-badge--danger", _ => "a-badge--neutral" })">
+                @(Model.Status switch { "Pending" => "معلق", "Accepted" => "مقبول", "Rejected" => "مرفوض", _ => Model.Status })
+            </span>
+        </div>
+        <div class="a-card__body">
+            <div class="a-dl">
+                <span class="a-dl__label">رقم الطلب</span>
+                <p class="a-dl__value"><span class="a-code">@Model.RequestNumber</span></p>
+
+                <span class="a-dl__label">الاسم بالعربية</span>
+                <p class="a-dl__value">@(Model.FullNameArabic ?? Model.FullName)</p>
+
+                <span class="a-dl__label">الاسم بالإنجليزية</span>
+                <p class="a-dl__value" dir="ltr">@(Model.FullNameEnglish ?? Model.FullName)</p>
+
+                <span class="a-dl__label">الجنس</span>
+                <p class="a-dl__value">@(Model.Gender == "Male" ? "ذكر" : Model.Gender == "Female" ? "أنثى" : "-")</p>
+
+                <span class="a-dl__label">الهاتف</span>
+                <p class="a-dl__value">@Model.Phone</p>
+
+                <span class="a-dl__label">البريد</span>
+                <p class="a-dl__value">@(Model.Email ?? "-")</p>
+
+                <span class="a-dl__label">كيف سمع عنا</span>
+                <p class="a-dl__value">@(Model.HeardFrom ?? "-")</p>
+
+                <span class="a-dl__label">الدورة</span>
+                <p class="a-dl__value">@Model.Course?.CourseName</p>
+
+                <span class="a-dl__label">تاريخ التسجيل</span>
+                <p class="a-dl__value">@Model.RegistrationDate.ToString("yyyy-MM-dd HH:mm")</p>
+
+                @if (Model.Status == "Accepted")
+                {
+                    <span class="a-dl__label">تاريخ القبول</span>
+                    <p class="a-dl__value">@Model.AcceptedDate?.ToString("yyyy-MM-dd")</p>
+
+                    <span class="a-dl__label">الموظف</span>
+                    <p class="a-dl__value">@Model.ProcessedBy</p>
+                }
+                @if (Model.Status == "Rejected")
+                {
+                    <span class="a-dl__label">سبب الرفض</span>
+                    <p class="a-dl__value text-danger">@Model.RejectionReason</p>
+
+                    <span class="a-dl__label">الموظف</span>
+                    <p class="a-dl__value">@Model.ProcessedBy</p>
+                }
             </div>
         </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card shadow-sm mb-3">
-            <div class="card-header bg-white"><h6 class="mb-0">الفاتورة</h6></div>
-            <div class="card-body">
+    </section>
+
+    <div>
+        <section class="a-card mb-4">
+            <div class="a-card__header">
+                <h2 class="a-card__title"><i class="bi bi-receipt" aria-hidden="true"></i> الفاتورة</h2>
+            </div>
+            <div class="a-card__body">
                 @if (Model.Invoice != null)
                 {
-                    <p><strong>رقم الفاتورة:</strong> @Model.Invoice.InvoiceNumber</p>
-                    <p><strong>المبلغ:</strong> @Model.Invoice.TotalAmount.ToString("N0") ريال</p>
-                    <p><strong>المدفوع:</strong> @Model.Invoice.PaidAmount.ToString("N0") ريال</p>
-                    <p><strong>المتبقي:</strong> @Model.Invoice.RemainingAmount.ToString("N0") ريال</p>
-                    <a asp-controller="Invoices" asp-action="Details" asp-route-id="@Model.Invoice.InvoiceId" class="btn btn-sm btn-outline-primary">عرض الفاتورة</a>
+                    <div class="a-dl">
+                        <span class="a-dl__label">رقم الفاتورة</span>
+                        <p class="a-dl__value"><span class="a-code">@Model.Invoice.InvoiceNumber</span></p>
+
+                        <span class="a-dl__label">المبلغ</span>
+                        <p class="a-dl__value">@Model.Invoice.TotalAmount.ToString("N0") ريال</p>
+
+                        <span class="a-dl__label">المدفوع</span>
+                        <p class="a-dl__value text-success">@Model.Invoice.PaidAmount.ToString("N0") ريال</p>
+
+                        <span class="a-dl__label">المتبقي</span>
+                        <p class="a-dl__value text-danger">@Model.Invoice.RemainingAmount.ToString("N0") ريال</p>
+                    </div>
+                    <div class="mt-3">
+                        <a asp-controller="Invoices" asp-action="Details" asp-route-id="@Model.Invoice.InvoiceId" class="btn btn-sm btn-outline-primary"><i class="bi bi-box-arrow-up-left"></i> عرض الفاتورة</a>
+                    </div>
                 }
                 else
                 {
-                    <p class="text-muted">لا توجد فاتورة. عند قبول التسجيل تُنشأ الفاتورة تلقائيًا.</p>
+                    <p class="text-muted mb-3">لا توجد فاتورة. عند قبول التسجيل تُنشأ الفاتورة تلقائيًا.</p>
                     @if (Model.Status == "Accepted")
                     {
                         <a asp-controller="Invoices" asp-action="Create" asp-route-registrationId="@Model.RegistrationId" class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-repeat"></i> تأكيد/استكمال الفاتورة</a>
                     }
                 }
             </div>
-        </div>
+        </section>
+
         @if (Model.Status is "Pending" or "Accepted")
         {
             var originalFee = Model.Invoice?.OriginalAmount > 0 ? Model.Invoice.OriginalAmount : (Model.Course?.FinalPrice ?? 0);
             var currentExemption = Model.ExemptionAmount;
             var payableFee = Math.Max(0, originalFee - currentExemption);
-            <div class="card shadow-sm mb-3 border-primary-subtle">
-                <div class="card-header bg-primary-subtle"><h6 class="mb-0"><i class="bi bi-shield-check"></i> الإعفاء المالي</h6></div>
-                <div class="card-body">
-                    <div class="row g-2 small mb-3">
-                        <div class="col-4"><span class="text-muted d-block">الرسوم الأصلية</span><strong>@originalFee.ToString("N2") ريال</strong></div>
-                        <div class="col-4"><span class="text-muted d-block">الإعفاء الحالي</span><strong class="text-success">@currentExemption.ToString("N2") ريال</strong></div>
-                        <div class="col-4"><span class="text-muted d-block">المستحق</span><strong>@payableFee.ToString("N2") ريال</strong></div>
+            <section class="a-card mb-4">
+                <div class="a-card__header">
+                    <h2 class="a-card__title"><i class="bi bi-shield-check" aria-hidden="true"></i> الإعفاء المالي</h2>
+                </div>
+                <div class="a-card__body">
+                    <div class="a-form__grid mb-3">
+                        <div class="a-field mb-0">
+                            <span class="a-field__label">الرسوم الأصلية</span>
+                            <strong>@originalFee.ToString("N2") ريال</strong>
+                        </div>
+                        <div class="a-field mb-0">
+                            <span class="a-field__label">الإعفاء الحالي</span>
+                            <strong class="text-success">@currentExemption.ToString("N2") ريال</strong>
+                        </div>
+                        <div class="a-field mb-0">
+                            <span class="a-field__label">المستحق</span>
+                            <strong>@payableFee.ToString("N2") ريال</strong>
+                        </div>
                     </div>
                     @if (Model.ExemptionAppliedAt.HasValue)
                     {
-                        <p class="small text-muted mb-3">طُبق بواسطة @Model.ExemptionAppliedBy بتاريخ @Model.ExemptionAppliedAt.Value.ToString("yyyy-MM-dd HH:mm")@(string.IsNullOrWhiteSpace(Model.ExemptionReason) ? "" : $" — السبب: {Model.ExemptionReason}")</p>
+                        <p class="a-hint mb-3">طُبق بواسطة @Model.ExemptionAppliedBy بتاريخ @Model.ExemptionAppliedAt.Value.ToString("yyyy-MM-dd HH:mm")@(string.IsNullOrWhiteSpace(Model.ExemptionReason) ? "" : $" — السبب: {Model.ExemptionReason}")</p>
                     }
-                    <form asp-action="ApplyExemption" method="post" class="row g-2 align-items-end">
+                    <form asp-action="ApplyExemption" method="post" class="a-form__grid align-items-end">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="RegistrationId" value="@Model.RegistrationId" />
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold" for="ExemptionAmount">مبلغ الإعفاء</label>
+                        <div class="a-field mb-0">
+                            <label class="a-field__label" for="ExemptionAmount">مبلغ الإعفاء</label>
                             <input class="form-control form-control-sm" id="ExemptionAmount" name="ExemptionAmount" type="number" min="0" max="@originalFee" step="0.01" value="@currentExemption.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" required />
-                            <div class="form-text">لإعفاء كامل أدخل @originalFee.ToString("N2") ريال.</div>
+                            <span class="a-hint">لإعفاء كامل أدخل @originalFee.ToString("N2") ريال.</span>
                         </div>
-                        <div class="col-md-5">
-                            <label class="form-label small fw-semibold" for="Reason">سبب الإعفاء</label>
+                        <div class="a-field mb-0">
+                            <label class="a-field__label" for="Reason">سبب الإعفاء</label>
                             <input class="form-control form-control-sm" id="Reason" name="Reason" maxlength="500" value="@Model.ExemptionReason" placeholder="مثال: منحة أو حالة اجتماعية" />
                         </div>
-                        <div class="col-md-3 d-grid">
-                            <button type="submit" class="btn btn-sm btn-primary" onclick="return confirm('سيتم تحديث المبلغ المستحق في الفاتورة إن وُجدت. هل تريد المتابعة؟');"><i class="bi bi-check2-circle"></i> حفظ الإعفاء</button>
+                        <div class="a-field mb-0">
+                            <button type="submit" class="btn btn-sm btn-primary w-100" onclick="return confirm('سيتم تحديث المبلغ المستحق في الفاتورة إن وُجدت. هل تريد المتابعة؟');"><i class="bi bi-check2-circle"></i> حفظ الإعفاء</button>
                         </div>
                     </form>
                 </div>
-            </div>
+            </section>
         }
+
         @if (Model.Status == "Pending")
         {
-            <div class="d-flex gap-2">
+            <div class="d-flex flex-wrap gap-2">
                 <form asp-action="Accept" method="post">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="id" value="@Model.RegistrationId" />
-                    <button type="submit" class="btn btn-success"><i class="bi bi-check"></i> قبول</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-check"></i> قبول التسجيل</button>
                 </form>
-                <a asp-action="Reject" asp-route-id="@Model.RegistrationId" class="btn btn-danger"><i class="bi bi-x"></i> رفض</a>
+                <a asp-action="Reject" asp-route-id="@Model.RegistrationId" class="btn btn-danger"><i class="bi bi-x"></i> رفض التسجيل</a>
             </div>
         }
     </div>
 </div>
-<a asp-action="Index" class="btn btn-outline-secondary mt-3"><i class="bi bi-arrow-right"></i> العودة</a>

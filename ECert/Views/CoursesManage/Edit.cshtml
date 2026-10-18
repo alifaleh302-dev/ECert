@@ -1,6 +1,8 @@
 @model Course
 @{
     ViewData["Title"] = "تعديل دورة";
+    ViewData["PageIcon"] = "bi-pencil-square";
+    ViewData["PageDesc"] = "حدّث تفاصيل الدورة ورسومها وجدولها";
     Layout = "_AdminLayout";
     var categories = ViewBag.Categories as List<Category> ?? new();
     var instructors = ViewBag.Instructors as List<Instructor> ?? new();
@@ -9,158 +11,191 @@
     var instructorOptionsJson = System.Text.Json.JsonSerializer.Serialize(instructors.Select(i => new { value = i.InstructorId, label = i.FullName }).OrderBy(x => x.label));
     var selectedInstructorIdsJson = System.Text.Json.JsonSerializer.Serialize(selectedInstructorIds);
 }
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white"><h4 class="mb-0"><i class="bi bi-pencil"></i> تعديل دورة: @Model.CourseNameEnglish / @Model.CourseNameArabic</h4></div>
-            <div class="card-body p-4">
-                <form asp-action="Edit" method="post" enctype="multipart/form-data">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" asp-for="CourseId" />
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label asp-for="CourseNameEnglish" class="form-label"></label>
-                            <input asp-for="CourseNameEnglish" class="form-control" dir="ltr" />
-                            <span asp-validation-for="CourseNameEnglish" class="text-danger"></span>
-                        </div>
-                        <div class="col-md-6">
-                            <label asp-for="CourseNameArabic" class="form-label"></label>
-                            <input asp-for="CourseNameArabic" class="form-control" dir="rtl" />
-                            <span asp-validation-for="CourseNameArabic" class="text-danger"></span>
-                        </div>
-                        <div class="col-md-4">
-                            <label asp-for="Price" class="form-label"></label>
-                            <input asp-for="Price" type="number" step="0.01" asp-format="{0:0.################}" class="form-control" />
-                            <span asp-validation-for="Price" class="text-danger"></span>
-                        </div>
-                        <div class="col-md-4">
-                            <label asp-for="DiscountType" class="form-label"></label>
-                            <select asp-for="DiscountType" class="form-select" id="discountType">
-                                <option value="">بدون خصم</option>
-                                <option value="Percentage">نسبة مئوية %</option>
-                                <option value="Fixed">مبلغ ثابت</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label asp-for="DiscountValue" class="form-label"></label>
-                            <input asp-for="DiscountValue" type="number" step="0.01" asp-format="{0:0.################}" class="form-control" id="discountValue" />
-                            <span asp-validation-for="DiscountValue" class="text-danger"></span>
-                        </div>
-                        <div class="col-12">
-                            <label asp-for="ShortDescription" class="form-label"></label>
-                            <input asp-for="ShortDescription" class="form-control" />
-                        </div>
-                        <div class="col-12">
-                            <label asp-for="FullDescription" class="form-label"></label>
-                            <textarea asp-for="FullDescription" class="form-control" rows="4"></textarea>
-                        </div>
-                        <div class="col-12">
-                            <label asp-for="Objectives" class="form-label"></label>
-                            <textarea asp-for="Objectives" class="form-control" rows="3"></textarea>
-                        </div>
-                        <div class="col-12">
-                            <label asp-for="Content" class="form-label"></label>
-                            <textarea asp-for="Content" class="form-control" rows="3"></textarea>
-                        </div>
-                        <div class="col-md-6">
-                            <label asp-for="CategoryId" class="form-label">الفئة</label>
-                            <select asp-for="CategoryId" class="form-select">
-                                <option value="">-- اختر الفئة --</option>
-                                @foreach (var cat in categories)
-                                {
-                                    <option value="@cat.CategoryId">@cat.CategoryName</option>
-                                }
-                            </select>
-                            <span asp-validation-for="CategoryId" class="text-danger"></span>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">المدربون</label>
-                            <div class="search-select">
-                                <input type="text" id="instructorSearch" class="form-control" placeholder="اكتب اسم المدرب للبحث ثم اختر من القائمة..." autocomplete="off" role="combobox" aria-expanded="false" aria-controls="instructorResults" />
-                                <div id="instructorResults" class="list-group position-absolute w-100 shadow-sm search-results" role="listbox" hidden></div>
-                            </div>
-                            <div class="form-text">بحث ذكي — اكتب جزءاً من اسم المدرب واختر من القائمة. يمكن تعديل المدربين في أي وقت.</div>
-                            <div id="instructorHidden"></div>
-                            <div id="selectedInstructors" class="d-flex flex-wrap gap-2 mt-2"></div>
-                            <span asp-validation-for="SelectedInstructorIds" class="text-danger"></span>
-                        </div>
-                        <div class="col-md-6">
-                            <label asp-for="CertificateDesignId" class="form-label">قالب شهادة هذه الدورة</label>
-                            <select asp-for="CertificateDesignId" class="form-select">
-                                <option value="">القالب العام المنشور (افتراضي)</option>
-                                @foreach (var design in certificateDesigns)
-                                {
-                                    <option value="@design.CertificateDesignId">@design.Name@(design.IsPublished ? " — منشور" : " — مسودة")</option>
-                                }
-                            </select>
-                            <div class="form-text">يُستخدم هذا القالب عند التحقق من شهادات الدورة. اتركه فارغاً لاستخدام القالب العام المنشور.</div>
-                        </div>
-                        <div class="col-md-4">
-                            <label asp-for="StartDate" class="form-label"></label>
-                            <input asp-for="StartDate" type="date" class="form-control" />
-                        </div>
-                        <div class="col-md-4">
-                            <label asp-for="EndDate" class="form-label"></label>
-                            <input asp-for="EndDate" type="date" class="form-control" />
-                        </div>
-                        <div class="col-md-6">
-                            <label asp-for="Location" class="form-label"></label>
-                            <input asp-for="Location" class="form-control" />
-                        </div>
-                        <div class="col-md-3">
-                            <label asp-for="Status" class="form-label"></label>
-                            <select asp-for="Status" class="form-select">
-                                <option value="Draft">مسودة</option>
-                                <option value="Published">منشورة</option>
-                                <option value="OpenForRegistration">مفتوحة للتسجيل</option>
-                                <option value="InProgress">جارية</option>
-                                <option value="Completed">مكتملة</option>
-                                <option value="Archived">مؤرشفة</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3 d-flex align-items-end">
-                            <div class="form-check">
-                                <input asp-for="IsFeatured" class="form-check-input" />
-                                <label asp-for="IsFeatured" class="form-check-label">دورة مميزة</label>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="border rounded-3 p-3 bg-light">
-                                <div class="form-check form-switch mb-1">
-                                    <input asp-for="RequiresAcademicDetails" class="form-check-input" />
-                                    <label asp-for="RequiresAcademicDetails" class="form-check-label fw-semibold">دورة جامعية</label>
-                                </div>
-                                <small class="text-muted">عند التفعيل، يُطلب من المتدرب إدخال الجامعة والكلية والتخصص والمستوى الدراسي أثناء التسجيل.</small>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">صورة الدورة</label>
-                            @if (!string.IsNullOrEmpty(Model.ImageUrl))
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للدورات</a>
+    </div>
+</div>
+
+<div class="a-card">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-journal-text" aria-hidden="true"></i> @Model.CourseNameArabic</h2>
+    </div>
+    <div class="a-card__body">
+        <form asp-action="Edit" method="post" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="CourseId" />
+            <div asp-validation-summary="ModelOnly" class="a-error mb-3"></div>
+
+            <section class="a-form__section">
+                <h3 class="a-form__section-title"><i class="bi bi-info-circle" aria-hidden="true"></i> البيانات الأساسية</h3>
+                <p class="a-form__section-desc">الاسم بالعربية والإنجليزية والوصف الذي يظهر للمتدربين.</p>
+                <div class="a-form__grid a-form__grid--2">
+                    <div class="a-field">
+                        <label asp-for="CourseNameEnglish" class="a-label a-label--required"></label>
+                        <input asp-for="CourseNameEnglish" class="form-control" dir="ltr" />
+                        <span asp-validation-for="CourseNameEnglish" class="a-error"></span>
+                    </div>
+                    <div class="a-field">
+                        <label asp-for="CourseNameArabic" class="a-label a-label--required"></label>
+                        <input asp-for="CourseNameArabic" class="form-control" dir="rtl" />
+                        <span asp-validation-for="CourseNameArabic" class="a-error"></span>
+                    </div>
+                    <div class="a-field a-field--full">
+                        <label asp-for="ShortDescription" class="a-label"></label>
+                        <input asp-for="ShortDescription" class="form-control" />
+                        <span asp-validation-for="ShortDescription" class="a-error"></span>
+                    </div>
+                    <div class="a-field a-field--full">
+                        <label asp-for="FullDescription" class="a-label"></label>
+                        <textarea asp-for="FullDescription" class="form-control" rows="4"></textarea>
+                        <span asp-validation-for="FullDescription" class="a-error"></span>
+                    </div>
+                    <div class="a-field">
+                        <label asp-for="Objectives" class="a-label"></label>
+                        <textarea asp-for="Objectives" class="form-control" rows="3"></textarea>
+                        <span asp-validation-for="Objectives" class="a-error"></span>
+                    </div>
+                    <div class="a-field">
+                        <label asp-for="Content" class="a-label"></label>
+                        <textarea asp-for="Content" class="form-control" rows="3"></textarea>
+                        <span asp-validation-for="Content" class="a-error"></span>
+                    </div>
+                    <div class="a-field">
+                        <label asp-for="CategoryId" class="a-label a-label--required">الفئة</label>
+                        <select asp-for="CategoryId" class="form-select">
+                            <option value="">-- اختر الفئة --</option>
+                            @foreach (var cat in categories)
                             {
-                                <div class="mb-2"><img src="@Model.ImageUrl" class="rounded" style="max-height:120px;" /></div>
+                                <option value="@cat.CategoryId">@cat.CategoryName</option>
                             }
-                            <input type="file" name="image" accept="image/*" class="form-control" onchange="previewImage(this, 'imgPreview')" />
-                            <img id="imgPreview" class="mt-2 rounded" style="max-height:150px; display:none;" />
+                        </select>
+                        <span asp-validation-for="CategoryId" class="a-error"></span>
+                    </div>
+                    <div class="a-field">
+                        <label asp-for="CertificateDesignId" class="a-label">قالب شهادة هذه الدورة</label>
+                        <select asp-for="CertificateDesignId" class="form-select">
+                            <option value="">القالب العام المنشور (افتراضي)</option>
+                            @foreach (var design in certificateDesigns)
+                            {
+                                <option value="@design.CertificateDesignId">@design.Name@(design.IsPublished ? " — منشور" : " — مسودة")</option>
+                            }
+                        </select>
+                        <span class="a-hint">يُستخدم هذا القالب عند التحقق من شهادات الدورة. اتركه فارغاً لاستخدام القالب العام المنشور.</span>
+                    </div>
+                    <div class="a-field a-field--full">
+                        <label class="a-label" for="instructorSearch">المدربون</label>
+                        <div class="search-select">
+                            <input type="text" id="instructorSearch" class="form-control" placeholder="اكتب اسم المدرب للبحث ثم اختر من القائمة..." autocomplete="off" role="combobox" aria-expanded="false" aria-controls="instructorResults" />
+                            <div id="instructorResults" class="list-group position-absolute w-100 shadow-sm search-results" role="listbox" hidden></div>
                         </div>
+                        <span class="a-hint">بحث ذكي — اكتب جزءاً من اسم المدرب واختر من القائمة. يمكن تعديل المدربين في أي وقت.</span>
+                        <div id="instructorHidden"></div>
+                        <div id="selectedInstructors" class="d-flex flex-wrap gap-2 mt-2"></div>
+                        <span asp-validation-for="SelectedInstructorIds" class="a-error"></span>
                     </div>
-                    <hr />
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ التعديلات</button>
-                        <a asp-action="Index" class="btn btn-outline-secondary">إلغاء</a>
+                </div>
+            </section>
+
+            <section class="a-form__section">
+                <h3 class="a-form__section-title"><i class="bi bi-cash-coin" aria-hidden="true"></i> الرسوم والخصم</h3>
+                <p class="a-form__section-desc">حدّد سعر الدورة وقيمة الخصم إن وُجد.</p>
+                <div class="a-form__grid">
+                    <div class="a-field">
+                        <label asp-for="Price" class="a-label"></label>
+                        <input asp-for="Price" type="number" step="0.01" asp-format="{0:0.################}" class="form-control" />
+                        <span asp-validation-for="Price" class="a-error"></span>
                     </div>
-                </form>
+                    <div class="a-field">
+                        <label asp-for="DiscountType" class="a-label"></label>
+                        <select asp-for="DiscountType" class="form-select" id="discountType">
+                            <option value="">بدون خصم</option>
+                            <option value="Percentage">نسبة مئوية %</option>
+                            <option value="Fixed">مبلغ ثابت</option>
+                        </select>
+                        <span asp-validation-for="DiscountType" class="a-error"></span>
+                    </div>
+                    <div class="a-field">
+                        <label asp-for="DiscountValue" class="a-label"></label>
+                        <input asp-for="DiscountValue" type="number" step="0.01" asp-format="{0:0.################}" class="form-control" id="discountValue" />
+                        <span asp-validation-for="DiscountValue" class="a-error"></span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="a-form__section">
+                <h3 class="a-form__section-title"><i class="bi bi-calendar-event" aria-hidden="true"></i> الجدول والحالة</h3>
+                <p class="a-form__section-desc">تواريخ الدورة ومكانها وحالة النشر.</p>
+                <div class="a-form__grid">
+                    <div class="a-field">
+                        <label asp-for="StartDate" class="a-label"></label>
+                        <input asp-for="StartDate" type="date" class="form-control" />
+                        <span asp-validation-for="StartDate" class="a-error"></span>
+                    </div>
+                    <div class="a-field">
+                        <label asp-for="EndDate" class="a-label"></label>
+                        <input asp-for="EndDate" type="date" class="form-control" />
+                        <span asp-validation-for="EndDate" class="a-error"></span>
+                    </div>
+                    <div class="a-field">
+                        <label asp-for="Location" class="a-label"></label>
+                        <input asp-for="Location" class="form-control" />
+                        <span asp-validation-for="Location" class="a-error"></span>
+                    </div>
+                    <div class="a-field">
+                        <label asp-for="Status" class="a-label"></label>
+                        <select asp-for="Status" class="form-select">
+                            <option value="Draft">مسودة</option>
+                            <option value="Published">منشورة</option>
+                            <option value="OpenForRegistration">مفتوحة للتسجيل</option>
+                            <option value="InProgress">جارية</option>
+                            <option value="Completed">مكتملة</option>
+                            <option value="Archived">مؤرشفة</option>
+                        </select>
+                        <span asp-validation-for="Status" class="a-error"></span>
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-4 mt-3">
+                    <div class="form-check">
+                        <input asp-for="IsFeatured" class="form-check-input" />
+                        <label asp-for="IsFeatured" class="form-check-label">دورة مميزة</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input asp-for="RequiresAcademicDetails" class="form-check-input" />
+                        <label asp-for="RequiresAcademicDetails" class="form-check-label">دورة جامعية</label>
+                    </div>
+                </div>
+                <p class="a-hint">عند تفعيل «دورة جامعية»، يُطلب من المتدرب إدخال الجامعة والكلية والتخصص والمستوى الدراسي أثناء التسجيل.</p>
+            </section>
+
+            <section class="a-form__section">
+                <h3 class="a-form__section-title"><i class="bi bi-image" aria-hidden="true"></i> صورة الدورة</h3>
+                <div class="a-field">
+                    <label class="a-label" for="courseImage">الصورة</label>
+                    @if (!string.IsNullOrEmpty(Model.ImageUrl))
+                    {
+                        <div class="a-media-current">
+                            <span class="a-media-current__box"><img src="@Model.ImageUrl" alt="صورة الدورة الحالية" /></span>
+                            <span class="a-media-current__meta">الصورة الحالية — ارفع صورة جديدة لاستبدالها.</span>
+                        </div>
+                    }
+                    <input id="courseImage" type="file" name="image" accept="image/*" class="form-control" onchange="previewImage(this, 'imgPreview')" />
+                    <span class="a-hint">اتركه فارغاً إذا لم ترد تغيير الصورة.</span>
+                    <img id="imgPreview" class="a-media-preview" alt="معاينة صورة الدورة" hidden />
+                </div>
+            </section>
+
+            <div class="a-form__actions">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ التعديلات</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">إلغاء</a>
             </div>
-        </div>
+        </form>
     </div>
 </div>
 
 @section Scripts {
-<style>
-    .search-select { position: relative; }
-    .search-results { z-index: 1050; max-height: 220px; overflow-y: auto; }
-    .search-results .list-group-item { text-align: right; cursor: pointer; }
-    .search-results .list-group-item:hover { background-color: #eef2ff; }
-</style>
 <script>
 const instructorOptions = @Html.Raw(instructorOptionsJson);
 const initialSelectedInstructorIds = @Html.Raw(selectedInstructorIdsJson);
@@ -189,7 +224,7 @@ const initialSelectedInstructorIds = @Html.Raw(selectedInstructorIdsJson);
             const instr = all.find(function (x) { return x.value === id; });
             if (!instr) return;
             const chip = document.createElement('span');
-            chip.className = 'badge text-bg-primary d-inline-flex align-items-center gap-2';
+            chip.className = 'a-badge a-badge--brand d-inline-flex align-items-center gap-2';
             chip.style.fontSize = '0.9rem';
             chip.style.padding = '0.45rem 0.75rem';
             const name = document.createElement('span');
@@ -268,9 +303,9 @@ function previewImage(input, previewId) {
     var preview = document.getElementById(previewId);
     if (input.files && input.files[0]) {
         var reader = new FileReader();
-        reader.onload = function(e) { preview.src = e.target.result; preview.style.display = 'block'; };
+        reader.onload = function(e) { preview.src = e.target.result; preview.hidden = false; };
         reader.readAsDataURL(input.files[0]);
-    } else { preview.style.display = 'none'; }
+    } else { preview.hidden = true; }
 }
 </script>
 }

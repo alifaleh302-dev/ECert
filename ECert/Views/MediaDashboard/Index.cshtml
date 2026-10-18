@@ -1,106 +1,105 @@
 @{
     ViewData["Title"] = "لوحة الإعلامي";
+    ViewData["PageIcon"] = "bi-newspaper";
+    ViewData["PageDesc"] = "إدارة المنشورات والأخبار ومتابعة حالة النشر";
     Layout = "_AdminLayout";
+
     var recentPosts = ViewBag.RecentPosts as List<ECert.Models.Post> ?? new();
+
+    var kpis = new List<KpiCard>
+    {
+        new() { Label = "المنشورات", Value = ViewBag.TotalPosts?.ToString() ?? "0", Icon = "bi-newspaper", Tone = "brand", Href = Url.Action("Index", "PostsManage") },
+        new() { Label = "منشورات منشورة", Value = ViewBag.PublishedPosts?.ToString() ?? "0", Icon = "bi-check-circle", Tone = "success" },
+        new() { Label = "مسودات", Value = ViewBag.DraftPosts?.ToString() ?? "0", Icon = "bi-pencil", Tone = "warning", Hint = "بانتظار النشر" },
+        new() { Label = "الأخبار", Value = ViewBag.TotalNews?.ToString() ?? "0", Icon = "bi-megaphone", Tone = "info", Href = Url.Action("Index", "NewsManage") },
+        new() { Label = "أخبار منشورة", Value = ViewBag.PublishedNews?.ToString() ?? "0", Icon = "bi-broadcast", Tone = "neutral" },
+    };
+
+    var quickLinks = new (string Ctrl, string Action, string Label, string Icon)[]
+    {
+        ("PostsManage", "Create", "إضافة منشور", "bi-plus-circle"),
+        ("NewsManage", "Create", "إضافة خبر", "bi-megaphone"),
+        ("PostsManage", "Index", "إدارة المنشورات", "bi-newspaper"),
+        ("NewsManage", "Index", "إدارة الأخبار", "bi-list-ul"),
+    };
 }
-<h2 class="mb-4"><i class="bi bi-speedometer2"></i> لوحة تحكم الإعلامي</h2>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-4 col-lg-2">
-        <a asp-controller="PostsManage" asp-action="Index" class="text-decoration-none">
-            <div class="card border-0 shadow-sm bg-primary text-white h-100">
-                <div class="card-body text-center">
-                    <h3>@ViewBag.TotalPosts</h3>
-                    <small><i class="bi bi-newspaper"></i> المنشورات</small>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-4 col-lg-2">
-        <div class="card border-0 shadow-sm bg-success text-white h-100">
-            <div class="card-body text-center">
-                <h3>@ViewBag.PublishedPosts</h3>
-                <small><i class="bi bi-check-circle"></i> منشورات منشورة</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4 col-lg-2">
-        <div class="card border-0 shadow-sm bg-warning text-dark h-100">
-            <div class="card-body text-center">
-                <h3>@ViewBag.DraftPosts</h3>
-                <small><i class="bi bi-pencil"></i> مسودات</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4 col-lg-2">
-        <a asp-controller="NewsManage" asp-action="Index" class="text-decoration-none">
-            <div class="card border-0 shadow-sm bg-info text-white h-100">
-                <div class="card-body text-center">
-                    <h3>@ViewBag.TotalNews</h3>
-                    <small><i class="bi bi-megaphone"></i> الأخبار</small>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-4 col-lg-2">
-        <div class="card border-0 shadow-sm bg-dark text-white h-100">
-            <div class="card-body text-center">
-                <h3>@ViewBag.PublishedNews</h3>
-                <small><i class="bi bi-broadcast"></i> أخبار منشورة</small>
-            </div>
-        </div>
-    </div>
+<div class="page-header">
+    <partial name="_PageHeader" />
 </div>
 
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h6 class="mb-3">إجراءات سريعة</h6>
-                <a asp-controller="PostsManage" asp-action="Create" class="btn btn-primary btn-sm me-1"><i class="bi bi-plus-circle"></i> إضافة منشور</a>
-                <a asp-controller="NewsManage" asp-action="Create" class="btn btn-info btn-sm me-1 text-white"><i class="bi bi-plus-circle"></i> إضافة خبر</a>
-                <a asp-controller="PostsManage" asp-action="Index" class="btn btn-outline-secondary btn-sm me-1"><i class="bi bi-newspaper"></i> إدارة المنشورات</a>
-                <a asp-controller="NewsManage" asp-action="Index" class="btn btn-outline-info btn-sm me-1"><i class="bi bi-megaphone"></i> إدارة الأخبار</a>
-            </div>
+<section class="a-kpis" aria-label="مؤشرات المحتوى">
+    @foreach (var kpi in kpis)
+    {
+        <partial name="_KpiCard" model="kpi" />
+    }
+</section>
+
+<section class="a-card mb-4" aria-label="إجراءات سريعة">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-lightning-charge" aria-hidden="true"></i> إجراءات سريعة</h2>
+    </div>
+    <div class="a-card__body">
+        <div class="a-quicklinks">
+            @foreach (var link in quickLinks)
+            {
+                <a class="a-quicklink" asp-controller="@link.Ctrl" asp-action="@link.Action">
+                    <i class="bi @link.Icon" aria-hidden="true"></i>
+                    <span>@link.Label</span>
+                </a>
+            }
         </div>
     </div>
-</div>
+</section>
 
-<div class="card shadow-sm">
-    <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-clock-history"></i> أحدث المحتوى</h6></div>
-    <div class="card-body">
-        @if (recentPosts.Any())
-        {
-            <div class="table-responsive">
-                <table class="table table-sm">
-                    <thead><tr><th>العنوان</th><th>النوع</th><th>الحالة</th><th>التاريخ</th></tr></thead>
-                    <tbody>
-                        @foreach (var p in recentPosts)
-                        {
-                            <tr>
-                                <td>@p.Title</td>
-                                <td>@(p.PostType == "News" ? "خبر" : "منشور")</td>
-                                <td>
-                                    @switch (p.Status)
-                                    {
-                                        case "Published":
-                                            @:<span class="badge bg-success">منشور</span>
-                                            break;
-                                        case "Draft":
-                                            @:<span class="badge bg-warning text-dark">مسودة</span>
-                                            break;
-                                        case "Archived":
-                                            @:<span class="badge bg-secondary">مؤرشف</span>
-                                            break;
-                                    }
-                                </td>
-                                <td>@p.CreatedAt.ToString("MM-dd")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
-        else { <p class="text-muted text-center">لا يوجد محتوى</p> }
+<section class="a-card" aria-label="أحدث المحتوى">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-clock-history" aria-hidden="true"></i> أحدث المحتوى</h2>
     </div>
-</div>
+    @if (recentPosts.Any())
+    {
+        <div class="a-table-wrap">
+            <table class="a-table">
+                <thead>
+                    <tr>
+                        <th scope="col">العنوان</th>
+                        <th scope="col">النوع</th>
+                        <th scope="col">الحالة</th>
+                        <th scope="col">التاريخ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in recentPosts)
+                    {
+                        <tr>
+                            <td class="a-table__primary">@p.Title</td>
+                            <td>@(p.PostType == "News" ? "خبر" : "منشور")</td>
+                            <td>
+                                @switch (p.Status)
+                                {
+                                    case "Published":
+                                        <span class="a-badge a-badge--success">منشور</span>
+                                        break;
+                                    case "Draft":
+                                        <span class="a-badge a-badge--warning">مسودة</span>
+                                        break;
+                                    case "Archived":
+                                        <span class="a-badge a-badge--neutral">مؤرشف</span>
+                                        break;
+                                    default:
+                                        <span class="a-badge a-badge--neutral">@p.Status</span>
+                                        break;
+                                }
+                            </td>
+                            <td class="a-table__num">@p.CreatedAt.ToString("yyyy-MM-dd")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-journal-x", Title = "لا يوجد محتوى بعد", Text = "ابدأ بإضافة منشور أو خبر ليظهر هنا." })" />
+    }
+</section>

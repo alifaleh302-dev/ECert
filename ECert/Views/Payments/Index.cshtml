@@ -57,10 +57,10 @@
 
 @if (payments.Any())
 {
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover">
+    <div class="a-card">
+        <div class="a-card__body a-card__body--flush">
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover">
                     <thead>
                         <tr><th>الفاتورة</th><th>اسم الطالب</th><th>المبلغ</th><th>طريقة الدفع</th><th>التاريخ</th><th>الموظف</th><th>ملاحظات</th><th>الحالة</th><th></th></tr>
                     </thead>
@@ -102,11 +102,11 @@
                                 <td>
                                     @if (p.IsCancelled)
                                     {
-                                        <span class="badge bg-danger">ملغية</span>
+                                        <span class="a-badge a-badge--danger">ملغية</span>
                                     }
                                     else
                                     {
-                                        <span class="badge bg-success">نشطة</span>
+                                        <span class="a-badge a-badge--success">نشطة</span>
                                     }
                                 </td>
                                 <td>
@@ -126,8 +126,8 @@
 }
 else
 {
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
+    <div class="a-card">
+        <div class="a-card__body">
             <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-cash-stack", Title = "لا توجد دفعات", Text = "لا توجد دفعة مطابقة للبحث أو الفلتر الحالي." })" />
         </div>
     </div>

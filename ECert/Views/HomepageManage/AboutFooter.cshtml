@@ -20,9 +20,9 @@
     @Html.AntiForgeryToken()
     <div class="row g-4">
         <div class="col-lg-7">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white"><strong>محتوى صفحة من نحن</strong></div>
-                <div class="card-body">
+            <div class="a-card">
+                <div class="a-card__header"><strong>محتوى صفحة من نحن</strong></div>
+                <div class="a-card__body">
                     <div class="mb-3">
                         <label asp-for="AboutTitle" class="form-label"></label>
                         <input asp-for="AboutTitle" class="form-control" />
@@ -41,9 +41,9 @@
         </div>
 
         <div class="col-lg-5">
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white"><strong>التحكم في الفوتر</strong></div>
-                <div class="card-body">
+            <div class="a-card mb-4">
+                <div class="a-card__header"><strong>التحكم في الفوتر</strong></div>
+                <div class="a-card__body">
                     <div class="form-check form-switch mb-3">
                         <input asp-for="FooterEnabled" class="form-check-input" />
                         <label asp-for="FooterEnabled" class="form-check-label"></label>
@@ -67,9 +67,9 @@
                 </div>
             </div>
 
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white"><strong>أين يدير الأدمن هذه الأجزاء؟</strong></div>
-                <div class="card-body">
+            <div class="a-card">
+                <div class="a-card__header"><strong>أين يدير الأدمن هذه الأجزاء؟</strong></div>
+                <div class="a-card__body">
                     <ul class="mb-0 ps-3" style="line-height:2;">
                         <li><strong>من نحن والنبذة:</strong> من هذه الصفحة نفسها.</li>
                         <li><strong>الفوتر وإظهار/إخفاء أعمدته:</strong> من هذه الصفحة نفسها.</li>

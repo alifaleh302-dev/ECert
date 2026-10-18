@@ -1,52 +1,66 @@
 @model PhoneCountry
 @{
     ViewData["Title"] = "تعديل دولة";
+    ViewData["PageIcon"] = "bi-pencil-square";
+    ViewData["PageDesc"] = "حدّث رمز الدولة وقواعد التحقق من أرقام الهواتف";
     Layout = "_AdminLayout";
 }
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white"><h4 class="mb-0"><i class="bi bi-pencil"></i> تعديل: @Model.CountryName</h4></div>
-            <div class="card-body p-4">
-                <form asp-action="Edit" method="post">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" asp-for="PhoneCountryId" />
-                    <div class="mb-3">
-                        <label asp-for="CountryName" class="form-label"></label>
-                        <input asp-for="CountryName" class="form-control" />
-                        <span asp-validation-for="CountryName" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="CountryCode" class="form-label"></label>
-                        <input asp-for="CountryCode" class="form-control" />
-                        <span asp-validation-for="CountryCode" class="text-danger"></span>
-                    </div>
-                    <div class="row mb-3">
-                        <div class="col-6">
-                            <label asp-for="MinPhoneLength" class="form-label"></label>
-                            <input asp-for="MinPhoneLength" type="number" class="form-control" />
-                        </div>
-                        <div class="col-6">
-                            <label asp-for="MaxPhoneLength" class="form-label"></label>
-                            <input asp-for="MaxPhoneLength" type="number" class="form-control" />
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Prefixes" class="form-label"></label>
-                        <input asp-for="Prefixes" class="form-control" />
-                        <small class="text-muted">افصل بين البدايات بفاصلة</small>
-                    </div>
-                    <div class="mb-3 form-check">
-                        <input asp-for="IsActive" class="form-check-input" />
-                        <label asp-for="IsActive" class="form-check-label"></label>
-                    </div>
-                    <hr />
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ التعديلات</button>
-                        <a asp-action="Index" class="btn btn-outline-secondary">إلغاء</a>
-                    </div>
-                </form>
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للدول</a>
+    </div>
+</div>
+
+<div class="a-card a-card--narrow">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-pencil" aria-hidden="true"></i> @Model.CountryName</h2>
+    </div>
+    <div class="a-card__body">
+        <form asp-action="Edit" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="PhoneCountryId" />
+            <div asp-validation-summary="ModelOnly" class="a-error mb-3"></div>
+
+            <div class="a-form__grid a-form__grid--2">
+                <div class="a-field">
+                    <label asp-for="CountryName" class="a-label a-label--required"></label>
+                    <input asp-for="CountryName" class="form-control" />
+                    <span asp-validation-for="CountryName" class="a-error"></span>
+                </div>
+                <div class="a-field">
+                    <label asp-for="CountryCode" class="a-label a-label--required"></label>
+                    <input asp-for="CountryCode" class="form-control" />
+                    <span asp-validation-for="CountryCode" class="a-error"></span>
+                </div>
+                <div class="a-field">
+                    <label asp-for="MinPhoneLength" class="a-label"></label>
+                    <input asp-for="MinPhoneLength" type="number" class="form-control" />
+                    <span asp-validation-for="MinPhoneLength" class="a-error"></span>
+                </div>
+                <div class="a-field">
+                    <label asp-for="MaxPhoneLength" class="a-label"></label>
+                    <input asp-for="MaxPhoneLength" type="number" class="form-control" />
+                    <span asp-validation-for="MaxPhoneLength" class="a-error"></span>
+                </div>
+                <div class="a-field a-field--full">
+                    <label asp-for="Prefixes" class="a-label"></label>
+                    <input asp-for="Prefixes" class="form-control" />
+                    <span class="a-hint">افصل بين البدايات بفاصلة.</span>
+                    <span asp-validation-for="Prefixes" class="a-error"></span>
+                </div>
             </div>
-        </div>
+
+            <div class="form-check mb-0">
+                <input asp-for="IsActive" class="form-check-input" />
+                <label asp-for="IsActive" class="form-check-label"></label>
+            </div>
+
+            <div class="a-form__actions">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ التعديلات</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">إلغاء</a>
+            </div>
+        </form>
     </div>
 </div>

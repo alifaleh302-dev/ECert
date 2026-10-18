@@ -1,137 +1,165 @@
 @model Invoice
 @{
     ViewData["Title"] = "فاتورة " + Model.InvoiceNumber;
+    ViewData["PageIcon"] = "bi-receipt";
+    ViewData["PageDesc"] = "تفاصيل الفاتورة والدفعات المرتبطة بها";
     Layout = "_AdminLayout";
 }
-<h2 class="mb-4"><i class="bi bi-receipt"></i> فاتورة @Model.InvoiceNumber</h2>
-<div class="row g-4">
-    <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-header bg-white"><h6 class="mb-0">بيانات الفاتورة</h6></div>
-            <div class="card-body">
-                <table class="table table-borderless">
-                    <tr><th class="w-50">رقم الفاتورة</th><td><code>@Model.InvoiceNumber</code></td></tr>
-                    <tr><th>اسم الطالب بالعربية</th><td>@(Model.TraineeNameArabic ?? Model.TraineeName)</td></tr>
-                    <tr><th>اسم الطالب بالإنجليزية</th><td dir="ltr">@(Model.TraineeNameEnglish ?? Model.TraineeName)</td></tr>
-                    <tr><th>الهاتف</th><td>@Model.TraineePhone</td></tr>
-                    <tr><th>الدورة بالعربية</th><td>@(Model.CourseNameArabic ?? Model.CourseName)</td></tr>
-                    <tr><th>الدورة بالإنجليزية</th><td dir="ltr">@(Model.CourseNameEnglish ?? Model.CourseName)</td></tr>
-                    <tr><th>الرسوم الأصلية</th><td>@Model.OriginalAmount.ToString("N2") ريال</td></tr>
-                    @if (Model.ExemptionAmount > 0)
-                    {
-                        <tr><th>الإعفاء</th><td class="text-success">@Model.ExemptionAmount.ToString("N2") ريال@(string.IsNullOrWhiteSpace(Model.ExemptionReason) ? "" : $" — {Model.ExemptionReason}")</td></tr>
-                    }
-                    <tr><th>المبلغ المستحق</th><td class="fw-bold">@Model.TotalAmount.ToString("N2") ريال</td></tr>
-                    <tr><th>المبلغ المدفوع</th><td class="text-success">@Model.PaidAmount.ToString("N2") ريال</td></tr>
-                    <tr><th>المبلغ المتبقي</th><td class="text-danger">@Model.RemainingAmount.ToString("N0") ريال</td></tr>
-                    <tr><th>الحالة</th><td>
-                        @switch (Model.Status)
-                        {
-                            case "Unpaid":
-                                @:<span class="badge bg-danger">غير مدفوعة</span>
-                                break;
-                            case "PartiallyPaid":
-                                @:<span class="badge bg-warning text-dark">مدفوعة جزئياً</span>
-                                break;
-                            case "Paid":
-                                @:<span class="badge bg-success">مدفوعة</span>
-                                break;
-                            case "Cancelled":
-                                @:<span class="badge bg-secondary">ملغية</span>
-                                break;
-                        }
-                    </td></tr>
-                    <tr><th>تاريخ الإنشاء</th><td>@Model.CreatedAt.ToString("yyyy-MM-dd")</td></tr>
-                    <tr><th>تاريخ الاستحقاق</th><td>@(Model.DueDate?.ToString("yyyy-MM-dd") ?? "-")</td></tr>
-                    <tr><th>أنشأها</th><td>@Model.CreatedBy</td></tr>
-                </table>
-                @if (Model.Status != "Paid" && Model.Status != "Cancelled")
-                {
-                    <a asp-controller="Payments" asp-action="Add" asp-route-invoiceId="@Model.InvoiceId" class="btn btn-success btn-sm"><i class="bi bi-cash"></i> تسجيل دفعة</a>
-                    <form asp-action="Cancel" method="post" style="display:inline" onsubmit="return confirm('هل أنت متأكد من إلغاء الفاتورة؟')">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="id" value="@Model.InvoiceId" />
-                        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-x-circle"></i> إلغاء الفاتورة</button>
-                    </form>
-                }
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-cash-stack"></i> الدفعات</h6></div>
-            <div class="card-body">
-                @if (Model.Payments.Any())
-                {
-                    @foreach (var p in Model.Payments)
-                    {
-                        <div class="border rounded-3 p-3 mb-3 @(p.IsCancelled ? "border-danger bg-danger bg-opacity-10" : "")">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <span class="fw-bold fs-5 text-primary">@p.Amount.ToString("N0") ريال</span>
-                                @if (p.IsCancelled) { <span class="badge bg-danger">ملغاة</span> }
-                                else { <span class="badge bg-success">صحيحة</span> }
-                            </div>
-                            <table class="table table-sm table-borderless mb-0">
-                                <tr>
-                                    <th class="text-muted" style="width:120px;">طريقة الدفع</th>
-                                    <td>
-                                        @switch (p.PaymentMethod)
-                                        {
-                                            case "Cash":
-                                                @:<span><i class="bi bi-cash"></i> نقد</span>
-                                                break;
-                                            case "BankTransfer":
-                                                @:<span><i class="bi bi-wallet2"></i> محافظ إلكترونية</span>
-                                                break;
-                                            case "EWallet":
-                                                @:<span><i class="bi bi-wallet2"></i> محفظة إلكترونية</span>
-                                                break;
-                                            case "Card":
-                                                @:<span><i class="bi bi-wallet2"></i> محافظ إلكترونية</span>
-                                                break;
-                                            default: <span>@p.PaymentMethod</span> break;
-                                        }
-                                    </td>
-                                </tr>
-                                @if (!string.IsNullOrEmpty(p.ReferenceNumber))
-                                {
-                                    <tr>
-                                        <th class="text-muted">رقم السند</th>
-                                        <td><code>@p.ReferenceNumber</code></td>
-                                    </tr>
-                                }
-                                <tr>
-                                    <th class="text-muted">التاريخ</th>
-                                    <td>@p.PaymentDate.ToString("yyyy-MM-dd")</td>
-                                </tr>
-                                <tr>
-                                    <th class="text-muted">الموظف</th>
-                                    <td>@p.RecordedBy</td>
-                                </tr>
-                                @if (!string.IsNullOrEmpty(p.Notes))
-                                {
-                                    <tr>
-                                        <th class="text-muted">ملاحظة</th>
-                                        <td class="small">@p.Notes</td>
-                                    </tr>
-                                }
-                            </table>
-                            @if (!p.IsCancelled)
-                            {
-                                <div class="mt-2 pt-2 border-top">
-                                    <form asp-controller="Payments" asp-action="Delete" method="post" style="display:inline" onsubmit="return confirm('هل أنت متأكد من حذف هذه الدفعة؟ سيتم تحديث رصيد الفاتورة.')">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="id" value="@p.PaymentId" />
-                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> حذف الدفعة</button>
-                                    </form>
-                                </div>
-                            }
-                        </div>
-                    }
-                }
-                else { <p class="text-muted text-center py-3">لا توجد دفعات</p> }
-            </div>
-        </div>
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للفواتير</a>
     </div>
 </div>
-<a asp-action="Index" class="btn btn-outline-secondary mt-3"><i class="bi bi-arrow-right"></i> العودة</a>
+
+<div class="a-grid-2">
+    <section class="a-card">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-file-text" aria-hidden="true"></i> بيانات الفاتورة</h2>
+            <span class="a-badge @(Model.Status switch { "Paid" => "a-badge--success", "Unpaid" => "a-badge--danger", "PartiallyPaid" => "a-badge--warning", "Cancelled" => "a-badge--neutral", _ => "a-badge--neutral" })">
+                @(Model.Status switch { "Unpaid" => "غير مدفوعة", "PartiallyPaid" => "مدفوعة جزئياً", "Paid" => "مدفوعة", "Cancelled" => "ملغية", _ => Model.Status })
+            </span>
+        </div>
+        <div class="a-card__body">
+            <div class="a-dl">
+                <span class="a-dl__label">رقم الفاتورة</span>
+                <p class="a-dl__value"><span class="a-code">@Model.InvoiceNumber</span></p>
+
+                <span class="a-dl__label">اسم الطالب بالعربية</span>
+                <p class="a-dl__value">@(Model.TraineeNameArabic ?? Model.TraineeName)</p>
+
+                <span class="a-dl__label">اسم الطالب بالإنجليزية</span>
+                <p class="a-dl__value" dir="ltr">@(Model.TraineeNameEnglish ?? Model.TraineeName)</p>
+
+                <span class="a-dl__label">الهاتف</span>
+                <p class="a-dl__value">@Model.TraineePhone</p>
+
+                <span class="a-dl__label">الدورة بالعربية</span>
+                <p class="a-dl__value">@(Model.CourseNameArabic ?? Model.CourseName)</p>
+
+                <span class="a-dl__label">الدورة بالإنجليزية</span>
+                <p class="a-dl__value" dir="ltr">@(Model.CourseNameEnglish ?? Model.CourseName)</p>
+
+                <span class="a-dl__label">الرسوم الأصلية</span>
+                <p class="a-dl__value">@Model.OriginalAmount.ToString("N2") ريال</p>
+
+                @if (Model.ExemptionAmount > 0)
+                {
+                    <span class="a-dl__label">الإعفاء</span>
+                    <p class="a-dl__value text-success">@Model.ExemptionAmount.ToString("N2") ريال@(string.IsNullOrWhiteSpace(Model.ExemptionReason) ? "" : $" — {Model.ExemptionReason}")</p>
+                }
+
+                <span class="a-dl__label">المبلغ المستحق</span>
+                <p class="a-dl__value fw-bold">@Model.TotalAmount.ToString("N2") ريال</p>
+
+                <span class="a-dl__label">المبلغ المدفوع</span>
+                <p class="a-dl__value text-success">@Model.PaidAmount.ToString("N2") ريال</p>
+
+                <span class="a-dl__label">المبلغ المتبقي</span>
+                <p class="a-dl__value text-danger">@Model.RemainingAmount.ToString("N0") ريال</p>
+
+                <span class="a-dl__label">تاريخ الإنشاء</span>
+                <p class="a-dl__value">@Model.CreatedAt.ToString("yyyy-MM-dd")</p>
+
+                <span class="a-dl__label">تاريخ الاستحقاق</span>
+                <p class="a-dl__value">@(Model.DueDate?.ToString("yyyy-MM-dd") ?? "-")</p>
+
+                <span class="a-dl__label">أنشأها</span>
+                <p class="a-dl__value">@Model.CreatedBy</p>
+            </div>
+        </div>
+        @if (Model.Status != "Paid" && Model.Status != "Cancelled")
+        {
+            <div class="a-card__footer d-flex flex-wrap gap-2">
+                <a asp-controller="Payments" asp-action="Add" asp-route-invoiceId="@Model.InvoiceId" class="btn btn-success btn-sm"><i class="bi bi-cash"></i> تسجيل دفعة</a>
+                <form asp-action="Cancel" method="post" onsubmit="return confirm('هل أنت متأكد من إلغاء الفاتورة؟')">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@Model.InvoiceId" />
+                    <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-x-circle"></i> إلغاء الفاتورة</button>
+                </form>
+            </div>
+        }
+    </section>
+
+    <section class="a-card">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-cash-stack" aria-hidden="true"></i> الدفعات</h2>
+            <span class="a-badge a-badge--neutral a-badge--none">@Model.Payments.Count دفعة</span>
+        </div>
+        @if (Model.Payments.Any())
+        {
+            <div class="a-card__body">
+                @foreach (var p in Model.Payments)
+                {
+                    <div class="a-payment @(p.IsCancelled ? "a-payment--cancelled" : "")">
+                        <div class="a-payment__head">
+                            <span class="a-payment__amount">@p.Amount.ToString("N0") ريال</span>
+                            @if (p.IsCancelled)
+                            {
+                                <span class="a-badge a-badge--danger">ملغاة</span>
+                            }
+                            else
+                            {
+                                <span class="a-badge a-badge--success">صحيحة</span>
+                            }
+                        </div>
+                        <div class="a-dl">
+                            <span class="a-dl__label">طريقة الدفع</span>
+                            <p class="a-dl__value">
+                                @switch (p.PaymentMethod)
+                                {
+                                    case "Cash":
+                                        <span><i class="bi bi-cash"></i> نقد</span>
+                                        break;
+                                    case "BankTransfer":
+                                        <span><i class="bi bi-bank"></i> تحويل بنكي</span>
+                                        break;
+                                    case "EWallet":
+                                    case "Card":
+                                        <span><i class="bi bi-wallet2"></i> محفظة إلكترونية</span>
+                                        break;
+                                    default:
+                                        <span>@p.PaymentMethod</span>
+                                        break;
+                                }
+                            </p>
+
+                            @if (!string.IsNullOrEmpty(p.ReferenceNumber))
+                            {
+                                <span class="a-dl__label">رقم السند</span>
+                                <p class="a-dl__value"><span class="a-code">@p.ReferenceNumber</span></p>
+                            }
+
+                            <span class="a-dl__label">التاريخ</span>
+                            <p class="a-dl__value">@p.PaymentDate.ToString("yyyy-MM-dd")</p>
+
+                            <span class="a-dl__label">الموظف</span>
+                            <p class="a-dl__value">@p.RecordedBy</p>
+
+                            @if (!string.IsNullOrEmpty(p.Notes))
+                            {
+                                <span class="a-dl__label">ملاحظة</span>
+                                <p class="a-dl__value">@p.Notes</p>
+                            }
+                        </div>
+                        @if (!p.IsCancelled)
+                        {
+                            <div class="a-payment__actions">
+                                <form asp-controller="Payments" asp-action="Delete" method="post" onsubmit="return confirm('هل أنت متأكد من حذف هذه الدفعة؟ سيتم تحديث رصيد الفاتورة.')">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@p.PaymentId" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> حذف الدفعة</button>
+                                </form>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-cash-stack", Title = "لا توجد دفعات", Text = "لم تُسجَّل أي دفعة على هذه الفاتورة بعد." })" />
+        }
+    </section>
+</div>

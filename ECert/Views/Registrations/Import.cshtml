@@ -13,8 +13,8 @@
     </div>
 </div>
 
-<div class="alert alert-info d-flex gap-2 align-items-start">
-    <i class="bi bi-shield-check fs-5"></i>
+<div class="a-note a-note--info mb-4">
+    <i class="bi bi-shield-check" aria-hidden="true"></i>
     <div>
         <strong>استيراد آمن قبل الحفظ.</strong>
         اختر الدورة أولاً ثم ارفع ملف XLSX. إذا كانت الدورة جامعية فسيتم التحقق من الجامعة والكلية والتخصص والمستوى الدراسي طبقاً للبيانات الموجودة داخل النظام.
@@ -23,18 +23,20 @@
 
 @if (!ViewData.ModelState.IsValid)
 {
-    <div class="alert alert-danger"><div asp-validation-summary="All"></div></div>
+    <div class="a-note a-note--danger mb-4" role="alert"><div asp-validation-summary="All"></div></div>
 }
 
 @if (Model.Preview is null)
 {
-    <div class="card shadow-sm">
-        <div class="card-body p-4">
-            <h5 class="mb-3"><i class="bi bi-cloud-arrow-up text-primary"></i> رفع ملف المتدربين</h5>
-            <form asp-action="Import" method="post" enctype="multipart/form-data" class="row g-3">
+    <div class="a-card">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-cloud-arrow-up" aria-hidden="true"></i> رفع ملف المتدربين</h2>
+        </div>
+        <div class="a-card__body">
+            <form asp-action="Import" method="post" enctype="multipart/form-data" class="a-form__grid">
                 @Html.AntiForgeryToken()
-                <div class="col-lg-6">
-                    <label asp-for="CourseId" class="form-label fw-bold">الدورة المستهدفة</label>
+                <div class="a-field a-field--full">
+                    <label asp-for="CourseId" class="a-field__label a-label--required">الدورة المستهدفة</label>
                     <select asp-for="CourseId" class="form-select" required>
                         <option value="">-- اختر الدورة --</option>
                         @foreach (var course in Model.Courses)
@@ -43,23 +45,23 @@
                         }
                     </select>
                 </div>
-                <div class="col-lg-3">
-                    <label asp-for="ImportStatus" class="form-label fw-bold">الحالة بعد الاستيراد</label>
+                <div class="a-field">
+                    <label asp-for="ImportStatus" class="a-field__label">الحالة بعد الاستيراد</label>
                     <select asp-for="ImportStatus" class="form-select">
                         <option value="Pending">معلق</option>
                         <option value="Accepted">مقبول مباشرة</option>
                     </select>
                 </div>
-                <div class="col-lg-3">
-                    <label class="form-label fw-bold">الدورة الجامعية</label>
-                    <div class="form-control bg-light">@(Model.CourseRequiresAcademicDetails ? "نعم، يلزم التحقق الأكاديمي" : "لا")</div>
+                <div class="a-field">
+                    <label class="a-field__label">الدورة الجامعية</label>
+                    <div class="a-readonly">@(Model.CourseRequiresAcademicDetails ? "نعم، يلزم التحقق الأكاديمي" : "لا")</div>
                 </div>
-                <div class="col-12">
-                    <label asp-for="File" class="form-label fw-bold">ملف XLSX</label>
+                <div class="a-field a-field--full">
+                    <label asp-for="File" class="a-field__label a-label--required">ملف XLSX</label>
                     <input asp-for="File" type="file" class="form-control" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required />
-                    <div class="form-text">الحد الأقصى 10 ميجابايت. استخدم القالب المرفق، ويمكنك تنزيل قالب مخصص بعد اختيار الدورة.</div>
+                    <div class="a-hint">الحد الأقصى 10 ميجابايت. استخدم القالب المرفق، ويمكنك تنزيل قالب مخصص بعد اختيار الدورة.</div>
                 </div>
-                <div class="col-12 d-flex gap-2">
+                <div class="a-field a-field--full">
                     <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> فحص ومعاينة الملف</button>
                 </div>
             </form>
@@ -68,27 +70,27 @@
 }
 else
 {
-    <div class="row g-3 mb-3">
-        <div class="col-md-3"><div class="card shadow-sm border-0"><div class="card-body"><div class="text-muted small">الدورة</div><div class="fw-bold">@Model.Preview.CourseName</div></div></div></div>
-        <div class="col-md-3"><div class="card shadow-sm border-0"><div class="card-body"><div class="text-muted small">إجمالي الصفوف</div><div class="fs-3 fw-bold">@Model.Preview.TotalRows</div></div></div></div>
-        <div class="col-md-3"><div class="card shadow-sm border-0"><div class="card-body"><div class="text-muted small">صفوف سليمة</div><div class="fs-3 fw-bold text-success">@Model.Preview.ValidRows</div></div></div></div>
-        <div class="col-md-3"><div class="card shadow-sm border-0"><div class="card-body"><div class="text-muted small">صفوف تحتاج مراجعة</div><div class="fs-3 fw-bold text-danger">@Model.Preview.InvalidRows</div></div></div></div>
-    </div>
+    <section class="a-kpis mb-4" aria-label="ملخص الملف">
+        <partial name="_KpiCard" model="@(new KpiCard { Label = "الدورة", Value = Model.Preview.CourseName, Icon = "bi-journal-bookmark", Tone = "brand" })" />
+        <partial name="_KpiCard" model="@(new KpiCard { Label = "إجمالي الصفوف", Value = Model.Preview.TotalRows.ToString(), Icon = "bi-list-ol", Tone = "info" })" />
+        <partial name="_KpiCard" model="@(new KpiCard { Label = "صفوف سليمة", Value = Model.Preview.ValidRows.ToString(), Icon = "bi-check-circle", Tone = "success" })" />
+        <partial name="_KpiCard" model="@(new KpiCard { Label = "صفوف تحتاج مراجعة", Value = Model.Preview.InvalidRows.ToString(), Icon = "bi-exclamation-triangle", Tone = "danger" })" />
+    </section>
 
     @if (Model.Preview.InvalidRows > 0)
     {
-        <div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> لا يمكن الاعتماد قبل إصلاح جميع الصفوف المعلّمة. عدّل الملف ثم ارفعه مرة أخرى.</div>
+        <div class="a-note a-note--danger mb-4" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i><div>لا يمكن الاعتماد قبل إصلاح جميع الصفوف المعلّمة. عدّل الملف ثم ارفعه مرة أخرى.</div></div>
     }
     else
     {
-        <div class="alert alert-success"><i class="bi bi-check-circle"></i> جميع الصفوف اجتازت التحقق. راجع البيانات ثم اعتمد الاستيراد بحالة <strong>@(Model.Preview.ImportStatus == "Accepted" ? "مقبول مباشرة" : "معلق")</strong>.</div>
+        <div class="a-note a-note--success mb-4" role="status"><i class="bi bi-check-circle" aria-hidden="true"></i><div>جميع الصفوف اجتازت التحقق. راجع البيانات ثم اعتمد الاستيراد بحالة <strong>@(Model.Preview.ImportStatus == "Accepted" ? "مقبول مباشرة" : "معلق")</strong>.</div></div>
     }
 
-    <div class="card shadow-sm">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
+    <div class="a-card">
+        <div class="a-card__body a-card__body--flush">
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover align-middle mb-0">
+                    <thead>
                         <tr>
                             <th>الصف</th>
                             <th>الاسم بالعربية</th>
@@ -108,7 +110,7 @@ else
                             <td dir="ltr">@row.FullNameEnglish</td>
                             <td dir="ltr">@(row.NormalizedPhone ?? row.Phone)</td>
                             <td>@(string.IsNullOrWhiteSpace(academicSummary) ? "—" : academicSummary)</td>
-                            <td>@if (row.IsValid) { <span class="badge bg-success">سليم</span> } else { <span class="text-danger small">@string.Join("، ", row.Errors)</span> }</td>
+                            <td>@if (row.IsValid) { <span class="a-badge a-badge--success">سليم</span> } else { <span class="a-error">@string.Join("، ", row.Errors)</span> }</td>
                         </tr>
                     }
                     </tbody>
@@ -117,7 +119,7 @@ else
         </div>
     </div>
 
-    <div class="d-flex justify-content-between align-items-center mt-3">
+    <div class="d-flex justify-content-between align-items-center mt-4">
         <a asp-action="Import" class="btn btn-outline-secondary"><i class="bi bi-arrow-repeat"></i> رفع ملف آخر</a>
         @if (Model.Preview.CanCommit)
         {

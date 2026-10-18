@@ -13,16 +13,16 @@
     </div>
 </div>
 
-<div class="card shadow-sm border-0">
-    <div class="card-body p-4">
-        <div class="alert alert-warning border-0 d-flex gap-2 align-items-start" role="note">
-            <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+<div class="a-card">
+    <div class="a-card__body">
+        <div class="a-note a-note--warning mb-4" role="note">
+            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
             <div>تسري الصلاحيات المحدّثة عند تسجيل دخول المستخدمين المرتبطين بالدور مرة أخرى.</div>
         </div>
         <form asp-action="Edit" method="post">
             @Html.AntiForgeryToken()
             <partial name="_RoleForm" model="Model" />
-            <div class="d-flex flex-wrap gap-2 border-top mt-4 pt-4">
+            <div class="a-form__actions">
                 <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ التعديلات</button>
                 <a asp-action="Index" class="btn btn-outline-secondary">إلغاء</a>
             </div>

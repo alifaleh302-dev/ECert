@@ -1,118 +1,107 @@
 @{
     ViewData["Title"] = "لوحة الإداري";
+    ViewData["PageIcon"] = "bi-clipboard-data";
+    ViewData["PageDesc"] = "متابعة التسجيلات والدورات والمدربين والشهادات";
     Layout = "_AdminLayout";
+
     var recentRegs = ViewBag.RecentRegistrations as List<ECert.Models.Registration> ?? new();
+
+    var kpis = new List<KpiCard>
+    {
+        new() { Label = "تسجيلات معلقة", Value = ViewBag.PendingRegistrations?.ToString() ?? "0", Icon = "bi-hourglass-split", Tone = "warning", Hint = "بحاجة إلى مراجعة", Href = Url.Action("Index", "Registrations", new { status = "Pending" }) },
+        new() { Label = "متدربون مقبولون", Value = ViewBag.TotalTrainees?.ToString() ?? "0", Icon = "bi-people", Tone = "success" },
+        new() { Label = "دورات نشطة", Value = ViewBag.ActiveCourses?.ToString() ?? "0", Icon = "bi-book", Tone = "brand", Hint = "متاحة للتسجيل", Href = Url.Action("Index", "CoursesManage") },
+        new() { Label = "إجمالي الدورات", Value = ViewBag.TotalCourses?.ToString() ?? "0", Icon = "bi-journal-bookmark", Tone = "info" },
+        new() { Label = "المدربون", Value = ViewBag.TotalInstructors?.ToString() ?? "0", Icon = "bi-person-badge", Tone = "neutral", Href = Url.Action("Index", "Instructors") },
+        new() { Label = "شهادات صادرة", Value = ViewBag.CertificatesIssued?.ToString() ?? "0", Icon = "bi-award", Tone = "brand", Href = Url.Action("Index", "Certificates") },
+    };
+
+    var quickLinks = new (string Ctrl, string Action, string Label, string Icon)[]
+    {
+        ("Registrations", "Index", "التسجيلات", "bi-clipboard-check"),
+        ("CoursesManage", "Index", "الدورات", "bi-book"),
+        ("Instructors", "Index", "المدربون", "bi-person-badge"),
+        ("Certificates", "Index", "الشهادات", "bi-award"),
+    };
 }
-<h2 class="mb-4"><i class="bi bi-speedometer2"></i> لوحة تحكم الإداري</h2>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-4 col-lg-2">
-        <a asp-controller="Registrations" asp-action="Index" asp-route-status="Pending" class="text-decoration-none">
-            <div class="card border-0 shadow-sm bg-warning text-dark h-100">
-                <div class="card-body text-center">
-                    <h3>@ViewBag.PendingRegistrations</h3>
-                    <small><i class="bi bi-hourglass-split"></i> تسجيلات معلقة</small>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-4 col-lg-2">
-        <div class="card border-0 shadow-sm bg-success text-white h-100">
-            <div class="card-body text-center">
-                <h3>@ViewBag.TotalTrainees</h3>
-                <small><i class="bi bi-people"></i> متدربين مقبولين</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4 col-lg-2">
-        <a asp-controller="CoursesManage" asp-action="Index" class="text-decoration-none">
-            <div class="card border-0 shadow-sm bg-primary text-white h-100">
-                <div class="card-body text-center">
-                    <h3>@ViewBag.ActiveCourses</h3>
-                    <small><i class="bi bi-book"></i> دورات نشطة</small>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-4 col-lg-2">
-        <div class="card border-0 shadow-sm bg-info text-white h-100">
-            <div class="card-body text-center">
-                <h3>@ViewBag.TotalCourses</h3>
-                <small><i class="bi bi-journal-bookmark"></i> إجمالي الدورات</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4 col-lg-2">
-        <a asp-controller="Instructors" asp-action="Index" class="text-decoration-none">
-            <div class="card border-0 shadow-sm bg-secondary text-white h-100">
-                <div class="card-body text-center">
-                    <h3>@ViewBag.TotalInstructors</h3>
-                    <small><i class="bi bi-person-badge"></i> المدربون</small>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-4 col-lg-2">
-        <a asp-controller="Certificates" asp-action="Index" class="text-decoration-none">
-            <div class="card border-0 shadow-sm bg-dark text-white h-100">
-                <div class="card-body text-center">
-                    <h3>@ViewBag.CertificatesIssued</h3>
-                    <small><i class="bi bi-award"></i> شهادات صادرة</small>
-                </div>
-            </div>
-        </a>
-    </div>
+<div class="page-header">
+    <partial name="_PageHeader" />
 </div>
 
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h6 class="mb-3">إجراءات سريعة</h6>
-                <a asp-controller="Registrations" asp-action="Index" class="btn btn-outline-primary btn-sm me-1"><i class="bi bi-clipboard-check"></i> التسجيلات</a>
-                <a asp-controller="CoursesManage" asp-action="Index" class="btn btn-outline-info btn-sm me-1"><i class="bi bi-book"></i> الدورات</a>
-                <a asp-controller="Instructors" asp-action="Index" class="btn btn-outline-secondary btn-sm me-1"><i class="bi bi-person-badge"></i> المدربون</a>
-                <a asp-controller="Certificates" asp-action="Index" class="btn btn-outline-warning btn-sm me-1"><i class="bi bi-award"></i> الشهادات</a>
-            </div>
+<section class="a-kpis" aria-label="مؤشرات التشغيل">
+    @foreach (var kpi in kpis)
+    {
+        <partial name="_KpiCard" model="kpi" />
+    }
+</section>
+
+<section class="a-card mb-4" aria-label="إجراءات سريعة">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-lightning-charge" aria-hidden="true"></i> إجراءات سريعة</h2>
+    </div>
+    <div class="a-card__body">
+        <div class="a-quicklinks">
+            @foreach (var link in quickLinks)
+            {
+                <a class="a-quicklink" asp-controller="@link.Ctrl" asp-action="@link.Action">
+                    <i class="bi @link.Icon" aria-hidden="true"></i>
+                    <span>@link.Label</span>
+                </a>
+            }
         </div>
     </div>
-</div>
+</section>
 
-<div class="card shadow-sm">
-    <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-clock-history"></i> أحدث التسجيلات</h6></div>
-    <div class="card-body">
-        @if (recentRegs.Any())
-        {
-            <div class="table-responsive">
-                <table class="table table-sm">
-                    <thead><tr><th>الاسم</th><th>الدورة</th><th>الحالة</th><th>التاريخ</th></tr></thead>
-                    <tbody>
-                        @foreach (var r in recentRegs)
-                        {
-                            <tr>
-                                <td>@r.FullName</td>
-                                <td>@r.Course?.CourseName</td>
-                                <td>
-                                    @switch (r.Status)
-                                    {
-                                        case "Pending":
-                                            @:<span class="badge bg-warning text-dark">معلق</span>
-                                            break;
-                                        case "Accepted":
-                                            @:<span class="badge bg-success">مقبول</span>
-                                            break;
-                                        case "Rejected":
-                                            @:<span class="badge bg-danger">مرفوض</span>
-                                            break;
-                                    }
-                                </td>
-                                <td>@r.RegistrationDate.ToString("MM-dd")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
-        else { <p class="text-muted text-center">لا توجد تسجيلات</p> }
+<section class="a-card" aria-label="أحدث التسجيلات">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-clock-history" aria-hidden="true"></i> أحدث التسجيلات</h2>
+        <a class="btn btn-sm btn-outline-primary" asp-controller="Registrations" asp-action="Index">عرض الكل</a>
     </div>
-</div>
+    @if (recentRegs.Any())
+    {
+        <div class="a-table-wrap">
+            <table class="a-table">
+                <thead>
+                    <tr>
+                        <th scope="col">الاسم</th>
+                        <th scope="col">الدورة</th>
+                        <th scope="col">الحالة</th>
+                        <th scope="col">التاريخ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in recentRegs)
+                    {
+                        <tr>
+                            <td class="a-table__primary">@r.FullName</td>
+                            <td>@r.Course?.CourseName</td>
+                            <td>
+                                @switch (r.Status)
+                                {
+                                    case "Pending":
+                                        <span class="a-badge a-badge--warning">معلق</span>
+                                        break;
+                                    case "Accepted":
+                                        <span class="a-badge a-badge--success">مقبول</span>
+                                        break;
+                                    case "Rejected":
+                                        <span class="a-badge a-badge--danger">مرفوض</span>
+                                        break;
+                                    default:
+                                        <span class="a-badge a-badge--neutral">@r.Status</span>
+                                        break;
+                                }
+                            </td>
+                            <td class="a-table__num">@r.RegistrationDate.ToString("yyyy-MM-dd")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-clipboard-x", Title = "لا توجد تسجيلات بعد", Text = "ستظهر أحدث الطلبات هنا فور وصولها." })" />
+    }
+</section>

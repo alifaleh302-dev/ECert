@@ -12,38 +12,40 @@
     }).OrderBy(group => group.Key);
 }
 
-<div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
-<div class="row g-3 mb-4">
-    <div class="col-md-6">
-        <label asp-for="RoleName" class="form-label"></label>
+<div asp-validation-summary="ModelOnly" class="a-error mb-3"></div>
+<div class="a-form__grid a-form__grid--2 mb-5">
+    <div class="a-field">
+        <label asp-for="RoleName" class="a-field__label"></label>
         <input asp-for="RoleName" class="form-control" maxlength="50" placeholder="مثال: مشرف التسجيلات" />
-        <span asp-validation-for="RoleName" class="text-danger small"></span>
+        <span asp-validation-for="RoleName" class="a-error"></span>
     </div>
-    <div class="col-md-6">
-        <label asp-for="Description" class="form-label"></label>
+    <div class="a-field">
+        <label asp-for="Description" class="a-field__label"></label>
         <input asp-for="Description" class="form-control" maxlength="250" placeholder="وصف موجز لمسؤوليات هذا الدور" />
-        <span asp-validation-for="Description" class="text-danger small"></span>
+        <span asp-validation-for="Description" class="a-error"></span>
     </div>
 </div>
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border-top pt-4 mb-3">
-    <div>
-        <h6 class="mb-1"><i class="bi bi-key-fill text-primary"></i> الصلاحيات</h6>
-        <p class="text-muted small mb-0">اختر ما يستطيع المستخدمون المرتبطون بهذا الدور تنفيذه داخل النظام.</p>
+<div class="a-form__section">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h3 class="a-form__section-title"><i class="bi bi-key-fill" aria-hidden="true"></i> الصلاحيات</h3>
+            <p class="a-form__section-desc mb-0">اختر ما يستطيع المستخدمون المرتبطون بهذا الدور تنفيذه داخل النظام.</p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="a-badge a-badge--brand" id="selectedPermissionCount">0 صلاحيات مختارة</span>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="toggleAllPermissions"><i class="bi bi-check2-all"></i> تحديد الكل</button>
+        </div>
     </div>
-    <div class="d-flex align-items-center gap-2">
-        <span class="badge text-bg-primary" id="selectedPermissionCount">0 صلاحيات مختارة</span>
-        <button type="button" class="btn btn-sm btn-outline-primary" id="toggleAllPermissions"><i class="bi bi-check2-all"></i> تحديد الكل</button>
-    </div>
-</div>
-<span asp-validation-for="PermissionIds" class="text-danger small d-block mb-3"></span>
+    <span asp-validation-for="PermissionIds" class="a-error d-block mb-3"></span>
 
-<div class="row g-3">
-    @foreach (var group in permissionGroups)
-    {
-        <div class="col-md-6">
-            <section class="card h-100 border shadow-sm">
-                <div class="card-header bg-light fw-semibold"><i class="bi bi-folder2-open text-primary"></i> @group.Key</div>
+    <div class="a-form__grid a-form__grid--2">
+        @foreach (var group in permissionGroups)
+        {
+            <section class="a-card">
+                <div class="a-card__header">
+                    <h4 class="a-card__title"><i class="bi bi-folder2-open" aria-hidden="true"></i> @group.Key</h4>
+                </div>
                 <div class="list-group list-group-flush">
                     @foreach (var permission in group)
                     {
@@ -58,8 +60,8 @@
                     }
                 </div>
             </section>
-        </div>
-    }
+        }
+    </div>
 </div>
 
 <script>

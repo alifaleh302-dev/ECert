@@ -1,28 +1,46 @@
 @{
     ViewData["Title"] = "إنشاء فاتورة";
+    ViewData["PageIcon"] = "bi-receipt";
+    ViewData["PageDesc"] = "أنشئ فاتورة جديدة للتسجيل المحدد";
     Layout = "_AdminLayout";
     var reg = ViewBag.Registration as Registration;
 }
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card shadow-sm border-0">
-            <div class="card-body p-4">
-                <h3 class="mb-4"><i class="bi bi-receipt"></i> إنشاء فاتورة جديدة</h3>
-                <div class="alert alert-info">
-                    <strong>المتدرب:</strong> @reg?.FullName<br />
-                    <strong>الدورة:</strong> @reg?.Course?.CourseName<br />
-                    <strong>المبلغ:</strong> @((reg?.Course?.Price ?? 0m).ToString("N0")) ريال
-                </div>
-                <form asp-action="Create" method="post">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="registrationId" value="@reg?.RegistrationId" />
-                    <div class="mb-3">
-                        <label class="form-label">تاريخ الاستحقاق (اختياري)</label>
-                        <input type="date" name="dueDate" class="form-control" />
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">إنشاء الفاتورة</button>
-                </form>
-            </div>
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للفواتير</a>
+    </div>
+</div>
+
+<div class="a-card a-card--narrow">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-receipt" aria-hidden="true"></i> فاتورة جديدة</h2>
+    </div>
+    <div class="a-card__body">
+        <div class="a-dl mb-4">
+            <span class="a-dl__label">المتدرب</span>
+            <p class="a-dl__value">@reg?.FullName</p>
+
+            <span class="a-dl__label">الدورة</span>
+            <p class="a-dl__value">@reg?.Course?.CourseName</p>
+
+            <span class="a-dl__label">المبلغ</span>
+            <p class="a-dl__value fw-bold">@((reg?.Course?.Price ?? 0m).ToString("N0")) ريال</p>
         </div>
+        <form asp-action="Create" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="registrationId" value="@reg?.RegistrationId" />
+            <div asp-validation-summary="ModelOnly" class="a-error mb-3"></div>
+
+            <div class="a-field">
+                <label class="a-label" for="dueDate">تاريخ الاستحقاق (اختياري)</label>
+                <input id="dueDate" type="date" name="dueDate" class="form-control" />
+            </div>
+
+            <div class="a-form__actions">
+                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-circle"></i> إنشاء الفاتورة</button>
+            </div>
+        </form>
     </div>
 </div>

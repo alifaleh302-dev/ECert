@@ -1,38 +1,51 @@
 @{
     ViewData["Title"] = "إضافة فئة";
+    ViewData["PageIcon"] = "bi-plus-circle";
+    ViewData["PageDesc"] = "أنشئ فئة جديدة واختر أيقونتها";
     Layout = "_AdminLayout";
     ViewData["CurrentIcon"] = null;
 }
-<h2 class="mb-4"><i class="bi bi-plus-circle"></i> إضافة فئة جديدة</h2>
 
-<div class="card shadow-sm">
-    <div class="card-body">
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للفئات</a>
+    </div>
+</div>
+
+<div class="a-card a-card--narrow">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-tags" aria-hidden="true"></i> بيانات الفئة</h2>
+    </div>
+    <div class="a-card__body">
         <form asp-action="Create" method="post" enctype="multipart/form-data">
             @Html.AntiForgeryToken()
-            <div class="mb-3">
-                <label class="form-label">اسم الفئة</label>
-                <input type="text" name="CategoryName" class="form-control" required />
+            <div asp-validation-summary="ModelOnly" class="a-error mb-3"></div>
+
+            <div class="a-field">
+                <label class="a-label a-label--required" for="CategoryName">اسم الفئة</label>
+                <input id="CategoryName" type="text" name="CategoryName" class="form-control" required />
             </div>
-            <div class="mb-3">
-                <label class="form-label">الوصف</label>
-                <textarea name="Description" class="form-control" rows="3"></textarea>
+            <div class="a-field">
+                <label class="a-label" for="Description">الوصف</label>
+                <textarea id="Description" name="Description" class="form-control" rows="3"></textarea>
             </div>
 
             <partial name="_PresetIconPicker" />
 
-            <div class="mb-3 pt-3 border-top">
-                <label class="form-label fw-semibold" for="categoryImage">أو ارفع صورة أو أيقونة مخصصة</label>
+            <div class="a-field">
+                <label class="a-label" for="categoryImage">أو ارفع صورة أو أيقونة مخصصة</label>
                 <input id="categoryImage" type="file" name="icon" accept="image/*" class="form-control" onchange="previewIcon(this)" />
-                <div class="mt-2 text-center">
-                    <img id="iconPreview" src="" alt="معاينة الصورة المختارة" style="display:none; max-width:100px; max-height:100px; object-fit:contain; border-radius:12px; border:2px solid #ddd; padding:5px;" />
-                </div>
-                <small class="text-muted">رفع صورة اختياري. إذا اخترت صورة وأيقونة جاهزة معاً، ستُستخدم الصورة المرفوعة.</small>
+                <span class="a-hint">رفع صورة اختياري. إذا اخترت صورة وأيقونة جاهزة معاً، ستُستخدم الصورة المرفوعة.</span>
+                <img id="iconPreview" class="a-media-preview a-media-preview--avatar" src="" alt="معاينة الأيقونة المختارة" hidden />
             </div>
-            <div class="mb-3 form-check">
+
+            <div class="form-check mb-0">
                 <input type="checkbox" name="IsActive" value="true" class="form-check-input" checked />
                 <label class="form-check-label">نشطة</label>
             </div>
-            <div class="d-flex gap-2">
+
+            <div class="a-form__actions">
                 <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> حفظ الفئة</button>
                 <a asp-action="Index" class="btn btn-outline-secondary">إلغاء</a>
             </div>
@@ -42,18 +55,17 @@
 
 @section Scripts {
 <script>
-function previewIcon(input) {
-    const preview = document.getElementById('iconPreview');
-    if (input.files && input.files[0]) {
-        document.querySelectorAll('.preset-icon-input').forEach(item => item.checked = false);
-        document.querySelectorAll('.preset-icon-option').forEach(item => item.classList.remove('is-selected'));
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            preview.src = e.target.result;
-            preview.style.display = 'block';
-        };
-        reader.readAsDataURL(input.files[0]);
+    function previewIcon(input) {
+        const preview = document.getElementById('iconPreview');
+        if (input.files && input.files[0]) {
+            document.querySelectorAll('.preset-icon-input').forEach(item => item.checked = false);
+            document.querySelectorAll('.preset-icon-option').forEach(item => item.classList.remove('is-selected'));
+            const reader = new FileReader();
+            reader.onload = function (e) { preview.src = e.target.result; preview.hidden = false; };
+            reader.readAsDataURL(input.files[0]);
+        } else {
+            preview.hidden = true;
+        }
     }
-}
 </script>
 }

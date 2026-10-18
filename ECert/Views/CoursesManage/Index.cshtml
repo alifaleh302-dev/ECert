@@ -28,11 +28,11 @@
     </div>
 </form>
 
-<div class="card shadow-sm border-0">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle">
-                <thead class="table-light">
+<div class="a-card">
+    <div class="a-card__body a-card__body--flush">
+        <div class="a-table-wrap">
+            <table class="table a-table table-hover align-middle">
+                <thead>
                     <tr>
                         <th>الدورة</th>
                         <th>الفئة</th>
@@ -60,22 +60,22 @@
                                     @switch (course.Status)
                                     {
                                         case "Draft":
-                                            @:<span class="badge bg-secondary">مسودة</span>
+                                            @:<span class="a-badge a-badge--neutral">مسودة</span>
                                             break;
                                         case "Published":
-                                            @:<span class="badge bg-info">منشورة</span>
+                                            @:<span class="a-badge a-badge--info">منشورة</span>
                                             break;
                                         case "OpenForRegistration":
-                                            @:<span class="badge bg-success">مفتوحة للتسجيل</span>
+                                            @:<span class="a-badge a-badge--success">مفتوحة للتسجيل</span>
                                             break;
                                         case "InProgress":
-                                            @:<span class="badge bg-primary">جارية</span>
+                                            @:<span class="a-badge a-badge--brand">جارية</span>
                                             break;
                                         case "Completed":
-                                            @:<span class="badge bg-dark">مكتملة</span>
+                                            @:<span class="a-badge a-badge--neutral">مكتملة</span>
                                             break;
                                         case "Archived":
-                                            @:<span class="badge bg-warning text-dark">مؤرشفة</span>
+                                            @:<span class="a-badge a-badge--warning">مؤرشفة</span>
                                             break;
                                     }
                                 </td>

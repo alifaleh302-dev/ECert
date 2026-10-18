@@ -14,8 +14,8 @@
     </div>
 </div>
 
-<div class="alert alert-info border-0 shadow-sm d-flex gap-2 align-items-start" role="note">
-    <i class="bi bi-info-circle-fill mt-1"></i>
+<div class="a-note a-note--info mb-4" role="note">
+    <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
     <div>
         <strong>إدارة آمنة للصلاحيات.</strong> الأدوار المخصصة تسمح بتجميع الصلاحيات حسب مهام الموظفين. أدوار النظام محمية، وأي تغيير على دور مخصص يسري عند تسجيل دخول مستخدميه مرة أخرى.
     </div>
@@ -27,19 +27,19 @@
         var permissionCount = role.RolePermissions.Count;
         var userCount = role.UserRoles.Count;
         <div class="col-lg-6">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-body p-4">
+            <div class="a-card">
+                <div class="a-card__body">
                     <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
                         <div>
                             <div class="d-flex align-items-center gap-2 mb-1">
                                 <h5 class="mb-0">@role.RoleName</h5>
                                 @if (role.IsSystem)
                                 {
-                                    <span class="badge text-bg-secondary"><i class="bi bi-lock-fill"></i> دور نظام</span>
+                                    <span class="a-badge a-badge--neutral"><i class="bi bi-lock-fill"></i> دور نظام</span>
                                 }
                                 else
                                 {
-                                    <span class="badge text-bg-primary"><i class="bi bi-sliders"></i> دور مخصص</span>
+                                    <span class="a-badge a-badge--brand"><i class="bi bi-sliders"></i> دور مخصص</span>
                                 }
                             </div>
                             <p class="text-muted mb-0 small">@(string.IsNullOrWhiteSpace(role.Description) ? "لا يوجد وصف لهذا الدور." : role.Description)</p>
@@ -59,7 +59,7 @@
                             <div class="d-flex flex-wrap gap-1">
                                 @foreach (var rolePermission in role.RolePermissions.OrderBy(rp => rp.Permission?.Description))
                                 {
-                                    <span class="badge text-bg-light border text-dark fw-normal">@(rolePermission.Permission?.Description ?? rolePermission.Permission?.PermissionName)</span>
+                                    <span class="a-badge a-badge--neutral">@(rolePermission.Permission?.Description ?? rolePermission.Permission?.PermissionName)</span>
                                 }
                             </div>
                         }

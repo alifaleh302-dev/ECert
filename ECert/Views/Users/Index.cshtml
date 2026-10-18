@@ -49,11 +49,11 @@
     </div>
 </form>
 
-<div class="card shadow-sm border-0">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle">
-                <thead class="table-light">
+<div class="a-card">
+    <div class="a-card__body a-card__body--flush">
+        <div class="a-table-wrap">
+            <table class="table a-table table-hover align-middle">
+                <thead>
                     <tr>
                         <th>اسم المستخدم</th>
                         <th>الاسم الكامل</th>
@@ -76,12 +76,12 @@
                                 <td>
                                     @foreach (var ur in user.UserRoles)
                                     {
-                                        <span class="badge bg-info">@ur.Role?.RoleName</span>
+                                        <span class="a-badge a-badge--info">@ur.Role?.RoleName</span>
                                     }
                                 </td>
                                 <td>
-                                    @if (user.IsActive) { <span class="badge bg-success">نشط</span> }
-                                    else { <span class="badge bg-danger">معطل</span> }
+                                    @if (user.IsActive) { <span class="a-badge a-badge--success">نشط</span> }
+                                    else { <span class="a-badge a-badge--danger">معطل</span> }
                                 </td>
                                 <td>@(user.LastLoginAt?.ToString("yyyy-MM-dd HH:mm") ?? "لم يسجل دخول")</td>
                                 <td>

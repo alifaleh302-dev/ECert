@@ -21,14 +21,14 @@
 
 @if (TempData["Success"] != null)
 {
-    <div class="alert alert-success py-2 px-3 small d-flex align-items-center gap-2">
-        <i class="bi bi-check-circle"></i> @TempData["Success"]
+    <div class="a-note a-note--success mb-3" role="status">
+        <i class="bi bi-check-circle" aria-hidden="true"></i> <div>@TempData["Success"]</div>
     </div>
 }
 @if (TempData["Error"] != null)
 {
-    <div class="alert alert-danger py-2 px-3 small d-flex align-items-center gap-2">
-        <i class="bi bi-exclamation-triangle"></i> @TempData["Error"]
+    <div class="a-note a-note--danger mb-3" role="alert">
+        <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> <div>@TempData["Error"]</div>
     </div>
 }
 
@@ -52,13 +52,13 @@
     </div>
 </form>
 
-<div class="card shadow-sm">
-    <div class="card-body">
+<div class="a-card">
+    <div class="a-card__body">
         @if (data != null && data.Count > 0)
         {
-            <div class="table-responsive">
-                <table class="table table-hover table-striped align-middle">
-                    <thead class="table-dark">
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover align-middle">
+                    <thead>
                         <tr>
                             <th>الدورة</th>
                             <th>المسجلين</th>
@@ -87,7 +87,7 @@
                                 <td>@(((decimal)item.Cash).ToString("N0")) ريال</td>
                                 <td>@(((decimal)item.Bank).ToString("N0")) ريال</td>
                                 <td class="text-center">
-                                    <span class="badge bg-success">@(((decimal)item.Transferred).ToString("N0")) ريال</span>
+                                    <span class="a-badge a-badge--success">@(((decimal)item.Transferred).ToString("N0")) ريال</span>
                                 </td>
                                 <td class="text-center">
                                     @{

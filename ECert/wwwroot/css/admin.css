@@ -1182,7 +1182,9 @@ a.a-kpi:focus-visible {
 }
 
 .a-note i { font-size: 1rem; flex-shrink: 0; margin-top: 2px; }
+.a-note__link { color: inherit; font-weight: 800; text-decoration: underline; }
 .a-note--info { background: var(--a-info-soft); color: var(--a-info); }
+.a-note--neutral { background: var(--a-surface-2); color: var(--a-text-2); }
 .a-note--warning { background: var(--a-warning-soft); color: var(--a-warning); }
 .a-note--danger { background: var(--a-danger-soft); color: var(--a-danger); }
 .a-note--success { background: var(--a-success-soft); color: var(--a-success); }
@@ -1351,7 +1353,325 @@ a.a-kpi:focus-visible {
 }
 
 /* --------------------------------------------------------------------------
-   19. Responsive
+   19. Forms & detail views
+   -------------------------------------------------------------------------- */
+/* Section inside a form card: an optional title + description + fields. */
+.a-form__section + .a-form__section {
+    margin-top: var(--a-6);
+    padding-top: var(--a-6);
+    border-top: 1px solid var(--a-border);
+}
+
+.a-form__section-title {
+    display: flex;
+    align-items: center;
+    gap: var(--a-2);
+    margin: 0 0 var(--a-1);
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--a-text);
+}
+
+.a-form__section-title i { color: var(--a-brand); }
+
+.a-form__section-desc {
+    margin: 0 0 var(--a-5);
+    font-size: 0.83rem;
+    color: var(--a-text-3);
+    max-width: 76ch;
+}
+
+/* Field grid — responsive without needing Bootstrap row/col per field. */
+.a-form__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--a-4);
+}
+
+.a-form__grid--2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+
+.a-field--full { grid-column: 1 / -1; }
+
+/* Sticky-ish action bar that closes a form. */
+.a-form__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--a-2);
+    margin-top: var(--a-6);
+    padding-top: var(--a-5);
+    border-top: 1px solid var(--a-border);
+}
+
+.a-form__actions--end { justify-content: flex-end; }
+
+/* Marks a field as required with a subtle asterisk. */
+.a-label--required::after,
+.a-field__label--required::after {
+    content: '*';
+    margin-inline-start: 4px;
+    color: var(--a-danger);
+}
+
+/* Description list for read-only detail views (label / value pairs). */
+.a-dl {
+    display: grid;
+    grid-template-columns: minmax(150px, 38%) 1fr;
+    margin: 0;
+}
+
+.a-dl__label {
+    padding: 11px var(--a-4) 11px 0;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--a-text-3);
+    border-bottom: 1px solid var(--a-border);
+}
+
+.a-dl__value {
+    padding: 11px 0;
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--a-text);
+    border-bottom: 1px solid var(--a-border);
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.a-dl__label:last-of-type,
+.a-dl__value:last-of-type { border-bottom: 0; }
+
+/* Media upload preview — replaces hardcoded inline styles so it follows the theme. */
+.a-media-preview {
+    display: block;
+    max-width: 100%;
+    max-height: 200px;
+    margin-top: var(--a-3);
+    padding: var(--a-2);
+    background: var(--a-surface-2);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-r);
+    object-fit: contain;
+}
+
+.a-media-preview--avatar {
+    width: 120px;
+    height: 120px;
+    padding: 0;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.a-media-preview[hidden] { display: none; }
+
+/* Initials avatar shown when no photo exists. */
+.a-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--a-brand-soft);
+    color: var(--a-brand);
+    font-weight: 800;
+    font-size: 1rem;
+    line-height: 1;
+    user-select: none;
+}
+
+.a-avatar--lg { width: 80px; height: 80px; font-size: 2rem; }
+.a-avatar--sm { width: 32px; height: 32px; font-size: 0.8rem; }
+
+/* The currently-stored image/icon, shown above a replacement file input. */
+.a-media-current {
+    display: flex;
+    align-items: center;
+    gap: var(--a-3);
+    padding: var(--a-3);
+    margin-bottom: var(--a-3);
+    background: var(--a-surface-2);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-r);
+}
+
+.a-media-current__box {
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    background: var(--a-surface);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-r-sm);
+    overflow: hidden;
+}
+
+.a-media-current__box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.a-media-current__box i { font-size: 1.7rem; color: var(--a-brand); }
+
+.a-media-current__meta { min-width: 0; font-size: 0.8rem; color: var(--a-text-3); }
+
+/* Read-only value that mimics an input control (no form binding). */
+.a-readonly {
+    padding: var(--a-3) var(--a-4);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-r-sm);
+    background: var(--a-surface-2);
+    color: var(--a-text-2);
+    font-size: 0.9rem;
+}
+
+/* Large navigational tile that links to a sub-page (homepage sections hub). */
+.a-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--a-2);
+    height: 100%;
+    padding: var(--a-6) var(--a-4);
+    text-align: center;
+    color: var(--a-text);
+    background: var(--a-surface);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-r-lg);
+    box-shadow: var(--a-e1);
+    text-decoration: none;
+    transition: transform var(--a-t-fast), box-shadow var(--a-t-fast), border-color var(--a-t-fast);
+}
+
+.a-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--a-e3);
+    border-color: var(--a-brand-ring);
+    color: var(--a-text);
+}
+
+.a-tile:focus-visible {
+    outline: 2px solid var(--a-brand);
+    outline-offset: 2px;
+}
+
+.a-tile__icon {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    margin-bottom: var(--a-1);
+    font-size: 1.6rem;
+    color: var(--a-brand);
+    background: var(--a-brand-soft);
+    border-radius: var(--a-r-full);
+}
+
+.a-tile__title { font-size: 0.95rem; font-weight: 800; color: var(--a-text); }
+.a-tile__text { font-size: 0.78rem; color: var(--a-text-3); }
+
+.a-tile--success .a-tile__icon { color: var(--a-success); background: var(--a-success-soft); }
+.a-tile--warning .a-tile__icon { color: var(--a-warning); background: var(--a-warning-soft); }
+.a-tile--danger  .a-tile__icon { color: var(--a-danger);  background: var(--a-danger-soft); }
+.a-tile--info    .a-tile__icon { color: var(--a-info);    background: var(--a-info-soft); }
+.a-tile--neutral .a-tile__icon { color: var(--a-text-2);  background: var(--a-surface-3); }
+
+.a-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--a-4); }
+
+/* Signed amount in tables: green for inflow, red for outflow. */
+.a-amount { font-weight: 700; font-variant-numeric: tabular-nums; }
+.a-amount--in { color: var(--a-success); }
+.a-amount--out { color: var(--a-danger); }
+
+/* Typeahead search-select used by the course instructor picker. */
+.search-select { position: relative; }
+.search-results {
+    z-index: 1050;
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-r-sm);
+    background: var(--a-surface);
+    box-shadow: var(--a-e3);
+}
+
+.search-results .list-group-item {
+    text-align: start;
+    cursor: pointer;
+    background: transparent;
+    border-color: var(--a-border);
+    color: var(--a-text-2);
+}
+
+.search-results .list-group-item:hover { background: var(--a-surface-2); color: var(--a-text); }
+
+/* A single payment entry inside an invoice detail card. */
+.a-payment {
+    padding: var(--a-4);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-r);
+    background: var(--a-surface-2);
+}
+
+.a-payment + .a-payment { margin-top: var(--a-4); }
+
+.a-payment--cancelled {
+    border-color: var(--a-danger);
+    background: var(--a-danger-soft);
+}
+
+.a-payment__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--a-3);
+    margin-bottom: var(--a-2);
+}
+
+.a-payment__amount {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--a-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.a-payment__actions {
+    margin-top: var(--a-3);
+    padding-top: var(--a-3);
+    border-top: 1px solid var(--a-border);
+}
+
+/* A compact bordered row used by inline add/edit lists. */
+.a-item {
+    padding: var(--a-3);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-r);
+    background: var(--a-surface-2);
+}
+
+/* Small image thumbnail cell used in list tables (with placeholder fallback). */
+.a-thumb {
+    width: 60px;
+    height: 45px;
+    border-radius: var(--a-r-sm);
+    object-fit: cover;
+    border: 1px solid var(--a-border);
+}
+
+.a-thumb--wide { width: 80px; }
+
+.a-thumb--empty {
+    display: grid;
+    place-items: center;
+    background: var(--a-surface-3);
+    color: var(--a-text-3);
+    border: 1px solid var(--a-border);
+}
+
+/* --------------------------------------------------------------------------
+   20. Responsive
    -------------------------------------------------------------------------- */
 @media (min-width: 576px) {
     .admin-usermenu__meta { display: block; }

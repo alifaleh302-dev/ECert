@@ -33,13 +33,13 @@
     <a asp-action="Index" asp-route-status="Paid" class="a-segmented__item @(ViewBag.Status == "Paid" ? "is-active" : "")">مدفوعة</a>
     <a asp-action="Index" asp-route-status="Cancelled" class="a-segmented__item @(ViewBag.Status == "Cancelled" ? "is-active" : "")">ملغية</a>
 </nav>
-<div class="card shadow-sm">
-    <div class="card-body">
+<div class="a-card">
+    <div class="a-card__body">
         @if (invoices.Any())
         {
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead class="table-light"><tr><th>الرقم</th><th>المتدرب</th><th>الدورة</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover">
+                    <thead><tr><th>الرقم</th><th>المتدرب</th><th>الدورة</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th>إجراءات</th></tr></thead>
                     <tbody>
                         @foreach (var inv in invoices)
                         {
@@ -54,16 +54,16 @@
                                     @switch (inv.Status)
                                     {
                                         case "Unpaid":
-                                            @:<span class="badge bg-danger">غير مدفوعة</span>
+                                            @:<span class="a-badge a-badge--danger">غير مدفوعة</span>
                                             break;
                                         case "PartiallyPaid":
-                                            @:<span class="badge bg-warning text-dark">جزئية</span>
+                                            @:<span class="a-badge a-badge--warning">جزئية</span>
                                             break;
                                         case "Paid":
-                                            @:<span class="badge bg-success">مدفوعة</span>
+                                            @:<span class="a-badge a-badge--success">مدفوعة</span>
                                             break;
                                         case "Cancelled":
-                                            @:<span class="badge bg-secondary">ملغية</span>
+                                            @:<span class="a-badge a-badge--neutral">ملغية</span>
                                             break;
                                     }
                                 </td>

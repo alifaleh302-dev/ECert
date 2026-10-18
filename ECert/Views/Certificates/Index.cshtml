@@ -21,8 +21,8 @@
     </div>
 </div>
 
-<div class="card shadow-sm mb-3 border-0">
-    <div class="card-body">
+<div class="a-card mb-3">
+    <div class="a-card__body">
         <form method="get" class="a-toolbar" role="search" aria-label="بحث وتصفية الشهادات">
             <div class="a-toolbar__field a-toolbar__field--grow">
                 <label class="a-field__label" for="certSearch">بحث</label>
@@ -67,8 +67,8 @@
 
 <form asp-action="ExportSelected" method="post" id="selectedExportForm">
     @Html.AntiForgeryToken()
-    <div class="card shadow-sm border-0">
-        <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div class="a-card">
+        <div class="a-card__header d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <h6 class="mb-1">بيانات الشهادات المصدرة</h6>
                 <small class="text-muted">يمكن فتح الشهادة الموحدة وطباعتها من داخل النظام، كما يمكن تصدير بيانات الشهادة وروابط التحقق إلى Excel.</small>
@@ -79,7 +79,7 @@
                 </button>
             </div>
         </div>
-        <div class="card-body">
+        <div class="a-card__body">
             @if (Model.Certificates.Any())
             {
                 <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
@@ -88,9 +88,9 @@
                     <span class="small text-muted">المحدد حالياً: <strong id="selectedCount">0</strong></span>
                 </div>
 
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle">
-                        <thead class="table-light">
+                <div class="a-table-wrap">
+                    <table class="table a-table table-hover align-middle">
+                        <thead>
                             <tr>
                                 <th style="width:50px;"><input type="checkbox" id="toggleAllRows" aria-label="تحديد جميع الشهادات الظاهرة" /></th>
                                 <th>رقم الشهادة</th>
@@ -122,15 +122,15 @@
                                     <td>
                                         @if (cert.Status?.Trim().ToLowerInvariant() == "revoked")
                                         {
-                                            <span class="badge text-bg-danger">ملغية</span>
+                                            <span class="a-badge a-badge--danger">ملغية</span>
                                         }
                                         else if (cert.Status?.Trim().ToLowerInvariant() == "valid")
                                         {
-                                            <span class="badge text-bg-success">سارية</span>
+                                            <span class="a-badge a-badge--success">سارية</span>
                                         }
                                         else
                                         {
-                                            <span class="badge text-bg-warning">غير معروفة</span>
+                                            <span class="a-badge a-badge--warning">غير معروفة</span>
                                         }
                                     </td>
                                     <td>

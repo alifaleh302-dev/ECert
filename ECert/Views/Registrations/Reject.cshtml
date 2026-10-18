@@ -1,37 +1,46 @@
 @model RejectRegistrationViewModel
 @{
     ViewData["Title"] = "رفض الطلب";
+    ViewData["PageIcon"] = "bi-x-circle";
+    ViewData["PageDesc"] = "أضف سبباً واضحاً للرفض ليظهر في سجل الطلب";
     Layout = "_AdminLayout";
     var returnUrl = !string.IsNullOrWhiteSpace(Model.ReturnUrl) ? Model.ReturnUrl : (Url.Action("Index", "Registrations") ?? "/Registrations");
 }
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-5">
-        <div class="card shadow-sm border-0">
-            <div class="card-body p-4">
-                <div class="d-flex align-items-center gap-2 mb-3">
-                    <span class="d-inline-flex align-items-center justify-content-center rounded-3 bg-danger-subtle text-danger" style="width:42px;height:42px;"><i class="bi bi-x-circle fs-5"></i></span>
-                    <div>
-                        <h5 class="mb-0 text-danger">رفض طلب التسجيل</h5>
-                        <small class="text-muted">أضف سبباً واضحاً ليظهر في سجل الطلب.</small>
-                    </div>
-                </div>
-                <form asp-action="Reject" method="post">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" asp-for="RegistrationId" />
-                    <input type="hidden" asp-for="ReturnUrl" />
-                    <div class="mb-3">
-                        <label asp-for="Reason" class="form-label fw-semibold"></label>
-                        <textarea asp-for="Reason" class="form-control" rows="4" maxlength="500" placeholder="مثال: عدم استيفاء متطلبات التسجيل أو وجود بيانات غير مكتملة"></textarea>
-                        <span asp-validation-for="Reason" class="text-danger small"></span>
-                    </div>
-                    <div class="d-flex flex-wrap gap-2">
-                        <a href="@returnUrl" class="btn btn-light">إلغاء</a>
-                        <button type="submit" class="btn btn-danger ms-auto" onclick="return confirm('هل أنت متأكد من رفض هذا الطلب؟');">
-                            <i class="bi bi-x-lg"></i> تأكيد الرفض
-                        </button>
-                    </div>
-                </form>
-            </div>
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a href="@returnUrl" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة</a>
+    </div>
+</div>
+
+<div class="a-card a-card--narrow">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-x-circle" aria-hidden="true"></i> رفض طلب التسجيل</h2>
+    </div>
+    <div class="a-card__body">
+        <div class="a-note a-note--danger mb-4">
+            <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+            <div>سيُرفض الطلب ويُسجَّل السبب. لا يمكن التراجع عن هذا الإجراء من هذه الصفحة.</div>
         </div>
+        <form asp-action="Reject" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="RegistrationId" />
+            <input type="hidden" asp-for="ReturnUrl" />
+            <div asp-validation-summary="ModelOnly" class="a-error mb-3"></div>
+
+            <div class="a-field">
+                <label asp-for="Reason" class="a-label a-label--required"></label>
+                <textarea asp-for="Reason" class="form-control" rows="4" maxlength="500" placeholder="مثال: عدم استيفاء متطلبات التسجيل أو وجود بيانات غير مكتملة"></textarea>
+                <span asp-validation-for="Reason" class="a-error"></span>
+            </div>
+
+            <div class="a-form__actions">
+                <button type="submit" class="btn btn-danger" onclick="return confirm('هل أنت متأكد من رفض هذا الطلب؟');">
+                    <i class="bi bi-x-lg"></i> تأكيد الرفض
+                </button>
+                <a href="@returnUrl" class="btn btn-outline-secondary">إلغاء</a>
+            </div>
+        </form>
     </div>
 </div>

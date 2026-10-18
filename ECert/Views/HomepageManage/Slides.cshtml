@@ -17,10 +17,10 @@
     </div>
 </div>
 
-<div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
+<div class="a-card">
+    <div class="a-table-wrap">
+        <table class="table a-table table-hover align-middle mb-0">
+            <thead>
                 <tr>
                     <th>الصورة</th>
                     <th>العنوان</th>
@@ -38,11 +38,11 @@
                         <td>
                             @if (!string.IsNullOrEmpty(s.ImageUrl))
                             {
-                                <img src="@s.ImageUrl" style="width:80px;height:45px;object-fit:cover;border-radius:6px" />
+                                <img src="@s.ImageUrl" alt="@s.Title" class="a-thumb a-thumb--wide" />
                             }
                             else
                             {
-                                <div style="width:80px;height:45px;background:#e2e8f0;border-radius:6px;display:flex;align-items:center;justify-content:center">
+                                <div class="a-thumb a-thumb--wide a-thumb--empty">
                                     <i class="bi bi-image text-muted"></i>
                                 </div>
                             }
@@ -52,11 +52,11 @@
                         <td>
                             @if (s.IsActive)
                             {
-                                <span class="badge bg-success">ظاهر</span>
+                                <span class="a-badge a-badge--success">ظاهر</span>
                             }
                             else
                             {
-                                <span class="badge bg-secondary">مخفي</span>
+                                <span class="a-badge a-badge--neutral">مخفي</span>
                             }
                         </td>
                         <td>

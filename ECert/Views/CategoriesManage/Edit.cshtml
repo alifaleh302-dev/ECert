@@ -1,55 +1,68 @@
 @using ECert.Services
 @{
     ViewData["Title"] = "تعديل فئة";
+    ViewData["PageIcon"] = "bi-pencil-square";
+    ViewData["PageDesc"] = "حدّث اسم الفئة أو أيقونتها أو حالتها";
     Layout = "_AdminLayout";
     ViewData["CurrentIcon"] = CategoryIconCatalog.IsAllowed(Model.IconUrl) ? Model.IconUrl : null;
 }
-<h2 class="mb-4"><i class="bi bi-pencil-square"></i> تعديل الفئة: @Model.CategoryName</h2>
 
-<div class="card shadow-sm">
-    <div class="card-body">
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للفئات</a>
+    </div>
+</div>
+
+<div class="a-card a-card--narrow">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-tags" aria-hidden="true"></i> @Model.CategoryName</h2>
+    </div>
+    <div class="a-card__body">
         <form asp-action="Edit" asp-route-id="@Model.CategoryId" method="post" enctype="multipart/form-data">
             @Html.AntiForgeryToken()
-            <div class="mb-3">
-                <label class="form-label">اسم الفئة</label>
-                <input type="text" name="CategoryName" value="@Model.CategoryName" class="form-control" required />
+            <div asp-validation-summary="ModelOnly" class="a-error mb-3"></div>
+
+            <div class="a-field">
+                <label class="a-label a-label--required" for="CategoryName">اسم الفئة</label>
+                <input id="CategoryName" type="text" name="CategoryName" value="@Model.CategoryName" class="form-control" required />
             </div>
-            <div class="mb-3">
-                <label class="form-label">الوصف</label>
-                <textarea name="Description" class="form-control" rows="3">@Model.Description</textarea>
+            <div class="a-field">
+                <label class="a-label" for="Description">الوصف</label>
+                <textarea id="Description" name="Description" class="form-control" rows="3">@Model.Description</textarea>
             </div>
 
             <partial name="_PresetIconPicker" />
 
-            <div class="mb-3 pt-3 border-top">
-                <label class="form-label fw-semibold" for="categoryImage">أو ارفع صورة أو أيقونة مخصصة</label>
+            <div class="a-field">
+                <label class="a-label" for="categoryImage">أو ارفع صورة أو أيقونة مخصصة</label>
                 @if (!string.IsNullOrEmpty(Model.IconUrl))
                 {
-                    <div class="mb-2 d-flex align-items-center gap-2">
-                        @if (CategoryIconCatalog.IsAllowed(Model.IconUrl))
-                        {
-                            <span class="d-inline-flex align-items-center justify-content-center rounded border bg-light" style="width:80px;height:80px;">
-                                <i class="@Model.IconUrl text-primary" style="font-size:2rem;"></i>
-                            </span>
-                        }
-                        else
-                        {
-                            <img src="@Model.IconUrl" alt="الأيقونة الحالية" style="width:80px;height:80px;object-fit:contain;border-radius:12px;border:2px solid #ddd;padding:5px;" />
-                        }
-                        <small class="text-muted">الأيقونة الحالية</small>
+                    <div class="a-media-current">
+                        <span class="a-media-current__box">
+                            @if (CategoryIconCatalog.IsAllowed(Model.IconUrl))
+                            {
+                                <i class="@Model.IconUrl"></i>
+                            }
+                            else
+                            {
+                                <img src="@Model.IconUrl" alt="الأيقونة الحالية" />
+                            }
+                        </span>
+                        <span class="a-media-current__meta">الأيقونة الحالية — ارفع صورة جديدة لاستبدالها.</span>
                     </div>
                 }
                 <input id="categoryImage" type="file" name="icon" accept="image/*" class="form-control" onchange="previewIcon(this)" />
-                <div class="mt-2 text-center">
-                    <img id="iconPreview" src="" alt="معاينة الصورة المختارة" style="display:none; max-width:100px; max-height:100px; object-fit:contain; border-radius:12px; border:2px solid #ddd; padding:5px;" />
-                </div>
-                <small class="text-muted">اترك الحقل فارغاً للإبقاء على الأيقونة الحالية. عند رفع صورة، تكون الصورة هي المعتمدة.</small>
+                <span class="a-hint">اترك الحقل فارغاً للإبقاء على الأيقونة الحالية. عند رفع صورة، تكون الصورة هي المعتمدة.</span>
+                <img id="iconPreview" class="a-media-preview a-media-preview--avatar" src="" alt="معاينة الأيقونة الجديدة" hidden />
             </div>
-            <div class="mb-3 form-check">
+
+            <div class="form-check mb-0">
                 <input type="checkbox" name="IsActive" value="true" class="form-check-input" @(Model.IsActive ? "checked" : "") />
                 <label class="form-check-label">نشطة</label>
             </div>
-            <div class="d-flex gap-2">
+
+            <div class="a-form__actions">
                 <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> حفظ التعديلات</button>
                 <a asp-action="Index" class="btn btn-outline-secondary">إلغاء</a>
             </div>
@@ -59,18 +72,17 @@
 
 @section Scripts {
 <script>
-function previewIcon(input) {
-    const preview = document.getElementById('iconPreview');
-    if (input.files && input.files[0]) {
-        document.querySelectorAll('.preset-icon-input').forEach(item => item.checked = false);
-        document.querySelectorAll('.preset-icon-option').forEach(item => item.classList.remove('is-selected'));
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            preview.src = e.target.result;
-            preview.style.display = 'block';
-        };
-        reader.readAsDataURL(input.files[0]);
+    function previewIcon(input) {
+        const preview = document.getElementById('iconPreview');
+        if (input.files && input.files[0]) {
+            document.querySelectorAll('.preset-icon-input').forEach(item => item.checked = false);
+            document.querySelectorAll('.preset-icon-option').forEach(item => item.classList.remove('is-selected'));
+            const reader = new FileReader();
+            reader.onload = function (e) { preview.src = e.target.result; preview.hidden = false; };
+            reader.readAsDataURL(input.files[0]);
+        } else {
+            preview.hidden = true;
+        }
     }
-}
 </script>
 }

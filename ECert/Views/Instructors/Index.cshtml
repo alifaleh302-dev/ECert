@@ -32,18 +32,16 @@
         @foreach (var inst in Model)
         {
             <div class="col-md-4">
-                <div class="card shadow-sm border-0 h-100">
-                    <div class="card-body text-center">
+                <div class="a-card">
+                    <div class="a-card__body text-center">
                         <div class="mb-3">
                             @if (!string.IsNullOrEmpty(inst.PhotoUrl))
                             {
-                                <img src="@inst.PhotoUrl" class="rounded-circle" width="80" height="80" style="object-fit:cover" alt="@inst.FullName" />
+                                <img src="@inst.PhotoUrl" class="a-media-preview a-media-preview--avatar" alt="@inst.FullName" />
                             }
                             else
                             {
-                                <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width:80px;height:80px;font-size:2rem">
-                                    @inst.FullName[0]
-                                </div>
+                                <span class="a-avatar a-avatar--lg" aria-hidden="true">@inst.FullName[0]</span>
                             }
                         </div>
                         <h5>@inst.FullName</h5>
@@ -58,11 +56,11 @@
                             <p class="small mb-0"><i class="bi bi-envelope"></i> @inst.Email</p>
                         }
                         <div class="mt-2">
-                            @if (inst.IsActive) { <span class="badge bg-success">نشط</span> }
-                            else { <span class="badge bg-secondary">غير نشط</span> }
+                            @if (inst.IsActive) { <span class="a-badge a-badge--success">نشط</span> }
+                            else { <span class="a-badge a-badge--neutral">غير نشط</span> }
                         </div>
                     </div>
-                    <div class="card-footer bg-white text-center">
+                    <div class="a-card__footer text-center">
                         <a asp-action="Edit" asp-route-id="@inst.InstructorId" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i> تعديل</a>
                     </div>
                 </div>
@@ -72,8 +70,8 @@
     else
     {
         <div class="col-12">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
+            <div class="a-card">
+                <div class="a-card__body">
                     <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-person-badge", Title = "لا يوجد مدربون", Text = "لم يُضف أي مدرب مطابق بعد. جرّب تعديل البحث أو أضف مدربًا جديدًا.", ActionText = "إضافة مدرب", ActionHref = Url.Action("Create") })" />
                 </div>
             </div>

@@ -1,56 +1,70 @@
 @model AddPaymentViewModel
 @{
     ViewData["Title"] = "تسجيل دفعة";
+    ViewData["PageIcon"] = "bi-cash-coin";
+    ViewData["PageDesc"] = "سجّل دفعة على الفاتورة وحدّد طريقة الدفع";
     Layout = "_AdminLayout";
     var invoice = ViewBag.Invoice as Invoice;
 }
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white"><h4 class="mb-0"><i class="bi bi-cash-stack"></i> تسجيل دفعة جديدة</h4></div>
-            <div class="card-body p-4">
-                <div class="alert alert-info">
-                    <strong>الفاتورة:</strong> @invoice?.InvoiceNumber<br />
-                    <strong>المتدرب:</strong> @invoice?.TraineeName<br />
-                    <strong>الدورة:</strong> @invoice?.CourseName<br />
-                    <strong>المتبقي:</strong> <span class="text-danger fw-bold">@((invoice?.RemainingAmount ?? 0m).ToString("N0")) ريال</span>
-                </div>
-                <form asp-action="Add" method="post" id="paymentForm">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" asp-for="InvoiceId" />
-                    <div class="mb-3">
-                        <label asp-for="Amount" class="form-label"></label>
-                        <div class="input-group">
-                            <input asp-for="Amount" type="number" step="0.01" class="form-control" max="@invoice?.RemainingAmount" placeholder="0.00" />
-                            <span class="input-group-text">ريال</span>
-                        </div>
-                        <span asp-validation-for="Amount" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="PaymentMethod" class="form-label"></label>
-                        <select asp-for="PaymentMethod" class="form-select" id="paymentMethod">
-                            <option value="Cash">نقد</option>
-                            <option value="BankTransfer">محافظ إلكترونية</option>
-                            <option value="EWallet">محفظة إلكترونية</option>
-                            <option value="Card">محافظ إلكترونية</option>
-                        </select>
-                        <span asp-validation-for="PaymentMethod" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3" id="referenceGroup" style="display:none;">
-                        <label asp-for="ReferenceNumber" class="form-label"></label>
-                        <input asp-for="ReferenceNumber" class="form-control" placeholder="مثال: TX-98541236" />
-                        <span asp-validation-for="ReferenceNumber" class="text-danger"></span>
-                        <small class="text-muted">رقم السند أو رقم العملية (إجباري للطرق الإلكترونية)</small>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Notes" class="form-label"></label>
-                        <textarea asp-for="Notes" class="form-control" rows="2" placeholder="ملاحظات إضافية (اختياري)"></textarea>
-                    </div>
-                    <hr />
-                    <button type="submit" class="btn btn-success w-100 btn-lg"><i class="bi bi-check-circle"></i> تسجيل الدفعة</button>
-                </form>
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-controller="Invoices" asp-action="Details" asp-route-id="@invoice?.InvoiceId" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للفاتورة</a>
+    </div>
+</div>
+
+<div class="a-card a-card--narrow">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-cash-stack" aria-hidden="true"></i> دفعة جديدة</h2>
+    </div>
+    <div class="a-card__body">
+        <div class="a-note a-note--info mb-4">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            <div>
+                <strong>الفاتورة:</strong> @invoice?.InvoiceNumber — <strong>المتدرب:</strong> @invoice?.TraineeName<br />
+                <strong>الدورة:</strong> @invoice?.CourseName — <strong>المتبقي:</strong> @((invoice?.RemainingAmount ?? 0m).ToString("N0")) ريال
             </div>
         </div>
+        <form asp-action="Add" method="post" id="paymentForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="InvoiceId" />
+            <div asp-validation-summary="ModelOnly" class="a-error mb-3"></div>
+
+            <div class="a-field">
+                <label asp-for="Amount" class="a-label a-label--required"></label>
+                <div class="input-group">
+                    <input asp-for="Amount" type="number" step="0.01" class="form-control" max="@invoice?.RemainingAmount" placeholder="0.00" />
+                    <span class="input-group-text">ريال</span>
+                </div>
+                <span asp-validation-for="Amount" class="a-error"></span>
+            </div>
+            <div class="a-field">
+                <label asp-for="PaymentMethod" class="a-label a-label--required"></label>
+                <select asp-for="PaymentMethod" class="form-select" id="paymentMethod">
+                    <option value="Cash">نقد</option>
+                    <option value="BankTransfer">تحويل بنكي</option>
+                    <option value="EWallet">محفظة إلكترونية</option>
+                    <option value="Card">بطاقة</option>
+                </select>
+                <span asp-validation-for="PaymentMethod" class="a-error"></span>
+            </div>
+            <div class="a-field" id="referenceGroup" hidden>
+                <label asp-for="ReferenceNumber" class="a-label"></label>
+                <input asp-for="ReferenceNumber" class="form-control" placeholder="مثال: TX-98541236" />
+                <span class="a-hint">رقم السند أو رقم العملية (إجباري للطرق الإلكترونية).</span>
+                <span asp-validation-for="ReferenceNumber" class="a-error"></span>
+            </div>
+            <div class="a-field">
+                <label asp-for="Notes" class="a-label"></label>
+                <textarea asp-for="Notes" class="form-control" rows="2" placeholder="ملاحظات إضافية (اختياري)"></textarea>
+                <span asp-validation-for="Notes" class="a-error"></span>
+            </div>
+
+            <div class="a-form__actions">
+                <button type="submit" class="btn btn-success btn-lg w-100"><i class="bi bi-check-circle"></i> تسجيل الدفعة</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -64,10 +78,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function toggleReference() {
         const method = methodSelect.value;
         if (method === 'Cash') {
-            refGroup.style.display = 'none';
+            refGroup.hidden = true;
             refInput.removeAttribute('required');
         } else {
-            refGroup.style.display = 'block';
+            refGroup.hidden = false;
             refInput.setAttribute('required', 'required');
         }
     }

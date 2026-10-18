@@ -1,52 +1,82 @@
 @model ECert.Models.Post
 @{
     ViewData["Title"] = "تعديل خبر";
+    ViewData["PageIcon"] = "bi-pencil-square";
+    ViewData["PageDesc"] = "حدّث محتوى الخبر أو صورته أو حالة النشر";
     Layout = "_AdminLayout";
 }
-<h2 class="mb-4"><i class="bi bi-pencil"></i> تعديل الخبر</h2>
 
-<div class="card shadow-sm">
-    <div class="card-body">
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للأخبار</a>
+    </div>
+</div>
+
+<div class="a-card">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-pencil" aria-hidden="true"></i> بيانات الخبر</h2>
+    </div>
+    <div class="a-card__body">
         <form asp-action="Edit" method="post" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
             <input type="hidden" asp-for="PostId" />
-            <div asp-validation-summary="All" class="text-danger"></div>
-            <div class="mb-3">
-                <label asp-for="Title" class="form-label"></label>
+            <div asp-validation-summary="ModelOnly" class="a-error mb-3"></div>
+
+            <div class="a-field">
+                <label asp-for="Title" class="a-label a-label--required"></label>
                 <input asp-for="Title" class="form-control" />
-                <span asp-validation-for="Title" class="text-danger"></span>
+                <span asp-validation-for="Title" class="a-error"></span>
             </div>
-            <div class="mb-3">
-                <label asp-for="Content" class="form-label"></label>
+            <div class="a-field">
+                <label asp-for="Content" class="a-label a-label--required"></label>
                 <textarea asp-for="Content" class="form-control" rows="8"></textarea>
-                <span asp-validation-for="Content" class="text-danger"></span>
+                <span asp-validation-for="Content" class="a-error"></span>
             </div>
-            <div class="mb-3">
-                <label class="form-label">الصورة الرئيسية</label>
-                @if (!string.IsNullOrEmpty(Model.ImageUrl))
-                {
-                    <div class="mb-2 text-center">
-                        <img src="@Model.ImageUrl" alt="الصورة الحالية" style="max-width:250px; max-height:150px; object-fit:cover; border-radius:8px; border:2px solid #ddd;" />
-                        <p class="small text-muted mt-1">الصورة الحالية</p>
-                    </div>
-                }
-                <input type="file" name="image" accept="image/*" class="form-control" id="photoInput" onchange="previewPhoto(this)" />
-                <small class="text-muted">اتركه فارغاً إذا لم ترد تغيير الصورة</small>
-                <div class="mt-2 text-center">
-                    <img id="photoPreview" src="" alt="" style="display:none; max-width:300px; max-height:200px; object-fit:cover; border-radius:8px; border:2px solid #ddd;" />
+            <div class="a-form__grid a-form__grid--2">
+                <div class="a-field">
+                    <label class="a-label" for="newsImage">الصورة الرئيسية</label>
+                    @if (!string.IsNullOrEmpty(Model.ImageUrl))
+                    {
+                        <div class="a-media-current">
+                            <span class="a-media-current__box"><img src="@Model.ImageUrl" alt="الصورة الحالية" /></span>
+                            <span class="a-media-current__meta">الصورة الحالية — ارفع صورة جديدة لاستبدالها.</span>
+                        </div>
+                    }
+                    <input id="newsImage" type="file" name="image" accept="image/*" class="form-control" onchange="previewPhoto(this)" />
+                    <span class="a-hint">اتركه فارغاً إذا لم ترد تغيير الصورة.</span>
+                    <img id="photoPreview" class="a-media-preview" src="" alt="معاينة الصورة الجديدة" hidden />
+                </div>
+                <div class="a-field">
+                    <label asp-for="Status" class="a-label">الحالة</label>
+                    <select asp-for="Status" class="form-select">
+                        <option value="Draft">مسودة</option>
+                        <option value="Published">منشور</option>
+                        <option value="Archived">مؤرشف</option>
+                    </select>
+                    <span asp-validation-for="Status" class="a-error"></span>
                 </div>
             </div>
-            <div class="mb-3">
-                <label asp-for="Status" class="form-label">الحالة</label>
-                <select asp-for="Status" class="form-select">
-                    <option value="Draft">مسودة</option>
-                    <option value="Published">منشور</option>
-                    <option value="Archived">مؤرشف</option>
-                </select>
-            </div>
-            <div class="d-flex gap-2">
+
+            <div class="a-form__actions">
                 <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> حفظ التعديلات</button>
                 <a asp-action="Index" class="btn btn-outline-secondary">إلغاء</a>
             </div>
         </form>
     </div>
 </div>
+
+@section Scripts {
+<script>
+    function previewPhoto(input) {
+        const preview = document.getElementById('photoPreview');
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function (e) { preview.src = e.target.result; preview.hidden = false; };
+            reader.readAsDataURL(input.files[0]);
+        } else {
+            preview.hidden = true;
+        }
+    }
+</script>
+}

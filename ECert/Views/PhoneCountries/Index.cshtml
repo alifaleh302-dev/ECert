@@ -12,13 +12,13 @@
     </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-body">
+<div class="a-card">
+    <div class="a-card__body">
         @if (Model.Any())
         {
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead class="table-light">
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover">
+                    <thead>
                         <tr><th>الدولة</th><th>المفتاح</th><th>طول الرقم</th><th>البدايات</th><th>الحالة</th><th>إجراءات</th></tr>
                     </thead>
                     <tbody>
@@ -30,8 +30,8 @@
                                 <td>@item.MinPhoneLength - @item.MaxPhoneLength</td>
                                 <td>@item.Prefixes</td>
                                 <td>
-                                    @if (item.IsActive) { <span class="badge bg-success">نشط</span> }
-                                    else { <span class="badge bg-secondary">معطل</span> }
+                                    @if (item.IsActive) { <span class="a-badge a-badge--success">نشط</span> }
+                                    else { <span class="a-badge a-badge--neutral">معطل</span> }
                                 </td>
                                 <td>
                                     <a asp-action="Edit" asp-route-id="@item.PhoneCountryId" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
