@@ -160,7 +160,8 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
-        db.Database.EnsureCreated();
+        var bootstrapLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseBootstrap");
+        await EnsureSchemaAsync(db, bootstrapLogger);
         await db.Database.ExecuteSqlRawAsync(@"
             CREATE TABLE IF NOT EXISTS `DataProtectionKeys` (
                 `Id` INT NOT NULL AUTO_INCREMENT,
@@ -246,6 +247,30 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+
+// EnsureCreated builds the whole schema in one transaction, so a concurrent or interrupted
+// first boot can leave a partially created database behind. Retrying it then fails on the
+// objects that already exist (e.g. "Duplicate key name") and the app never starts. Only an
+// empty database is created; an existing one is used as-is and left to the idempotent
+// *SchemaMigrationService upgrades below.
+static async Task EnsureSchemaAsync(ECertDbContext db, ILogger logger)
+{
+    const int maxAttempts = 5;
+
+    for (var attempt = 1; ; attempt++)
+    {
+        try
+        {
+            db.Database.EnsureCreated();
+            return;
+        }
+        catch (Exception ex) when (attempt < maxAttempts)
+        {
+            logger.LogWarning(ex, "Schema creation attempt {Attempt}/{MaxAttempts} failed; retrying.", attempt, maxAttempts);
+            await Task.Delay(TimeSpan.FromSeconds(2 * attempt));
+        }
+    }
+}
 
 static string GetClientAddress(HttpContext context)
 {
