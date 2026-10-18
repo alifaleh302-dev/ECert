@@ -99,8 +99,9 @@ public class CashboxController : Controller
         ViewBag.FundRemaining = totalTransferred - totalWithdrawn;
         ViewBag.UntransferredTotal = totalCollected - totalTransferred;
         ViewBag.TransfersByCourse = byCourse;
-        ViewBag.Courses = await _db.Courses.OrderBy(c => c.CourseName)
-            .Select(c => new { c.CourseId, c.CourseName }).ToListAsync();
+        // Razor iterates ViewBag values as dynamic; anonymous-type properties are
+        // inaccessible to the generated view and cause RuntimeBinderException.
+        ViewBag.Courses = await _db.Courses.OrderBy(c => c.CourseName).ToListAsync();
         ViewBag.CanTransfer = CanTransfer;
         ViewBag.CanWithdraw = CanWithdraw;
         ViewBag.IsSuperAdmin = IsSuperAdmin;

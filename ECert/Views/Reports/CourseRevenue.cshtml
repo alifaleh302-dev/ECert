@@ -3,8 +3,8 @@
     ViewData["PageIcon"] = "bi-graph-up-arrow";
     ViewData["PageDesc"] = "تحليل الإيرادات والمدفوعات لكل دورة تدريبية";
     Layout = "_AdminLayout";
-    var data = ViewBag.Data as dynamic;
-    var courses = ViewBag.Courses as dynamic;
+    var data = ViewBag.Data as List<CourseRevenueRowViewModel> ?? new();
+    var courses = ViewBag.Courses as List<Course> ?? new();
     bool canTransfer = ViewBag.CanTransfer is bool b && b;
 }
 <div class="page-header">

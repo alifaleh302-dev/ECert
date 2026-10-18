@@ -1,6 +1,7 @@
 using System.Data;
 using ECert.Data;
 using ECert.Models;
+using ECert.Models.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -27,8 +28,9 @@ public class ReportsController : Controller
     {
         if (!HasPermission("view-reports")) return Forbid();
 
-        ViewBag.Courses = await _db.Courses.OrderBy(c => c.CourseName)
-            .Select(c => new { c.CourseId, c.CourseName }).ToListAsync();
+        // Razor iterates ViewBag values as dynamic; anonymous-type properties are
+        // inaccessible to the generated view and cause RuntimeBinderException.
+        ViewBag.Courses = await _db.Courses.OrderBy(c => c.CourseName).ToListAsync();
         ViewBag.CourseId = courseId;
         ViewBag.CanTransfer = CanTransfer;
 
@@ -70,10 +72,10 @@ public class ReportsController : Controller
             var bank = payments.Where(p => p.PaymentMethod != "Cash").Sum(p => p.Amount);
             var transferred = transferredByCourse.TryGetValue(c.CourseId, out var v) ? v : 0m;
             var availableToTransfer = paid - transferred;
-            return new
+            return new CourseRevenueRowViewModel
             {
-                c.CourseId,
-                c.CourseName,
+                CourseId = c.CourseId,
+                CourseName = c.CourseName,
                 Registrations = c.Registrations.Count(r => r.Status == "Accepted"),
                 Original = invoices.Sum(i => i.OriginalAmount),
                 Exemptions = exemptions,

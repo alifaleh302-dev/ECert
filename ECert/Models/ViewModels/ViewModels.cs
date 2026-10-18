@@ -263,3 +263,22 @@ public class PublicCertificateDesignElementViewModel
     public int ZIndex { get; set; }
     public int Rotation { get; set; }
 }
+
+public class CourseRevenueRowViewModel
+{
+    public int CourseId { get; set; }
+    public string CourseName { get; set; } = string.Empty;
+    public int Registrations { get; set; }
+    public decimal Original { get; set; }
+    public decimal Exemptions { get; set; }
+    public decimal Expected { get; set; }
+    public decimal Paid { get; set; }
+    public decimal Remaining { get; set; }
+    public int FullPaid { get; set; }
+    public int Partial { get; set; }
+    public int Unpaid { get; set; }
+    public decimal Cash { get; set; }
+    public decimal Bank { get; set; }
+    public decimal Transferred { get; set; }
+    public decimal AvailableToTransfer { get; set; }
+}

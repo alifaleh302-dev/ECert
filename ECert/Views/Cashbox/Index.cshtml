@@ -13,8 +13,8 @@
     decimal untransferredTotal = ViewBag.UntransferredTotal is decimal ut ? ut : 0m;
     var byCourse = ViewBag.TransfersByCourse as Dictionary<int, decimal> ?? new();
     var coursesMap = new Dictionary<int, string>();
-    if (ViewBag.Courses is IEnumerable<dynamic> cList)
-        foreach (var cc in cList) coursesMap[(int)cc.CourseId] = (string)cc.CourseName;
+    if (ViewBag.Courses is List<Course> cList)
+        foreach (var cc in cList) coursesMap[cc.CourseId] = cc.CourseName;
     bool canTransfer = ViewBag.CanTransfer is bool ct && ct;
     bool canWithdraw = ViewBag.CanWithdraw is bool cw && cw;
 }
