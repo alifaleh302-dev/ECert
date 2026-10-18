@@ -59,6 +59,7 @@ public class Invoice
     public decimal RemainingAmount => TotalAmount - PaidAmount;
 
     [Display(Name = "حالة الفاتورة")]
+    [StringLength(40)]
     public string Status { get; set; } = "Unpaid";
     // Unpaid, PartiallyPaid, Paid, Cancelled
 

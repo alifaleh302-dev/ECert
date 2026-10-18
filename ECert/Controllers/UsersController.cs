@@ -114,7 +114,16 @@ public class UsersController : Controller
         if (!HasPermission("manage-users")) return Forbid();
         var user = await _db.Users.FindAsync(id);
         if (user == null) return NotFound();
+
+        var policyError = PasswordPolicy.Validate(newPassword).FirstOrDefault();
+        if (policyError != null)
+        {
+            TempData["Error"] = policyError.ErrorMessage;
+            return RedirectToAction("Index");
+        }
+
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        user.MustChangePassword = true;
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Update", "User", id, null, "Password reset");
         TempData["Success"] = "تم إعادة تعيين كلمة المرور.";

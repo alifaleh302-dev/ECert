@@ -55,16 +55,7 @@ public class VerifyRequestGuardService
         return true;
     }
 
-    private static string GetClientIp(HttpContext httpContext)
-    {
-        var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(forwardedFor))
-        {
-            return forwardedFor.Split(',')[0].Trim();
-        }
-
-        return httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-    }
+    private static string GetClientIp(HttpContext httpContext) => ClientAddressResolver.Resolve(httpContext);
 
     private sealed class VerifyRequestState
     {

@@ -91,6 +91,7 @@ public class Course
     public CertificateDesign? CertificateDesign { get; set; }
 
     [Display(Name = "حالة الدورة")]
+    [StringLength(40)]
     public string Status { get; set; } = "Draft";
 
     public bool IsFeatured { get; set; } = false;

@@ -12,7 +12,7 @@
     var selectedCourseId = (int?)ViewBag.CourseId;
     var activeDateFrom = (DateTime?)ViewBag.DateFrom;
     var activeDateTo = (DateTime?)ViewBag.DateTo;
-    var courses = (ViewBag.Courses as dynamic) ?? new List<dynamic>();
+    var courses = ViewBag.Courses as List<Course> ?? new();
     var returnUrl = (string?)ViewBag.ReturnUrl ?? Url.Action("Index", "Registrations") ?? "/Registrations";
     var pendingCount = registrations.Count(r => r.Status == "Pending");
     var hasActiveFilters = !string.IsNullOrWhiteSpace(activeStatus)

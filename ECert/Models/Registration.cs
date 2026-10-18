@@ -67,6 +67,7 @@ public class Registration
     public Course? Course { get; set; }
 
     [Display(Name = "حالة الطلب")]
+    [StringLength(40)]
     public string Status { get; set; } = "Pending";
     // Pending, Accepted, Rejected, Archived
 

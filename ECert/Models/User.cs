@@ -35,5 +35,11 @@ public class User
 
     public DateTime? LastLoginAt { get; set; }
 
+    /// <summary>
+    /// Set for accounts created by the seeder with a well-known bootstrap password.
+    /// The user is forced to choose a new password before using the application.
+    /// </summary>
+    public bool MustChangePassword { get; set; }
+
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
 }

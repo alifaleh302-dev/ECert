@@ -1,5 +1,6 @@
 using ECert.Data;
 using ECert.Models;
+using ECert.Services;
 using ECert.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -44,6 +45,13 @@ public class HomepageManageController : Controller
 
         if (ImageFile != null && ImageFile.Length > 0)
         {
+            var (valid, validationError) = await ImageUploadValidator.ValidateAsync(ImageFile);
+            if (!valid)
+            {
+                TempData["Error"] = validationError;
+                return RedirectToAction("Slides");
+            }
+
             var uploadsDir = Path.Combine(_env.WebRootPath, "uploads", "slides");
             Directory.CreateDirectory(uploadsDir);
             var fileName = $"{Guid.NewGuid()}{Path.GetExtension(ImageFile.FileName)}";

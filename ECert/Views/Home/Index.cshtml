@@ -6,7 +6,7 @@
     var animatedTexts = ViewBag.AnimatedTexts as List<string> ?? new();
     var sections = ViewBag.Sections as List<HomepageSection> ?? new();
     var statCards = ViewBag.StatCards as List<StatCard> ?? new();
-    var categories = ViewBag.Categories as dynamic ?? new List<dynamic>();
+    var categories = ViewBag.Categories as List<Category> ?? new();
     var courses = ViewBag.LatestCourses as List<Course> ?? new();
     var news = ViewBag.LatestNews as List<Post> ?? new();
     var instructors = ViewBag.Instructors as List<Instructor> ?? new();

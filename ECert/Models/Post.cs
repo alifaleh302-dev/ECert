@@ -23,10 +23,12 @@ public class Post
     public string Author { get; set; } = string.Empty;
 
     [Display(Name = "النوع")]
+    [StringLength(40)]
     public string PostType { get; set; } = "Post";
     // Post, News
 
     [Display(Name = "الحالة")]
+    [StringLength(40)]
     public string Status { get; set; } = "Draft";
     // Draft, Published, Archived
 

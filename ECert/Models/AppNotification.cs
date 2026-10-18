@@ -28,6 +28,7 @@ public class AppNotification
     // SMS, WhatsApp, Email
 
     [Display(Name = "الحالة")]
+    [StringLength(40)]
     public string Status { get; set; } = "Pending";
     // Pending, Sent, Failed
 

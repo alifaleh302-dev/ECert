@@ -21,7 +21,7 @@ public class CertificatesController : Controller
     private readonly CertificateSecurityService _certificateSecurity;
     private readonly VerifyRequestGuardService _verifyGuard;
     private readonly IConfiguration _configuration;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly TurnstileService _turnstile;
     private readonly CertificateDesignService _certificateDesignService;
 
     public CertificatesController(
@@ -31,7 +31,7 @@ public class CertificatesController : Controller
         CertificateSecurityService certificateSecurity,
         VerifyRequestGuardService verifyGuard,
         IConfiguration configuration,
-        IHttpClientFactory httpClientFactory,
+        TurnstileService turnstile,
         CertificateDesignService certificateDesignService)
     {
         _db = db;
@@ -40,7 +40,7 @@ public class CertificatesController : Controller
         _certificateSecurity = certificateSecurity;
         _verifyGuard = verifyGuard;
         _configuration = configuration;
-        _httpClientFactory = httpClientFactory;
+        _turnstile = turnstile;
         _certificateDesignService = certificateDesignService;
     }
 
@@ -329,7 +329,7 @@ public class CertificatesController : Controller
     [HttpGet]
     public IActionResult Verify()
     {
-        ViewBag.TurnstileSiteKey = GetTurnstileSiteKey();
+        ViewBag.TurnstileSiteKey = _turnstile.SiteKey;
         return View();
     }
 
@@ -342,8 +342,7 @@ public class CertificatesController : Controller
         if (!IsVerifyRequestAllowed())
             return BuildRateLimitedVerifyResult(code);
 
-        var turnstileResponse = Request.Form["cf-turnstile-response"].FirstOrDefault();
-        if (!await IsTurnstileValidAsync(turnstileResponse))
+        if (!await _turnstile.VerifyRequestAsync(HttpContext))
             return BuildInvalidVerifyResult(code);
 
         var normalizedCode = NormalizeLookupCode(code);
@@ -545,41 +544,6 @@ public class CertificatesController : Controller
 
     private bool IsVerifyRequestAllowed() => _verifyGuard.IsAllowed(HttpContext);
 
-    private string? GetTurnstileSiteKey()
-        => _configuration["TURNSTILE_SITE_KEY"] ?? _configuration["CertificateSecurity:TurnstileSiteKey"];
-
-    private async Task<bool> IsTurnstileValidAsync(string? token)
-    {
-        var secretKey = _configuration["TURNSTILE_SECRET_KEY"] ?? _configuration["CertificateSecurity:TurnstileSecretKey"];
-        var siteKey = GetTurnstileSiteKey();
-
-        if (string.IsNullOrWhiteSpace(siteKey) || string.IsNullOrWhiteSpace(secretKey))
-            return true;
-
-        if (string.IsNullOrWhiteSpace(token))
-            return false;
-
-        try
-        {
-            using var client = _httpClientFactory.CreateClient();
-            var response = await client.PostAsync(
-                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-                new FormUrlEncodedContent(new Dictionary<string, string>
-                {
-                    ["secret"] = secretKey,
-                    ["response"] = token,
-                    ["remoteip"] = HttpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty
-                }));
-
-            response.EnsureSuccessStatusCode();
-            var payload = await response.Content.ReadFromJsonAsync<TurnstileVerifyResponse>();
-            return payload?.Success == true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
 
     private async Task<string> GenerateUniqueCertificateNumberAsync(string certificatePrefix, HashSet<string>? reservedValues = null)
     {
@@ -646,8 +610,4 @@ public class CertificatesController : Controller
             _ => "غير معروفة"
         };
 
-    private sealed class TurnstileVerifyResponse
-    {
-        public bool Success { get; set; }
-    }
 }

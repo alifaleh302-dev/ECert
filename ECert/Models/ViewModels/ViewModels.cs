@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using ECert.Services;
 
 namespace ECert.Models.ViewModels;
 
@@ -145,6 +146,7 @@ public class CreateUserViewModel
     public string? Phone { get; set; }
 
     [Required(ErrorMessage = "كلمة المرور مطلوبة")]
+    [StrongPassword]
     [Display(Name = "كلمة المرور")]
     public string Password { get; set; } = string.Empty;
 

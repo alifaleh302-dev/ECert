@@ -4,6 +4,7 @@ using ECert.Models.ViewModels;
 using ECert.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -33,7 +34,7 @@ public class AuthController : Controller
         if (!ModelState.IsValid) return View(model);
 
         var username = model.Username.Trim();
-        var clientAddress = GetClientAddress();
+        var clientAddress = ClientAddressResolver.Resolve(HttpContext);
         var accountDelayed = _loginGuard.IsAccountDelayed(username, out var accountDelay);
         var addressDelayed = _loginGuard.IsDelayed(username, clientAddress, out var addressDelay);
         if (accountDelayed || addressDelayed)
@@ -60,6 +61,9 @@ public class AuthController : Controller
             new(ClaimTypes.Email, user.Email)
         };
 
+        if (user.MustChangePassword)
+            claims.Add(new Claim("MustChangePassword", "true"));
+
         foreach (var ur in user.UserRoles)
         {
             claims.Add(new Claim(ClaimTypes.Role, ur.Role!.RoleName));
@@ -75,6 +79,9 @@ public class AuthController : Controller
 
         await _audit.LogAsync(user.FullName, "Login", "User", user.UserId, ip: HttpContext.Connection.RemoteIpAddress?.ToString());
 
+        if (user.MustChangePassword)
+            return RedirectToAction("ChangePassword");
+
         // Redirect based on role
         var roleName = user.UserRoles.FirstOrDefault()?.Role?.RoleName ?? "Admin";
         return roleName switch
@@ -87,13 +94,45 @@ public class AuthController : Controller
         };
     }
 
-    private string GetClientAddress()
-    {
-        var forwarded = Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(forwarded))
-            return forwarded.Split(',')[0].Trim();
+    [Authorize]
+    [HttpGet]
+    public IActionResult ChangePassword() => View(new ChangePasswordViewModel());
 
-        return HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    [Authorize]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
+    {
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdClaim, out var userId))
+            return RedirectToAction("Login");
+
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null) return RedirectToAction("Login");
+
+        if (!BCrypt.Net.BCrypt.Verify(model.CurrentPassword, user.PasswordHash))
+            ModelState.AddModelError(nameof(model.CurrentPassword), "كلمة المرور الحالية غير صحيحة.");
+
+        var policyError = PasswordPolicy.Validate(model.NewPassword).FirstOrDefault();
+        if (policyError != null)
+            ModelState.AddModelError(nameof(model.NewPassword), policyError.ErrorMessage ?? "كلمة المرور لا تستوفي الشروط.");
+
+        if (!string.Equals(model.NewPassword, model.ConfirmPassword, StringComparison.Ordinal))
+            ModelState.AddModelError(nameof(model.ConfirmPassword), "كلمتا المرور غير متطابقتين.");
+
+        if (!ModelState.IsValid)
+            return View(model);
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
+        user.MustChangePassword = false;
+        await _db.SaveChangesAsync();
+
+        await _audit.LogAsync(user.FullName, "Update", "User", user.UserId, ip: ClientAddressResolver.Resolve(HttpContext));
+        TempData["Success"] = "تم تحديث كلمة المرور بنجاح.";
+
+        // Reissue the cookie so the forced-change claim is dropped.
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        return RedirectToAction("Login");
     }
 
     public async Task<IActionResult> Logout()

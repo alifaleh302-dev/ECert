@@ -32,16 +32,20 @@ public class CoursesManageController : Controller
             .ToListAsync();
     }
 
-    private async Task<string?> SaveImage(IFormFile? image)
+    private async Task<(string? Path, string? Error)> SaveImageAsync(IFormFile? image)
     {
-        if (image == null || image.Length == 0) return null;
+        if (image == null || image.Length == 0) return (null, null);
+
+        var (valid, error) = await ImageUploadValidator.ValidateAsync(image);
+        if (!valid) return (null, error);
+
         var uploadsDir = Path.Combine(_env.WebRootPath, "uploads", "courses");
         Directory.CreateDirectory(uploadsDir);
         var fileName = $"{Guid.NewGuid()}{Path.GetExtension(image.FileName)}";
         var filePath = Path.Combine(uploadsDir, fileName);
         using var stream = new FileStream(filePath, FileMode.Create);
         await image.CopyToAsync(stream);
-        return $"/uploads/courses/{fileName}";
+        return ($"/uploads/courses/{fileName}", null);
     }
 
     public async Task<IActionResult> Index(string? search)
@@ -516,7 +520,13 @@ public class CoursesManageController : Controller
         }
 
         course.CreatedAt = DateTime.Now;
-        var imgPath = await SaveImage(image);
+        var (imgPath, imgError) = await SaveImageAsync(image);
+        if (imgError != null)
+        {
+            ModelState.AddModelError(string.Empty, imgError);
+            await LoadCourseFormOptions();
+            return View(course);
+        }
         if (imgPath != null) course.ImageUrl = imgPath;
         _db.Courses.Add(course);
         await _db.SaveChangesAsync();
@@ -590,7 +600,13 @@ public class CoursesManageController : Controller
         existing.Status = course.Status;
         existing.IsFeatured = course.IsFeatured;
         existing.RequiresAcademicDetails = course.RequiresAcademicDetails;
-        var imgPath = await SaveImage(image);
+        var (imgPath, imgError) = await SaveImageAsync(image);
+        if (imgError != null)
+        {
+            ModelState.AddModelError(string.Empty, imgError);
+            await LoadCourseFormOptions();
+            return View(existing);
+        }
         if (imgPath != null)
         {
             if (!string.IsNullOrEmpty(existing.ImageUrl))

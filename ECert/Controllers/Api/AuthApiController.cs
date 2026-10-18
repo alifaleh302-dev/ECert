@@ -72,6 +72,9 @@ public class AuthApiController : ControllerBase
             }
         }
 
+        if (user.MustChangePassword)
+            claims.Add(new Claim("MustChangePassword", "true"));
+
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
 
@@ -87,18 +90,12 @@ public class AuthApiController : ControllerBase
             username = user.Username,
             email = user.Email,
             role = roleName,
-            permissions
+            permissions,
+            mustChangePassword = user.MustChangePassword
         }, "تم تسجيل الدخول بنجاح"));
     }
 
-    private string GetClientAddress()
-    {
-        var forwarded = Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(forwarded))
-            return forwarded.Split(',')[0].Trim();
-
-        return HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-    }
+    private string GetClientAddress() => ClientAddressResolver.Resolve(HttpContext);
 
     [Authorize]
     [HttpGet("me")]

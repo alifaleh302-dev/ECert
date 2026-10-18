@@ -30,13 +30,13 @@ var mysqlConn = NormalizeMySqlConnectionString(rawMySqlConn);
 builder.Services.AddDbContext<ECertDbContext>(options =>
     options.UseMySql(mysqlConn, ServerVersion.AutoDetect(mysqlConn)));
 
-// Render rebuilds containers during each deploy. Persisting Data Protection keys in MySQL
+// Railway rebuilds containers during each deploy. Persisting Data Protection keys in MySQL
 // keeps authentication cookies and antiforgery tokens valid across future deployments.
 builder.Services.AddDataProtection()
     .PersistKeysToDbContext<ECertDbContext>()
     .SetApplicationName("ECert");
 
-// Render terminates TLS at the edge; explicitly configure the redirect target to avoid
+// Railway terminates TLS at the edge; explicitly configure the redirect target to avoid
 // startup warnings when the container itself has no HTTPS listener.
 builder.Services.AddHttpsRedirection(options => options.HttpsPort = 443);
 
@@ -60,6 +60,9 @@ builder.Services.AddScoped<FeeExemptionSchemaMigrationService>();
 builder.Services.AddScoped<CertificateDesignService>();
 builder.Services.AddScoped<CertificateDesignSchemaMigrationService>();
 builder.Services.AddScoped<CashboxSchemaMigrationService>();
+builder.Services.AddScoped<PerformanceIndexSchemaMigrationService>();
+builder.Services.AddScoped<TurnstileService>();
+builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -105,14 +108,14 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddAuthorization();
 
-// Protect anonymous, database-backed endpoints from automated abuse. The key is the
-// client address observed from Render's forwarded headers; this is intentionally
+// Protect anonymous, database-backed endpoints from automated abuse. The partition key is
+// the client address resolved by ClientAddressResolver; this is intentionally
 // endpoint-specific so normal browsing is not throttled by registration traffic.
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.AddPolicy("public-registration", context =>
-        RateLimitPartition.GetFixedWindowLimiter(GetClientAddress(context), _ =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientAddressResolver.Resolve(context), _ =>
             new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 3,
@@ -121,7 +124,7 @@ builder.Services.AddRateLimiter(options =>
                 AutoReplenishment = true
             }));
     options.AddPolicy("public-verification", context =>
-        RateLimitPartition.GetFixedWindowLimiter(GetClientAddress(context), _ =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientAddressResolver.Resolve(context), _ =>
             new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 20,
@@ -130,7 +133,7 @@ builder.Services.AddRateLimiter(options =>
                 AutoReplenishment = true
             }));
     options.AddPolicy("admin-login", context =>
-        RateLimitPartition.GetFixedWindowLimiter(GetClientAddress(context), _ =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientAddressResolver.Resolve(context), _ =>
             new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 10,
@@ -149,6 +152,12 @@ builder.Services.AddResponseCompression(options =>
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // The hosting platform terminates TLS at its edge proxy and forwards to the container, so
+    // the proxy addresses are not known in advance and cannot be pinned here. Limit the chain
+    // to a single hop instead: only the last entry is then trusted, so a caller cannot prepend
+    // forged addresses to spoof their origin. ClientAddressResolver reads the rightmost entry
+    // for the same reason.
+    options.ForwardLimit = 1;
     options.KnownNetworks.Clear();
     options.KnownProxies.Clear();
 });
@@ -190,8 +199,10 @@ using (var scope = app.Services.CreateScope())
         await academicMigration.EnsureAsync();
         var cashboxMigration = scope.ServiceProvider.GetRequiredService<CashboxSchemaMigrationService>();
         await cashboxMigration.EnsureAsync();
-        DbSeeder.Seed(db);
+        DbSeeder.Seed(db, bootstrapLogger);
         DbSeeder.SeedHomepageCms(db);
+        var performanceIndexMigration = scope.ServiceProvider.GetRequiredService<PerformanceIndexSchemaMigrationService>();
+        await performanceIndexMigration.EnsureAsync();
     }
     catch (Exception ex)
     {
@@ -207,11 +218,15 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
-    app.UseHttpsRedirection();
+
+    // The platform health probe calls /health over plain HTTP inside the container, so that
+    // path must not be redirected to HTTPS.
+    app.UseWhen(
+        context => !context.Request.Path.StartsWithSegments("/health"),
+        branch => branch.UseHttpsRedirection());
 }
 
 app.UseResponseCompression();
-app.UseRateLimiter();
 
 app.UseStaticFiles(new StaticFileOptions
 {
@@ -239,14 +254,59 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseRouting();
+
+// Must run after UseRouting: the [EnableRateLimiting] policies are endpoint metadata, and
+// endpoint-scoped policies are only applied once routing has selected an endpoint.
+app.UseRateLimiter();
+
 app.UseAuthentication();
+
+// Accounts seeded with a bootstrap password must replace it before using the application.
+app.Use(async (context, next) =>
+{
+    var user = context.User;
+    if (user?.Identity?.IsAuthenticated == true &&
+        user.HasClaim("MustChangePassword", "true") &&
+        !IsPasswordChangeExempt(context.Request.Path))
+    {
+        context.Response.Redirect("/Auth/ChangePassword");
+        return;
+    }
+
+    await next();
+});
+
 app.UseAuthorization();
 
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
+app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new { name = e.Key, status = e.Value.Status.ToString() })
+        });
+    }
+});
+
 app.Run();
+
+static bool IsPasswordChangeExempt(PathString path) =>
+    path.StartsWithSegments("/Auth/ChangePassword")
+    || path.StartsWithSegments("/Auth/Logout")
+    || path.StartsWithSegments("/api/auth")
+    || path.StartsWithSegments("/health")
+    || path.StartsWithSegments("/css")
+    || path.StartsWithSegments("/js")
+    || path.StartsWithSegments("/lib")
+    || path.StartsWithSegments("/images")
+    || path.StartsWithSegments("/favicon");
 
 // EnsureCreated builds the whole schema in one transaction, so a concurrent or interrupted
 // first boot can leave a partially created database behind. Retrying it then fails on the
@@ -270,15 +330,6 @@ static async Task EnsureSchemaAsync(ECertDbContext db, ILogger logger)
             await Task.Delay(TimeSpan.FromSeconds(2 * attempt));
         }
     }
-}
-
-static string GetClientAddress(HttpContext context)
-{
-    var forwarded = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-    if (!string.IsNullOrWhiteSpace(forwarded))
-        return forwarded.Split(',')[0].Trim();
-
-    return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 }
 
 static string ResolveMySqlConnectionString(IConfiguration configuration)

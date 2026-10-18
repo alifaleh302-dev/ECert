@@ -58,7 +58,16 @@ public class CategoriesManageController : Controller
 
         // الصورة المرفوعة تتقدم على الأيقونة الجاهزة عند اختيار الخيارين معاً.
         if (icon != null && icon.Length > 0)
-            category.IconUrl = await SaveIcon(icon);
+        {
+            var (iconPath, iconError) = await SaveIconAsync(icon);
+            if (iconError != null)
+            {
+                ModelState.AddModelError(string.Empty, iconError);
+                PrepareIconOptions();
+                return View(category);
+            }
+            category.IconUrl = iconPath;
+        }
 
         _db.Categories.Add(category);
         await _db.SaveChangesAsync();
@@ -107,7 +116,16 @@ public class CategoriesManageController : Controller
 
         // الصورة المرفوعة تتقدم على الأيقونة الجاهزة عند اختيار الخيارين معاً.
         if (icon != null && icon.Length > 0)
-            existing.IconUrl = await SaveIcon(icon);
+        {
+            var (iconPath, iconError) = await SaveIconAsync(icon);
+            if (iconError != null)
+            {
+                ModelState.AddModelError(string.Empty, iconError);
+                PrepareIconOptions();
+                return View(existing);
+            }
+            existing.IconUrl = iconPath;
+        }
 
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Update", "Category", id, null, category.CategoryName);
@@ -147,14 +165,17 @@ public class CategoriesManageController : Controller
         return true;
     }
 
-    private async Task<string> SaveIcon(IFormFile icon)
+    private async Task<(string? Path, string? Error)> SaveIconAsync(IFormFile icon)
     {
+        var (valid, error) = await ImageUploadValidator.ValidateAsync(icon);
+        if (!valid) return (null, error);
+
         var uploadsDir = Path.Combine(_env.WebRootPath, "uploads", "categories");
         Directory.CreateDirectory(uploadsDir);
         var fileName = $"{Guid.NewGuid()}{Path.GetExtension(icon.FileName)}";
         var filePath = Path.Combine(uploadsDir, fileName);
         using var stream = new FileStream(filePath, FileMode.Create);
         await icon.CopyToAsync(stream);
-        return $"/uploads/categories/{fileName}";
+        return ($"/uploads/categories/{fileName}", null);
     }
 }

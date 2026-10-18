@@ -11,14 +11,12 @@ namespace ECert.Controllers;
 public class RegistrationController : Controller
 {
     private readonly ECertDbContext _db;
-    private readonly IConfiguration _configuration;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly TurnstileService _turnstile;
 
-    public RegistrationController(ECertDbContext db, IConfiguration configuration, IHttpClientFactory httpClientFactory)
+    public RegistrationController(ECertDbContext db, TurnstileService turnstile)
     {
         _db = db;
-        _configuration = configuration;
-        _httpClientFactory = httpClientFactory;
+        _turnstile = turnstile;
     }
 
     [HttpGet]
@@ -57,8 +55,7 @@ public class RegistrationController : Controller
             return View("Success");
         }
 
-        var turnstileResponse = Request.Form["cf-turnstile-response"].FirstOrDefault();
-        if (!await IsTurnstileValidAsync(turnstileResponse))
+        if (!await _turnstile.VerifyRequestAsync(HttpContext))
         {
             ModelState.AddModelError(string.Empty, "تعذر التحقق من أنك مستخدم حقيقي. أعد المحاولة بعد اكتمال التحقق.");
             return await ReturnFormAsync(model, course);
@@ -220,44 +217,8 @@ public class RegistrationController : Controller
     {
         ViewBag.Countries = await _db.PhoneCountries.Where(c => c.IsActive).OrderBy(c => c.CountryName).ToListAsync();
         ViewBag.RequiresAcademicDetails = course.RequiresAcademicDetails;
-        ViewBag.TurnstileSiteKey = GetTurnstileSiteKey();
+        ViewBag.TurnstileSiteKey = _turnstile.SiteKey;
     }
-
-    private string? GetTurnstileSiteKey()
-        => _configuration["TURNSTILE_SITE_KEY"] ?? _configuration["CertificateSecurity:TurnstileSiteKey"];
-
-    private async Task<bool> IsTurnstileValidAsync(string? token)
-    {
-        var siteKey = GetTurnstileSiteKey();
-        var secretKey = _configuration["TURNSTILE_SECRET_KEY"] ?? _configuration["CertificateSecurity:TurnstileSecretKey"];
-
-        // Fail closed: registration must never be accepted when protection is configured incorrectly.
-        if (string.IsNullOrWhiteSpace(siteKey) || string.IsNullOrWhiteSpace(secretKey) || string.IsNullOrWhiteSpace(token))
-            return false;
-
-        try
-        {
-            using var client = _httpClientFactory.CreateClient();
-            using var response = await client.PostAsync(
-                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-                new FormUrlEncodedContent(new Dictionary<string, string>
-                {
-                    ["secret"] = secretKey,
-                    ["response"] = token,
-                    ["remoteip"] = HttpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty
-                }));
-
-            response.EnsureSuccessStatusCode();
-            var payload = await response.Content.ReadFromJsonAsync<TurnstileVerifyResponse>();
-            return payload?.Success == true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private sealed record TurnstileVerifyResponse(bool Success);
 
     private async Task PopulateAcademicDisplayNamesAsync(PublicRegistrationViewModel model)
     {

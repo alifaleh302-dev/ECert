@@ -4,7 +4,32 @@ namespace ECert.Data;
 
 public static class DbSeeder
 {
-    public static void Seed(ECertDbContext db)
+    /// <summary>
+    /// Password given to the bootstrap accounts on a brand-new database. Supply
+    /// <c>ECERT_BOOTSTRAP_PASSWORD</c> in the environment; otherwise a random password is
+    /// generated and written to the log once. Either way every seeded account must change
+    /// it at first sign-in.
+    /// </summary>
+    private const string BootstrapPasswordVariable = "ECERT_BOOTSTRAP_PASSWORD";
+
+    private static string ResolveBootstrapPassword(ILogger? logger)
+    {
+        var configured = Environment.GetEnvironmentVariable(BootstrapPasswordVariable);
+        if (!string.IsNullOrWhiteSpace(configured))
+            return configured;
+
+        var generated = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(12))
+            .Replace("+", "A").Replace("/", "B").TrimEnd('=');
+        (logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance).LogWarning(
+            "No {Variable} configured. Seeded accounts use this one-time password: {Password} " +
+            "They must change it at first sign-in.",
+            BootstrapPasswordVariable, generated);
+        Console.Error.WriteLine(
+            $"[bootstrap] No {BootstrapPasswordVariable} configured. One-time password for seeded accounts: {generated}");
+        return generated;
+    }
+
+    public static void Seed(ECertDbContext db, ILogger? logger = null)
     {
         EnsureCashboxPermissions(db);
         if (db.Roles.Any())
@@ -13,6 +38,8 @@ public static class DbSeeder
             SeedHomepageCms(db);
             return;
         }
+
+        var bootstrapPassword = ResolveBootstrapPassword(logger);
 
         // Create Permissions
         var permissions = new List<Permission>
@@ -74,8 +101,9 @@ public static class DbSeeder
             FullName = "مدير النظام",
             Email = "admin@training.com",
             Phone = "0500000000",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(bootstrapPassword),
             IsActive = true,
+            MustChangePassword = true,
             CreatedAt = DateTime.Now
         };
         db.Users.Add(superAdmin);
@@ -90,8 +118,9 @@ public static class DbSeeder
             FullName = "المدير الإداري",
             Email = "manager@training.com",
             Phone = "0501111111",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(bootstrapPassword),
             IsActive = true,
+            MustChangePassword = true,
             CreatedAt = DateTime.Now
         };
         db.Users.Add(admin);
@@ -105,8 +134,9 @@ public static class DbSeeder
             FullName = "سلمى الإعلامية",
             Email = "media@training.com",
             Phone = "0502222222",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(bootstrapPassword),
             IsActive = true,
+            MustChangePassword = true,
             CreatedAt = DateTime.Now
         };
         db.Users.Add(media);
@@ -120,8 +150,9 @@ public static class DbSeeder
             FullName = "المحاسب المالي",
             Email = "finance@training.com",
             Phone = "0503333333",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(bootstrapPassword),
             IsActive = true,
+            MustChangePassword = true,
             CreatedAt = DateTime.Now
         };
         db.Users.Add(finance);
