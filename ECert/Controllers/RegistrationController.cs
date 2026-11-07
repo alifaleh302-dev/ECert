@@ -219,7 +219,6 @@ public class RegistrationController : Controller
         var country = await _db.PhoneCountries.AsNoTracking()
             .FirstOrDefaultAsync(c => c.CountryCode == DefaultCountryCode && c.IsActive);
         ViewBag.CountryCode = country?.CountryCode ?? DefaultCountryCode;
-        ViewBag.CountryName = country?.CountryName ?? "اليمن";
         ViewBag.MinPhoneLength = country?.MinPhoneLength ?? 9;
         ViewBag.MaxPhoneLength = country?.MaxPhoneLength ?? 9;
         ViewBag.PhonePrefixes = country?.Prefixes ?? string.Empty;

@@ -17,29 +17,44 @@ public class PublicRegistrationFormTests
     public PublicRegistrationFormTests(AppFixture fixture) => _fixture = fixture;
 
     [Fact]
-    public async Task Form_omits_email_heard_from_and_country_picker_and_defaults_to_yemen()
+    public async Task Form_omits_email_heard_from_and_country_fields()
     {
         var courseId = await _fixture.Factory.FirstOpenCourseIdAsync();
         var client = AppClient.Create(_fixture.Factory);
 
         var html = await client.GetStringAsync($"/Registration/Register?courseId={courseId}");
 
-        // Removed fields.
+        // Removed fields: no country control at all, and no email / heard-from inputs.
         Assert.DoesNotContain("name=\"Email\"", html);
         Assert.DoesNotContain("name=\"HeardFrom\"", html);
+        Assert.DoesNotContain("name=\"CountryId\"", html);
         Assert.DoesNotContain("id=\"countrySelect\"", html);
 
-        // Country is shown read-only as Yemen with its dial code. Razor escapes '+' in the dial
-        // code, so compare against what the browser actually shows.
-        var visible = System.Net.WebUtility.HtmlDecode(html);
-        Assert.Contains("اليمن", visible);
+        // The country is never shown to the visitor; it is fixed server-side to Yemen. Scope the
+        // check to the form itself — the site footer legitimately mentions the address "صنعاء - اليمن".
+        var form = ExtractForm(html);
+        var visible = System.Net.WebUtility.HtmlDecode(form);
+        Assert.DoesNotContain("الدولة", visible);
+        Assert.DoesNotContain("اليمن", visible);
+        Assert.DoesNotContain("readonly", visible);
+
+        // The dial code is still shown inside the phone field's prefix.
         Assert.Contains("+967", visible);
-        Assert.Contains("readonly", visible);
 
         // The fields that must remain.
         Assert.Contains("name=\"FullNameArabic\"", html);
         Assert.Contains("name=\"FullNameEnglish\"", html);
         Assert.Contains("name=\"Phone\"", html);
+    }
+
+    /// <summary>Returns the markup of the registration form element.</summary>
+    private static string ExtractForm(string html)
+    {
+        var start = html.IndexOf("id=\"regForm\"", StringComparison.Ordinal);
+        Assert.True(start >= 0, "registration form (id=regForm) not found");
+        var end = html.IndexOf("</form>", start, StringComparison.Ordinal);
+        Assert.True(end >= 0, "closing </form> not found");
+        return html[start..end];
     }
 
     [Fact]
