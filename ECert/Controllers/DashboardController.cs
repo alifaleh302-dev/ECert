@@ -1,5 +1,6 @@
 using ECert.Data;
 using ECert.Models.ViewModels;
+using ECert.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,9 @@ public class DashboardController : Controller
 
     public async Task<IActionResult> Index()
     {
+        // The admin area is reserved for accounts holding at least one permission.
+        if (!User.HasAnyAdminPermission()) return Forbid();
+
         var vm = new DashboardViewModel
         {
             PendingRegistrations = await _db.Registrations.CountAsync(r => r.Status == "Pending"),

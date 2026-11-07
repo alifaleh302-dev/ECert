@@ -15,11 +15,11 @@ public class PhoneCountriesController : Controller
     public PhoneCountriesController(ECertDbContext db, AuditLogService audit)
     { _db = db; _audit = audit; }
 
-    private bool IsSuperAdmin() => User.IsInRole("SuperAdmin");
+    private bool CanManage() => User.HasPermission(AdminPermissions.ManagePhoneCountries);
 
     public async Task<IActionResult> Index()
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var list = await _db.PhoneCountries.OrderBy(c => c.CountryName).ToListAsync();
         return View(list);
     }
@@ -27,7 +27,7 @@ public class PhoneCountriesController : Controller
     [HttpGet]
     public IActionResult Create()
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         return View();
     }
 
@@ -35,7 +35,8 @@ public class PhoneCountriesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(PhoneCountry model)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
+        if (!ModelState.IsValid) return View(model);
         _db.PhoneCountries.Add(model);
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Create", "PhoneCountry", model.PhoneCountryId, null, model.CountryName);
@@ -46,7 +47,7 @@ public class PhoneCountriesController : Controller
     [HttpGet]
     public async Task<IActionResult> Edit(int id)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var item = await _db.PhoneCountries.FindAsync(id);
         if (item == null) return NotFound();
         return View(item);
@@ -56,7 +57,8 @@ public class PhoneCountriesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(PhoneCountry model)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
+        if (!ModelState.IsValid) return View(model);
         var existing = await _db.PhoneCountries.FindAsync(model.PhoneCountryId);
         if (existing == null) return NotFound();
         existing.CountryName = model.CountryName;
@@ -75,7 +77,7 @@ public class PhoneCountriesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var item = await _db.PhoneCountries.FindAsync(id);
         if (item == null) return NotFound();
         _db.PhoneCountries.Remove(item);

@@ -23,7 +23,7 @@ public class InvoicesApiController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> Get(string? status)
     {
-        if (!HasPermission("view-invoices"))
+        if (!User.CanAccessSection("Invoices"))
             return Ok(ApiResponse.Fail("ليس لديك صلاحية الوصول"));
 
         var query = _db.Invoices.AsQueryable();

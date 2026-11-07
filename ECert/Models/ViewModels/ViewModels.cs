@@ -253,6 +253,8 @@ public class PublicCertificateDesignElementViewModel
 {
     public string ElementType { get; set; } = "text";
     public string Content { get; set; } = string.Empty;
+    /// <summary>Populated for <c>qr</c> elements: a data-URI PNG of the verification link.</summary>
+    public string? ImageSrc { get; set; }
     public int X { get; set; }
     public int Y { get; set; }
     public int Width { get; set; }

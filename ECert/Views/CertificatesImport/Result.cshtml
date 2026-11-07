@@ -1,0 +1,103 @@
+@model ECert.ViewModels.LegacyCertificateImportResult
+@{
+    ViewData["Title"] = "تقرير استيراد الشهادات القديمة";
+    ViewData["PageIcon"] = "bi-clipboard-check";
+    ViewData["PageDesc"] = "ملخص عملية الاستيراد مع أكواد التحقق والباركود لكل شهادة قديمة";
+    Layout = "_AdminLayout";
+}
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions d-flex gap-2 flex-wrap">
+        <a asp-controller="Certificates" asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-award"></i> قائمة الشهادات</a>
+        <a asp-action="Import" class="btn btn-outline-primary"><i class="bi bi-cloud-arrow-up"></i> استيراد ملف آخر</a>
+    </div>
+</div>
+
+<section class="a-kpis mb-4" aria-label="ملخص الاستيراد">
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "تم استيرادها", Value = Model.Imported.ToString(), Icon = "bi-check-circle", Tone = "success" })" />
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "تم تجاهلها", Value = Model.Skipped.ToString(), Icon = "bi-files", Tone = "warning" })" />
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "دورات أُنشئت", Value = Model.CoursesCreated.ToString(), Icon = "bi-book", Tone = "info" })" />
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "دورات مرتبطة", Value = Model.CoursesLinked.ToString(), Icon = "bi-link-45deg", Tone = "brand" })" />
+</section>
+
+@if (Model.Imported > 0)
+{
+    <div class="a-note a-note--success mb-4" role="status">
+        <i class="bi bi-check-circle" aria-hidden="true"></i>
+        <div>تم استيراد <strong>@Model.Imported</strong> شهادة بنجاح، ويمكن الآن التحقق من كل منها برقم الشهادة أو بمسح الباركود.</div>
+    </div>
+}
+
+<div class="a-card">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-table" aria-hidden="true"></i> تفاصيل الصفوف</h2>
+    </div>
+    <div class="a-card__body a-card__body--flush">
+        <div class="a-table-wrap">
+            <table class="table a-table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>رقم الشهادة</th>
+                        <th>اسم المتدرب</th>
+                        <th>الدورة</th>
+                        <th>الباركود (QR)</th>
+                        <th>رمز التحقق</th>
+                        <th>رابط التحقق</th>
+                        <th>الحالة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var row in Model.Rows)
+                {
+                    <tr class="@(row.Imported ? "" : "table-warning")">
+                        <td><code>@row.CertificateNumber</code></td>
+                        <td>
+                            <strong>@row.TraineeNameArabic</strong>
+                            @if (!string.IsNullOrWhiteSpace(row.TraineeNameEnglish))
+                            {
+                                <span class="d-block text-muted small" dir="ltr">@row.TraineeNameEnglish</span>
+                            }
+                        </td>
+                        <td>@row.CourseName</td>
+                        <td>
+                            @if (row.Imported && !string.IsNullOrWhiteSpace(row.QrDataUri))
+                            {
+                                <img src="@row.QrDataUri" alt="باركود الشهادة @row.CertificateNumber" style="width:96px;height:96px;" />
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
+                        <td>@(string.IsNullOrWhiteSpace(row.VerificationCode) ? "—" : row.VerificationCode)</td>
+                        <td>
+                            @if (row.Imported && !string.IsNullOrWhiteSpace(row.VerificationUrl))
+                            {
+                                <a href="@row.VerificationUrl" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary"><i class="bi bi-box-arrow-up-right"></i> فتح</a>
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
+                        <td>
+                            @if (row.Imported)
+                            {
+                                <span class="a-badge a-badge--success">تم الاستيراد</span>
+                            }
+                            else
+                            {
+                                <span class="a-badge a-badge--warning" title="@row.SkipReason">تم التجاهل</span>
+                                @if (!string.IsNullOrWhiteSpace(row.SkipReason))
+                                {
+                                    <span class="d-block small text-muted">@row.SkipReason</span>
+                                }
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

@@ -117,6 +117,7 @@
                 <div class="ped-add-row">
                     <button type="button" class="ped-add-btn" id="addTextBtn"><i class="bi bi-type"></i> نص</button>
                     <button type="button" class="ped-add-btn" id="addDividerBtn"><i class="bi bi-dash-lg"></i> فاصل</button>
+                    <button type="button" class="ped-add-btn" id="addQrBtn"><i class="bi bi-qr-code"></i> رمز QR</button>
                 </div>
                 <div class="ped-group-title">حقول ديناميكية (تتعبأ تلقائياً عند التحقق)</div>
                 @foreach (var group in fieldGroups)
@@ -369,11 +370,13 @@
     function contentFor(el) {
         if (el.elementType === 'field') return sampleValues[el.fieldKey] || 'بيان ديناميكي';
         if (el.elementType === 'divider') return '';
+        if (el.elementType === 'qr') return '';
         return el.content || 'نص جديد';
     }
     function labelFor(el) {
         if (el.elementType === 'field') return FIELD_LABELS[el.fieldKey] || el.fieldKey || 'بيان';
         if (el.elementType === 'divider') return 'فاصل بصري';
+        if (el.elementType === 'qr') return 'رمز QR للتحقق';
         return (el.content || 'نص').replace(/\s+/g, ' ').slice(0, 22);
     }
     function styleFor(el) {
@@ -455,7 +458,7 @@
         const ordered = elements.map((el, i) => ({ el, i })).filter(o => o.el.isVisible);
         for (const o of ordered) {
             const node = document.createElement('div');
-            node.className = 'ped-el' + (o.el.elementType === 'divider' ? ' el-divider' : '');
+            node.className = 'ped-el' + (o.el.elementType === 'divider' ? ' el-divider' : '') + (o.el.elementType === 'qr' ? ' el-qr' : '');
             node.dataset.index = o.i;
             Object.assign(node.style, styleFor(o.el));
             node.textContent = contentFor(o.el);
@@ -643,8 +646,8 @@
     function addElement(type, fieldKey) {
         pushHistory();
         const count = elements.length;
-        const w = type === 'divider' ? 420 : 560;
-        const h = type === 'divider' ? 4 : 58;
+        const w = type === 'divider' ? 420 : (type === 'qr' ? 160 : 560);
+        const h = type === 'divider' ? 4 : (type === 'qr' ? 160 : 58);
         const el = {
             elementType: type,
             fieldKey: type === 'field' ? (fieldKey || 'trainee_name') : '',
@@ -749,7 +752,7 @@
             const el = elements[i];
             const row = document.createElement('div');
             row.className = 'ped-layer' + (i === selected ? ' active' : '');
-            const icon = el.elementType === 'field' ? '<i class="bi bi-link-45deg"></i>' : el.elementType === 'divider' ? '<i class="bi bi-dash-lg"></i>' : '<i class="bi bi-type"></i>';
+            const icon = el.elementType === 'field' ? '<i class="bi bi-link-45deg"></i>' : el.elementType === 'divider' ? '<i class="bi bi-dash-lg"></i>' : el.elementType === 'qr' ? '<i class="bi bi-qr-code"></i>' : '<i class="bi bi-type"></i>';
             row.innerHTML =
                 '<div class="ly-icon">' + icon + '</div>' +
                 '<div class="ly-name">' + labelFor(el) + '</div>' +
@@ -782,7 +785,7 @@
             : '<i class="bi bi-sliders2"></i> إعدادات القالب';
         syncCanvasInputs();
         if (!el) return;
-        $('elTypeBadge').textContent = el.elementType === 'field' ? 'بيان ديناميكي' : el.elementType === 'divider' ? 'فاصل بصري' : 'نص ثابت';
+        $('elTypeBadge').textContent = el.elementType === 'field' ? 'بيان ديناميكي' : el.elementType === 'divider' ? 'فاصل بصري' : el.elementType === 'qr' ? 'رمز QR' : 'نص ثابت';
         $('elIndexLabel').textContent = 'العنصر #' + (selected + 1) + ' من ' + elements.length;
         $('contentWrap').classList.toggle('d-none', el.elementType !== 'text');
         $('fieldWrap').classList.toggle('d-none', el.elementType !== 'field');
@@ -901,6 +904,7 @@
 
     $('addTextBtn').addEventListener('click', () => addElement('text'));
     $('addDividerBtn').addEventListener('click', () => addElement('divider'));
+    $('addQrBtn').addEventListener('click', () => addElement('qr'));
     document.querySelectorAll('.quick-field').forEach(b => b.addEventListener('click', () => addElement('field', b.dataset.field)));
 
     $('saveDraftBtn').addEventListener('click', () => submitForm(false));

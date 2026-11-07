@@ -183,5 +183,8 @@ public class ECertDbContext : DbContext, IDataProtectionKeyContext
             .HasIndex(c => c.VerificationCode)
             .IsUnique();
 
+        modelBuilder.Entity<Certificate>()
+            .HasIndex(c => c.Source);
+
     }
 }

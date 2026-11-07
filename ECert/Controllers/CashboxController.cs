@@ -23,19 +23,18 @@ public class CashboxController : Controller
     public CashboxController(ECertDbContext db, AuditLogService audit)
     { _db = db; _audit = audit; }
 
-    private bool IsSuperAdmin => User.IsInRole(CashboxRoles.SystemManager);
-    private bool IsManager => User.IsInRole(CashboxRoles.Manager);
+    private bool IsSuperAdmin => User.IsSuperAdmin();
     private bool CanTransfer => IsSuperAdmin
-        || User.HasClaim(c => c.Type == "Permission" && c.Value == CashboxRoles.PermTransfer);
+        || User.HasPermission(CashboxRoles.PermTransfer);
     private bool CanWithdraw => IsSuperAdmin
-        || User.HasClaim(c => c.Type == "Permission" && c.Value == CashboxRoles.PermWithdraw);
+        || User.HasPermission(CashboxRoles.PermWithdraw);
 
     /// <summary>منظر الصندوق الشامل — يعرض إجمالي الصندوق، إجمالي الرصيد بدون ترحيل،
     /// السحوبات، وعمليات الترحيل المجمَّعة حسب الدورة.</summary>
     [HttpGet]
     public async Task<IActionResult> Index()
     {
-        if (!IsSuperAdmin && !IsManager && !CanTransfer) return Forbid();
+        if (!IsSuperAdmin && !CanTransfer) return Forbid();
 
         // جلب كل الترحيلات والسحوبات عبر ADO.NET لتجاوز sqlite/pomelo edge case في EF.
         var transfers = new List<CashboxTransfer>();
@@ -105,7 +104,6 @@ public class CashboxController : Controller
         ViewBag.CanTransfer = CanTransfer;
         ViewBag.CanWithdraw = CanWithdraw;
         ViewBag.IsSuperAdmin = IsSuperAdmin;
-        ViewBag.IsManager = IsManager;
         return View();
     }
 

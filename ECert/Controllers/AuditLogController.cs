@@ -2,6 +2,7 @@ using System.Data;
 using System.Data.Common;
 using ECert.Data;
 using ECert.Models;
+using ECert.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -25,8 +26,9 @@ public class AuditLogController : Controller
     // bind the MVC route value ("Index"), so the filter silently became Action='Index'.
     public async Task<IActionResult> Index(string? entityType, [FromQuery(Name = "action")] string? action)
     {
-        var roleName = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value;
-        if (!HasPermission("view-audit-log") && roleName != "SuperAdmin") return Forbid();
+        if (!User.HasPermission(AdminPermissions.ViewAuditLog) && !User.IsSuperAdmin()) return Forbid();
+
+        var roleName = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
 
         int totalInDb = 0;
         List<AuditLog> logs = new();

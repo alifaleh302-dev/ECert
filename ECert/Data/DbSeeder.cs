@@ -1,4 +1,5 @@
 ﻿using ECert.Models;
+using ECert.Services;
 
 namespace ECert.Data;
 
@@ -58,71 +59,22 @@ public static class DbSeeder
 
     public static void Seed(ECertDbContext db, ILogger? logger = null)
     {
-        EnsureCashboxPermissions(db);
+        SyncPermissionCatalog(db);
+        RemoveDefaultNonAdminAccounts(db);
+
         if (db.Roles.Any())
         {
-            EnsureCertificateDesignPermission(db);
+            EnsureSuperAdminRole(db);
             SeedHomepageCms(db);
             ApplyAdminPasswordReset(db, logger);
             return;
         }
 
+        EnsureSuperAdminRole(db);
         var bootstrapPassword = ResolveBootstrapPassword(logger);
 
-        // Create Permissions
-        var permissions = new List<Permission>
-        {
-            new() { PermissionName = "manage-registrations", Description = "إدارة التسجيلات" },
-            new() { PermissionName = "manage-courses", Description = "إدارة الدورات" },
-            new() { PermissionName = "manage-instructors", Description = "إدارة المدربين" },
-            new() { PermissionName = "manage-finance", Description = "إدارة المالية" },
-            new() { PermissionName = "view-invoices", Description = "مشاهدة الفواتير" },
-            new() { PermissionName = "manage-payments", Description = "إدارة الدفعات" },
-            new() { PermissionName = "view-reports", Description = "مشاهدة التقارير" },
-            new() { PermissionName = "issue-certificates", Description = "إصدار الشهادات" },
-            new() { PermissionName = "manage-certificate-designs", Description = "إدارة تصميم الشهادات" },
-            new() { PermissionName = "manage-posts", Description = "إدارة المنشورات" },
-            new() { PermissionName = "manage-news", Description = "إدارة الأخبار" },
-            new() { PermissionName = "manage-users", Description = "إدارة المستخدمين" },
-            new() { PermissionName = "manage-roles", Description = "إدارة الأدوار والصلاحيات" },
-            new() { PermissionName = "view-audit-log", Description = "مشاهدة سجل العمليات" },
-            new() { PermissionName = "manage-categories", Description = "إدارة الفئات" },
-            new() { PermissionName = "manage-notifications", Description = "إدارة الإشعارات" }
-        };
-        db.Permissions.AddRange(permissions);
-        db.SaveChanges();
-
-        // Create Roles
-        var superAdminRole = new Role { RoleName = "SuperAdmin", Description = "سوبر أدمن - تحكم كامل", IsSystem = true };
-        var adminRole = new Role { RoleName = "Admin", Description = "مستخدم إداري", IsSystem = true };
-        var mediaRole = new Role { RoleName = "Media", Description = "مستخدم إعلامي", IsSystem = true };
-        var financeRole = new Role { RoleName = "Finance", Description = "مستخدم مالي", IsSystem = true };
-
-        db.Roles.AddRange(superAdminRole, adminRole, mediaRole, financeRole);
-        db.SaveChanges();
-
-        // Assign ALL permissions to SuperAdmin
-        foreach (var p in permissions)
-            db.RolePermissions.Add(new RolePermission { RoleId = superAdminRole.RoleId, PermissionId = p.PermissionId });
-
-        // Admin permissions (no finance, no users, no roles)
-        var adminPerms = new[] { "manage-registrations", "manage-courses", "manage-instructors", "issue-certificates", "manage-categories", "manage-certificate-designs" };
-        foreach (var p in permissions.Where(p => adminPerms.Contains(p.PermissionName)))
-            db.RolePermissions.Add(new RolePermission { RoleId = adminRole.RoleId, PermissionId = p.PermissionId });
-
-        // Media permissions
-        var mediaPerms = new[] { "manage-posts", "manage-news" };
-        foreach (var p in permissions.Where(p => mediaPerms.Contains(p.PermissionName)))
-            db.RolePermissions.Add(new RolePermission { RoleId = mediaRole.RoleId, PermissionId = p.PermissionId });
-
-        // Finance permissions
-        var financePerms = new[] { "manage-finance", "view-invoices", "manage-payments", "view-reports", "manage-cashbox" };
-        foreach (var p in permissions.Where(p => financePerms.Contains(p.PermissionName)))
-            db.RolePermissions.Add(new RolePermission { RoleId = financeRole.RoleId, PermissionId = p.PermissionId });
-
-        db.SaveChanges();
-
         // Create Super Admin user
+        var superAdminRole = db.Roles.First(r => r.RoleName == "SuperAdmin");
         var superAdmin = new User
         {
             Username = "admin",
@@ -138,55 +90,6 @@ public static class DbSeeder
         db.SaveChanges();
 
         db.UserRoles.Add(new UserRole { UserId = superAdmin.UserId, RoleId = superAdminRole.RoleId });
-
-        // Create Admin user
-        var admin = new User
-        {
-            Username = "manager",
-            FullName = "المدير الإداري",
-            Email = "manager@training.com",
-            Phone = "0501111111",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(bootstrapPassword),
-            IsActive = true,
-            MustChangePassword = true,
-            CreatedAt = DateTime.Now
-        };
-        db.Users.Add(admin);
-        db.SaveChanges();
-        db.UserRoles.Add(new UserRole { UserId = admin.UserId, RoleId = adminRole.RoleId });
-
-        // Create Media user
-        var media = new User
-        {
-            Username = "media",
-            FullName = "سلمى الإعلامية",
-            Email = "media@training.com",
-            Phone = "0502222222",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(bootstrapPassword),
-            IsActive = true,
-            MustChangePassword = true,
-            CreatedAt = DateTime.Now
-        };
-        db.Users.Add(media);
-        db.SaveChanges();
-        db.UserRoles.Add(new UserRole { UserId = media.UserId, RoleId = mediaRole.RoleId });
-
-        // Create Finance user
-        var finance = new User
-        {
-            Username = "finance",
-            FullName = "المحاسب المالي",
-            Email = "finance@training.com",
-            Phone = "0503333333",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(bootstrapPassword),
-            IsActive = true,
-            MustChangePassword = true,
-            CreatedAt = DateTime.Now
-        };
-        db.Users.Add(finance);
-        db.SaveChanges();
-        db.UserRoles.Add(new UserRole { UserId = finance.UserId, RoleId = financeRole.RoleId });
-
         db.SaveChanges();
 
         // Seed Categories
@@ -244,68 +147,105 @@ public static class DbSeeder
         SeedHomepageCms(db);
     }
 
-    private static void EnsureCashboxPermissions(ECertDbContext db)
+    /// <summary>
+    /// Keeps the Permissions table aligned with <see cref="AdminPermissions.Catalog"/>:
+    /// adds permissions introduced by a newer build, refreshes descriptions, and drops
+    /// permissions the catalog no longer defines (along with their role links). This is what
+    /// keeps the role editor offering exactly the permissions some section actually honours.
+    /// </summary>
+    private static void SyncPermissionCatalog(ECertDbContext db)
     {
-        // الصلاحيتان: ترحيل الرصيد (manage-cashbox) وسحب من الصندوق (withdraw-cashbox)
-        EnsurePermission(db, "manage-cashbox", "ترحيل أرصدة الدورات إلى الصندوق");
-        EnsurePermission(db, "withdraw-cashbox", "سحب من الصندوق العام");
+        var catalogNames = AdminPermissions.Catalog.Select(d => d.Name).ToHashSet(StringComparer.Ordinal);
+        var existing = db.Permissions.ToDictionary(p => p.PermissionName, StringComparer.Ordinal);
+        var changed = false;
 
-        // مدير المركز (Admin) يرى الصندوق ويحق له ترحيل الأرصدة.
-        GrantPermissionIfMissing(db, "Admin", "manage-cashbox");
-        // السوبر أدمن لديه الصلاحيتان دائماً (يُمنح في التمهيد الأول).
-        GrantPermissionIfMissing(db, "SuperAdmin", "manage-cashbox");
-        GrantPermissionIfMissing(db, "SuperAdmin", "withdraw-cashbox");
-        // المالي يحرّك الترحيلات لكنه لا يسحب من الصندوق.
-        GrantPermissionIfMissing(db, "Finance", "manage-cashbox");
-
-        // إذا كانت قاعدة البيانات قديمة بدون صلاحية "withdraw-cashbox" أصلاً:
-        // نضمن وجودها ومنحها للسوبر أدمن فقط حتى لا تسحب الأدوار الأخرى.
-    }
-
-    private static void EnsurePermission(ECertDbContext db, string name, string description)
-    {
-        if (db.Permissions.Any(p => p.PermissionName == name)) return;
-        db.Permissions.Add(new Permission { PermissionName = name, Description = description });
-        db.SaveChanges();
-    }
-
-    private static void GrantPermissionIfMissing(ECertDbContext db, string roleName, string permissionName)
-    {
-        var role = db.Roles.FirstOrDefault(r => r.RoleName == roleName);
-        var perm = db.Permissions.FirstOrDefault(p => p.PermissionName == permissionName);
-        if (role == null || perm == null) return;
-        if (db.RolePermissions.Any(rp => rp.RoleId == role.RoleId && rp.PermissionId == perm.PermissionId)) return;
-        db.RolePermissions.Add(new RolePermission { RoleId = role.RoleId, PermissionId = perm.PermissionId });
-        db.SaveChanges();
-    }
-
-    private static void EnsureCertificateDesignPermission(ECertDbContext db)
-    {
-        const string permissionName = "manage-certificate-designs";
-        var permission = db.Permissions.FirstOrDefault(p => p.PermissionName == permissionName);
-        if (permission == null)
+        foreach (var definition in AdminPermissions.Catalog)
         {
-            permission = new Permission
+            if (!existing.TryGetValue(definition.Name, out var permission))
             {
-                PermissionName = permissionName,
-                Description = "إدارة تصميم الشهادات"
-            };
-            db.Permissions.Add(permission);
+                db.Permissions.Add(new Permission { PermissionName = definition.Name, Description = definition.Description });
+                changed = true;
+            }
+            else if (permission.Description != definition.Description)
+            {
+                permission.Description = definition.Description;
+                changed = true;
+            }
+        }
+
+        var obsolete = existing.Values.Where(p => !catalogNames.Contains(p.PermissionName)).ToList();
+        if (obsolete.Count > 0)
+        {
+            var obsoleteIds = obsolete.Select(p => p.PermissionId).ToList();
+            db.RolePermissions.RemoveRange(db.RolePermissions.Where(rp => obsoleteIds.Contains(rp.PermissionId)));
+            db.Permissions.RemoveRange(obsolete);
+            changed = true;
+        }
+
+        if (changed) db.SaveChanges();
+    }
+
+    /// <summary>
+    /// The SuperAdmin role is the only built-in role. It is created on demand (so databases
+    /// seeded by older builds are upgraded in place) and always holds every permission.
+    /// </summary>
+    private static void EnsureSuperAdminRole(ECertDbContext db)
+    {
+        var role = db.Roles.FirstOrDefault(r => r.RoleName == "SuperAdmin");
+        if (role == null)
+        {
+            role = new Role { RoleName = "SuperAdmin", Description = "مدير النظام - تحكم كامل", IsSystem = true };
+            db.Roles.Add(role);
             db.SaveChanges();
         }
 
-        var rolesToGrant = db.Roles
-            .Where(role => role.RoleName == "SuperAdmin" || role.RoleName == "Admin")
+        var granted = db.RolePermissions.Where(rp => rp.RoleId == role.RoleId).Select(rp => rp.PermissionId).ToHashSet();
+        var missing = db.Permissions.Where(p => !granted.Contains(p.PermissionId))
+            .Select(p => new RolePermission { RoleId = role.RoleId, PermissionId = p.PermissionId })
             .ToList();
 
-        var missingAssignments = rolesToGrant
-            .Where(role => !db.RolePermissions.Any(rp => rp.RoleId == role.RoleId && rp.PermissionId == permission.PermissionId))
-            .Select(role => new RolePermission { RoleId = role.RoleId, PermissionId = permission.PermissionId })
-            .ToList();
-
-        if (missingAssignments.Count > 0)
+        if (missing.Count > 0)
         {
-            db.RolePermissions.AddRange(missingAssignments);
+            db.RolePermissions.AddRange(missing);
+            db.SaveChanges();
+        }
+    }
+
+    /// <summary>
+    /// The system ships with a single account (admin) and a single built-in role
+    /// (SuperAdmin). This removes the demo accounts and built-in roles that older builds
+    /// seeded automatically (Admin/Media/Finance roles; manager/media/finance users).
+    /// Roles and users an administrator created themselves are left untouched.
+    /// </summary>
+    private static void RemoveDefaultNonAdminAccounts(ECertDbContext db)
+    {
+        // Both tables are tiny and this runs once at startup, so the name matching is done
+        // in memory: translating a string-array Contains through EF is fragile here.
+        // Only the exact accounts older builds seeded are removed — matched on the seeded
+        // email/domain too, so an administrator's own "manager" user or "Admin" role survives.
+        var legacyUsernames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "manager", "media", "finance" };
+        var legacyUsers = db.Users.ToList()
+            .Where(u => legacyUsernames.Contains(u.Username)
+                        && (u.Email ?? string.Empty).EndsWith("@training.com", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (legacyUsers.Count > 0)
+        {
+            var legacyUserIds = legacyUsers.Select(u => u.UserId).ToList();
+            db.UserRoles.RemoveRange(db.UserRoles.Where(ur => legacyUserIds.Contains(ur.UserId)));
+            db.Users.RemoveRange(legacyUsers);
+            db.SaveChanges();
+        }
+
+        var legacyRoleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Admin", "Media", "Finance" };
+        var legacyRoles = db.Roles.ToList()
+            .Where(r => r.IsSystem && legacyRoleNames.Contains(r.RoleName))
+            .ToList();
+        if (legacyRoles.Count > 0)
+        {
+            var legacyRoleIds = legacyRoles.Select(r => r.RoleId).ToList();
+            db.RolePermissions.RemoveRange(db.RolePermissions.Where(rp => legacyRoleIds.Contains(rp.RoleId)));
+            db.UserRoles.RemoveRange(db.UserRoles.Where(ur => legacyRoleIds.Contains(ur.RoleId)));
+            db.Roles.RemoveRange(legacyRoles);
             db.SaveChanges();
         }
     }

@@ -55,6 +55,7 @@ public class InstructorsController : Controller
     public async Task<IActionResult> Create(Instructor instructor, IFormFile? photo)
     {
         if (!HasPermission("manage-instructors")) return Forbid();
+        if (!ModelState.IsValid) return View(instructor);
         instructor.CreatedAt = DateTime.Now;
         var photoPath = await SavePhoto(photo);
         if (photoPath != null) instructor.PhotoUrl = photoPath;
@@ -79,6 +80,7 @@ public class InstructorsController : Controller
     public async Task<IActionResult> Edit(Instructor instructor, IFormFile? photo)
     {
         if (!HasPermission("manage-instructors")) return Forbid();
+        if (!ModelState.IsValid) return View(instructor);
         var existing = await _db.Instructors.FindAsync(instructor.InstructorId);
         if (existing == null) return NotFound();
         existing.FullName = instructor.FullName;

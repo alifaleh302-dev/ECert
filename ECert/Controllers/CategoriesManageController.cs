@@ -20,7 +20,7 @@ public class CategoriesManageController : Controller
 
     public async Task<IActionResult> Index(string? search)
     {
-        if (!HasPermission("manage-courses")) return Forbid();
+        if (!HasPermission(AdminPermissions.ManageCategories)) return Forbid();
         var query = _db.Categories.Include(c => c.Courses).AsQueryable();
         if (!string.IsNullOrEmpty(search))
             query = query.Where(c => c.CategoryName.Contains(search));
@@ -32,7 +32,7 @@ public class CategoriesManageController : Controller
     [HttpGet]
     public IActionResult Create()
     {
-        if (!HasPermission("manage-courses")) return Forbid();
+        if (!HasPermission(AdminPermissions.ManageCategories)) return Forbid();
         PrepareIconOptions();
         return View();
     }
@@ -41,7 +41,7 @@ public class CategoriesManageController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create([Bind("CategoryName,Description,IsActive")] Category category, IFormFile? icon, string? presetIcon)
     {
-        if (!HasPermission("manage-courses")) return Forbid();
+        if (!HasPermission(AdminPermissions.ManageCategories)) return Forbid();
         if (string.IsNullOrWhiteSpace(category.CategoryName))
         {
             TempData["Error"] = "اسم الفئة مطلوب.";
@@ -79,7 +79,7 @@ public class CategoriesManageController : Controller
     [HttpGet]
     public async Task<IActionResult> Edit(int id)
     {
-        if (!HasPermission("manage-courses")) return Forbid();
+        if (!HasPermission(AdminPermissions.ManageCategories)) return Forbid();
         var category = await _db.Categories.FindAsync(id);
         if (category == null) return NotFound();
         PrepareIconOptions();
@@ -90,7 +90,7 @@ public class CategoriesManageController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id, [Bind("CategoryName,Description,IsActive")] Category category, IFormFile? icon, string? presetIcon)
     {
-        if (!HasPermission("manage-courses")) return Forbid();
+        if (!HasPermission(AdminPermissions.ManageCategories)) return Forbid();
         var existing = await _db.Categories.FindAsync(id);
         if (existing == null) return NotFound();
 
@@ -137,7 +137,7 @@ public class CategoriesManageController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        if (!HasPermission("manage-courses")) return Forbid();
+        if (!HasPermission(AdminPermissions.ManageCategories)) return Forbid();
         var category = await _db.Categories.Include(c => c.Courses).FirstOrDefaultAsync(c => c.CategoryId == id);
         if (category == null) return NotFound();
 

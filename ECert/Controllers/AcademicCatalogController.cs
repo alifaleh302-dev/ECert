@@ -19,11 +19,11 @@ public class AcademicCatalogController : Controller
         _audit = audit;
     }
 
-    private bool IsSuperAdmin() => User.IsInRole("SuperAdmin");
+    private bool CanManage() => User.HasPermission(AdminPermissions.ManageAcademicCatalog);
 
     public async Task<IActionResult> Index()
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
 
         var model = new AcademicCatalogPageViewModel
         {
@@ -39,7 +39,7 @@ public class AcademicCatalogController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateUniversity(string universityName)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         universityName = NormalizeName(universityName);
         if (string.IsNullOrEmpty(universityName)) return CatalogError("اسم الجامعة مطلوب.");
         if (universityName.Length > 160) return CatalogError("اسم الجامعة لا يمكن أن يتجاوز 160 حرفاً.");
@@ -57,7 +57,7 @@ public class AcademicCatalogController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateUniversity(int universityId, string universityName, bool isActive)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var university = await _db.Universities.FindAsync(universityId);
         if (university == null) return NotFound();
         universityName = NormalizeName(universityName);
@@ -76,7 +76,7 @@ public class AcademicCatalogController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateCollege(int universityId, string collegeName)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         collegeName = NormalizeName(collegeName);
         if (string.IsNullOrEmpty(collegeName)) return CatalogError("اسم الكلية مطلوب.");
         if (!await _db.Universities.AnyAsync(u => u.UniversityId == universityId)) return CatalogError("الجامعة المختارة غير موجودة.");
@@ -94,7 +94,7 @@ public class AcademicCatalogController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateCollege(int collegeId, int universityId, string collegeName, bool isActive)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var college = await _db.Colleges.FindAsync(collegeId);
         if (college == null) return NotFound();
         collegeName = NormalizeName(collegeName);
@@ -115,7 +115,7 @@ public class AcademicCatalogController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateSpecialization(int collegeId, string specializationName)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         specializationName = NormalizeName(specializationName);
         if (string.IsNullOrEmpty(specializationName)) return CatalogError("اسم التخصص مطلوب.");
         if (!await _db.Colleges.AnyAsync(c => c.CollegeId == collegeId)) return CatalogError("الكلية المختارة غير موجودة.");
@@ -133,7 +133,7 @@ public class AcademicCatalogController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateSpecialization(int academicSpecializationId, int collegeId, string specializationName, bool isActive)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var specialization = await _db.AcademicSpecializations.FindAsync(academicSpecializationId);
         if (specialization == null) return NotFound();
         specializationName = NormalizeName(specializationName);
@@ -154,7 +154,7 @@ public class AcademicCatalogController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateLevel(int academicSpecializationId, string levelName, int sortOrder = 0)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         levelName = NormalizeName(levelName);
         if (string.IsNullOrEmpty(levelName)) return CatalogError("اسم المستوى مطلوب.");
         if (levelName.Length > 80) return CatalogError("اسم المستوى لا يمكن أن يتجاوز 80 حرفاً.");
@@ -175,7 +175,7 @@ public class AcademicCatalogController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateLevel(int academicLevelOptionId, int academicSpecializationId, string levelName, int sortOrder, bool isActive)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var level = await _db.AcademicLevelOptions.FindAsync(academicLevelOptionId);
         if (level == null) return NotFound();
         levelName = NormalizeName(levelName);
@@ -198,7 +198,7 @@ public class AcademicCatalogController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteLevel(int id)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var level = await _db.AcademicLevelOptions.FindAsync(id);
         if (level == null) return NotFound();
         _db.AcademicLevelOptions.Remove(level);
@@ -225,7 +225,7 @@ public class AcademicCatalogController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteUniversity(int id)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var university = await _db.Universities.FindAsync(id);
         if (university == null) return NotFound();
         if (await _db.Colleges.AnyAsync(c => c.UniversityId == id) || await _db.Registrations.AnyAsync(r => r.UniversityId == id))
@@ -241,7 +241,7 @@ public class AcademicCatalogController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteCollege(int id)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var college = await _db.Colleges.FindAsync(id);
         if (college == null) return NotFound();
         if (await _db.AcademicSpecializations.AnyAsync(s => s.CollegeId == id) || await _db.Registrations.AnyAsync(r => r.CollegeId == id))
@@ -257,7 +257,7 @@ public class AcademicCatalogController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteSpecialization(int id)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var specialization = await _db.AcademicSpecializations.FindAsync(id);
         if (specialization == null) return NotFound();
         if (await _db.Registrations.AnyAsync(r => r.AcademicSpecializationId == id))
@@ -318,7 +318,7 @@ public class AcademicCatalogController : Controller
     }
 
     private static string NormalizeName(string value)
-        => string.Join(' ', value.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        => string.Join(' ', (value ?? string.Empty).Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries));
 }
 
 public class AcademicCatalogPageViewModel

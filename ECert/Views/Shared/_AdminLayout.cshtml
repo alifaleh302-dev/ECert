@@ -1,26 +1,11 @@
 @using System.Security.Claims
+@using ECert.Services
 @{
-    var roleName = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value ?? "";
-    bool HasPerm(string p) => User.HasClaim(c => c.Type == "Permission" && c.Value == p);
-    bool IsSuperAdmin = roleName == "SuperAdmin";
+    // A single, permission-aware dashboard serves every role.
+    const string dashController = "Dashboard";
 
-    string dashController = roleName switch
-    {
-        "SuperAdmin" => "Dashboard",
-        "Admin" => "ManagerDashboard",
-        "Media" => "MediaDashboard",
-        "Finance" => "FinanceDashboard",
-        _ => "Dashboard"
-    };
-
-    string roleLabel = roleName switch
-    {
-        "SuperAdmin" => "مدير عام",
-        "Admin" => "إداري",
-        "Media" => "إعلامي",
-        "Finance" => "مالي",
-        _ => "مستخدم"
-    };
+    // The role name is shown as-is so custom roles are labelled correctly.
+    var roleLabel = User.FindAll(ClaimTypes.Role).Select(c => c.Value).FirstOrDefault() ?? "مستخدم";
 
     string currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
     bool IsActive(string controller) => string.Equals(currentController, controller, StringComparison.OrdinalIgnoreCase);
@@ -65,29 +50,9 @@
         }),
     };
 
-    // Only render a link when the signed-in role actually holds the permission.
-    bool CanSee(string ctrl) => ctrl switch
-    {
-        "Registrations" => IsSuperAdmin || HasPerm("manage-registrations"),
-        "CoursesManage" => IsSuperAdmin || HasPerm("manage-courses"),
-        "CategoriesManage" => IsSuperAdmin || HasPerm("manage-courses"),
-        "Instructors" => IsSuperAdmin || HasPerm("manage-instructors"),
-        "Certificates" => IsSuperAdmin || HasPerm("manage-certificates"),
-        "CertificateDesigns" => IsSuperAdmin || HasPerm("manage-certificate-designs"),
-        "Invoices" => IsSuperAdmin || HasPerm("view-invoices") || HasPerm("manage-finance"),
-        "Payments" => IsSuperAdmin || HasPerm("manage-payments"),
-        "Cashbox" => IsSuperAdmin || HasPerm("manage-cashbox"),
-        "Reports" => IsSuperAdmin || HasPerm("view-reports"),
-        "PostsManage" => IsSuperAdmin || HasPerm("manage-posts"),
-        "NewsManage" => IsSuperAdmin || HasPerm("manage-news"),
-        "HomepageManage" => IsSuperAdmin,
-        "Users" => IsSuperAdmin || HasPerm("manage-users"),
-        "Roles" => IsSuperAdmin,
-        "AuditLog" => IsSuperAdmin || HasPerm("view-audit-log"),
-        "AcademicCatalog" => IsSuperAdmin,
-        "PhoneCountries" => IsSuperAdmin,
-        _ => IsSuperAdmin
-    };
+    // A section is visible when the signed-in role holds any of its permissions. The map in
+    // AdminPermissions is the single source of truth, mirrored by the controller guards.
+    bool CanSee(string ctrl) => User.CanAccessSection(ctrl);
 
     var visibleGroups = groups
         .Select(g => (g.Key, g.Label, g.Icon, Items: g.Items.Where(i => CanSee(i.Ctrl)).ToList()))

@@ -46,6 +46,7 @@ builder.Services.AddScoped<AuditLogService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<SiteLayoutDataFilter>();
 builder.Services.AddSingleton<CertificateSecurityService>();
+builder.Services.AddSingleton<CertificateQrService>();
 builder.Services.AddSingleton<VerifyRequestGuardService>();
 builder.Services.AddSingleton<LoginAttemptGuard>();
 builder.Services.AddScoped<CertificateSchemaMigrationService>();
@@ -58,6 +59,7 @@ builder.Services.AddScoped<RegistrationInvoiceService>();
 builder.Services.AddScoped<InvoiceSchemaMigrationService>();
 builder.Services.AddScoped<FeeExemptionSchemaMigrationService>();
 builder.Services.AddScoped<CertificateDesignService>();
+builder.Services.AddScoped<LegacyCertificateImportService>();
 builder.Services.AddScoped<CertificateDesignSchemaMigrationService>();
 builder.Services.AddScoped<CashboxSchemaMigrationService>();
 builder.Services.AddScoped<PerformanceIndexSchemaMigrationService>();
@@ -181,6 +183,10 @@ using (var scope = app.Services.CreateScope())
         // Run this before every migration that queries Courses, because the EF model already includes CertificateDesignId.
         var certificateDesignMigration = scope.ServiceProvider.GetRequiredService<CertificateDesignSchemaMigrationService>();
         await certificateDesignMigration.EnsureAsync();
+        // The certificate columns must exist before any migration that loads the Certificate entity
+        // (CourseNameSchemaMigrationService selects every mapped column).
+        var certificateMigration = scope.ServiceProvider.GetRequiredService<CertificateSchemaMigrationService>();
+        await certificateMigration.EnsureAsync();
         var courseNameMigration = scope.ServiceProvider.GetRequiredService<CourseNameSchemaMigrationService>();
         await courseNameMigration.EnsureAsync();
         var courseSchemaMigration = scope.ServiceProvider.GetRequiredService<CourseSchemaMigrationService>();
@@ -193,8 +199,6 @@ using (var scope = app.Services.CreateScope())
         await invoiceMigration.EnsureAsync();
         var feeExemptionMigration = scope.ServiceProvider.GetRequiredService<FeeExemptionSchemaMigrationService>();
         await feeExemptionMigration.EnsureAsync();
-        var certificateMigration = scope.ServiceProvider.GetRequiredService<CertificateSchemaMigrationService>();
-        await certificateMigration.EnsureAsync();
         var academicMigration = scope.ServiceProvider.GetRequiredService<AcademicSchemaMigrationService>();
         await academicMigration.EnsureAsync();
         var cashboxMigration = scope.ServiceProvider.GetRequiredService<CashboxSchemaMigrationService>();
@@ -443,3 +447,6 @@ static string MapSslMode(string value)
         _ => "Preferred"
     };
 }
+
+// Exposed so the integration test project can boot the real application via WebApplicationFactory.
+public partial class Program { }

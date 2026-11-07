@@ -41,6 +41,7 @@ public class PostsManageController : Controller
     public async Task<IActionResult> Create(Post post, IFormFile? image)
     {
         if (!HasPermission("manage-posts")) return Forbid();
+        if (!ModelState.IsValid) return View(post);
         post.Author = User.Identity?.Name ?? "Unknown";
         post.CreatedAt = DateTime.Now;
         if (post.Status == "Published") post.PublishedAt = DateTime.Now;
@@ -69,6 +70,7 @@ public class PostsManageController : Controller
     public async Task<IActionResult> Edit(Post post, IFormFile? image)
     {
         if (!HasPermission("manage-posts")) return Forbid();
+        if (!ModelState.IsValid) return View(post);
         var existing = await _db.Posts.FindAsync(post.PostId);
         if (existing == null) return NotFound();
         existing.Title = post.Title;
