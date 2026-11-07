@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
+using ECert.Services;
 using ECert.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -240,6 +241,51 @@ public class LegacyCertificateImportTests
             new[] { new KeyValuePair<string, string>("code", certificate!.VerificationCode) });
         byCode.EnsureSuccessStatusCode();
         Assert.Contains("LEG-7001", await byCode.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Imported_certificate_shows_a_barcode_when_the_design_has_one()
+    {
+        var admin = await SignInAdminAsync();
+        var (instructorId, _) = await _fixture.Factory.FirstInstructorAsync();
+        var (categoryId, _) = await _fixture.Factory.FirstCategoryAsync();
+
+        var workbook = BuildWorkbook(("ليان ناصر", "Layan Nasser", "LEG-9001", "دورة الجودة", "2020-05-05"));
+        var previewHtml = await (await UploadAsync(admin, categoryId, instructorId, workbook)).Content.ReadAsStringAsync();
+        var token = ExtractToken(previewHtml);
+
+        await admin.PostFormAsync("/CertificatesImport/Import", "/CertificatesImport/ConfirmImport",
+            new[] { new KeyValuePair<string, string>("token", token) });
+
+        await _fixture.Factory.WithDbAsync(async db =>
+        {
+            // Retire any published design, then publish one that renders a barcode of the certificate number.
+            foreach (var existing in db.CertificateDesigns.Where(d => d.IsPublished))
+                existing.IsPublished = false;
+
+            var design = CertificateDesignService.CreateDefault("test");
+            design.DesignKey = "test-barcode-" + Guid.NewGuid().ToString("N");
+            design.Elements.Add(new ECert.Models.CertificateDesignElement
+            {
+                ElementType = "barcode",
+                FieldKey = "certificate_number",
+                X = 100, Y = 640, Width = 320, Height = 70,
+                FontSize = 14, FontFamily = "Tajawal", FontColor = "#172033",
+                FontWeight = "600", TextAlign = "center", IsVisible = true, SortOrder = 99, ZIndex = 99
+            });
+            db.CertificateDesigns.Add(design);
+            await db.SaveChangesAsync();
+            return true;
+        });
+
+        var anonymous = AppClient.Create(_fixture.Factory);
+        var verify = await anonymous.PostFormAsync("/Certificates/Verify", "/Certificates/Verify",
+            new[] { new KeyValuePair<string, string>("code", "LEG-9001") });
+        verify.EnsureSuccessStatusCode();
+        var html = System.Net.WebUtility.HtmlDecode(await verify.Content.ReadAsStringAsync());
+
+        Assert.Contains("باركود الشهادة", html);
+        Assert.Contains("data:image/svg+xml;base64,", html);
     }
 
     [Fact]

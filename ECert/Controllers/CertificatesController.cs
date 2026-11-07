@@ -24,6 +24,7 @@ public class CertificatesController : Controller
     private readonly TurnstileService _turnstile;
     private readonly CertificateDesignService _certificateDesignService;
     private readonly CertificateQrService _qrService;
+    private readonly CertificateBarcodeService _barcodeService;
 
     public CertificatesController(
         ECertDbContext db,
@@ -34,7 +35,8 @@ public class CertificatesController : Controller
         IConfiguration configuration,
         TurnstileService turnstile,
         CertificateDesignService certificateDesignService,
-        CertificateQrService qrService)
+        CertificateQrService qrService,
+        CertificateBarcodeService barcodeService)
     {
         _db = db;
         _audit = audit;
@@ -45,6 +47,7 @@ public class CertificatesController : Controller
         _turnstile = turnstile;
         _certificateDesignService = certificateDesignService;
         _qrService = qrService;
+        _barcodeService = barcodeService;
     }
 
     private bool HasPermission(string perm) => User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
@@ -460,7 +463,11 @@ public class CertificatesController : Controller
                         : e.Content,
                     ImageSrc = string.Equals(e.ElementType, "qr", StringComparison.OrdinalIgnoreCase)
                         ? _qrService.BuildDataUri(verificationUrl, QrModulePixels(e))
-                        : null,
+                        : string.Equals(e.ElementType, "barcode", StringComparison.OrdinalIgnoreCase)
+                            ? _barcodeService.BuildDataUri(
+                                CertificateDesignService.ResolveBarcodeValue(e.FieldKey, certificate, verificationUrl),
+                                BarcodeModuleWidth(e), BarcodeHeight(e))
+                            : null,
                     X = e.X,
                     Y = e.Y,
                     Width = e.Width,
@@ -510,6 +517,16 @@ public class CertificatesController : Controller
     /// <summary>Chooses a module size that keeps the rendered QR crisp without producing a huge PNG.</summary>
     private static int QrModulePixels(CertificateDesignElement element)
         => Math.Clamp(Math.Max(element.Width, element.Height) / 25, 3, 14);
+
+    /// <summary>
+    /// Code 128's width depends on the encoded text length, so the bar width is derived from the
+    /// element's pixel width; the SVG scales the bars to fill the element box regardless.
+    /// </summary>
+    private static int BarcodeModuleWidth(CertificateDesignElement element)
+        => Math.Clamp(element.Width / 60, 1, 4);
+
+    private static int BarcodeHeight(CertificateDesignElement element)
+        => Math.Clamp(element.Height, 24, 200);
 
     /// <summary>
     /// Serves the verification QR as a PNG. Used by the certificate list and by the old-system
