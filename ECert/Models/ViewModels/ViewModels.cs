@@ -34,17 +34,6 @@ public class PublicRegistrationViewModel
     [Display(Name = "الجنس")]
     public string? Gender { get; set; }
 
-    [Required(ErrorMessage = "الدولة مطلوبة")]
-    [Display(Name = "الدولة")]
-    public int CountryId { get; set; }
-
-    [Display(Name = "البريد الإلكتروني (اختياري)")]
-    [EmailAddress(ErrorMessage = "البريد الإلكتروني غير صحيح")]
-    public string? Email { get; set; }
-
-    [Display(Name = "كيف سمعت عنا؟ (اختياري)")]
-    public string? HeardFrom { get; set; }
-
     [Display(Name = "إدخال البيانات الجامعية")]
     public bool IncludeAcademicDetails { get; set; }
 

@@ -197,6 +197,17 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
     public Task<int> CategoryIdByNameAsync(string categoryName) =>
         WithDbAsync(db => db.Categories.Where(c => c.CategoryName == categoryName).Select(c => c.CategoryId).FirstAsync());
 
+    public Task<int> FirstOpenCourseIdAsync() =>
+        WithDbAsync(db => db.Courses
+            .Where(c => c.Status == "OpenForRegistration" && !c.RequiresAcademicDetails)
+            .Select(c => c.CourseId).FirstAsync());
+
+    public Task<ECert.Models.Registration?> FindRegistrationByPhoneAsync(string phone) =>
+        WithDbAsync(db => db.Registrations.AsNoTracking().FirstOrDefaultAsync(r => r.Phone == phone));
+
+    public Task<int> ActiveCountryCountAsync() =>
+        WithDbAsync(db => db.PhoneCountries.CountAsync(c => c.IsActive));
+
     private void CreateDatabase()
     {
         using var connection = new MySqlConnection(_serverBuilder.ConnectionString);

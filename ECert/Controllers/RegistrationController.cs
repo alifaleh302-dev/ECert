@@ -10,6 +10,9 @@ namespace ECert.Controllers;
 
 public class RegistrationController : Controller
 {
+    /// <summary>Registrations are always recorded against this country (Yemen).</summary>
+    private const string DefaultCountryCode = "+967";
+
     private readonly ECertDbContext _db;
     private readonly TurnstileService _turnstile;
 
@@ -66,10 +69,10 @@ public class RegistrationController : Controller
         if (!ModelState.IsValid)
             return await ReturnFormAsync(model, course);
 
-        var country = await _db.PhoneCountries.FindAsync(model.CountryId);
-        if (country == null || !country.IsActive)
+        var country = await _db.PhoneCountries.FirstOrDefaultAsync(c => c.CountryCode == DefaultCountryCode && c.IsActive);
+        if (country == null)
         {
-            ModelState.AddModelError(nameof(model.CountryId), "الدولة المختارة غير صحيحة.");
+            ModelState.AddModelError(string.Empty, "تعذر تحديد الدولة الافتراضية. تواصل مع الدعم.");
             return await ReturnFormAsync(model, course);
         }
 
@@ -126,8 +129,6 @@ public class RegistrationController : Controller
             FullNameEnglish = model.FullNameEnglish!.Trim(),
             Gender = model.Gender,
             Phone = normalizedPhone,
-            Email = model.Email?.Trim(),
-            HeardFrom = model.HeardFrom?.Trim(),
             CourseId = model.CourseId,
             Status = "Pending",
             RegistrationDate = DateTime.Now,
@@ -215,7 +216,13 @@ public class RegistrationController : Controller
 
     private async Task PopulateRegistrationFormAsync(Course course)
     {
-        ViewBag.Countries = await _db.PhoneCountries.Where(c => c.IsActive).OrderBy(c => c.CountryName).ToListAsync();
+        var country = await _db.PhoneCountries.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.CountryCode == DefaultCountryCode && c.IsActive);
+        ViewBag.CountryCode = country?.CountryCode ?? DefaultCountryCode;
+        ViewBag.CountryName = country?.CountryName ?? "اليمن";
+        ViewBag.MinPhoneLength = country?.MinPhoneLength ?? 9;
+        ViewBag.MaxPhoneLength = country?.MaxPhoneLength ?? 9;
+        ViewBag.PhonePrefixes = country?.Prefixes ?? string.Empty;
         ViewBag.RequiresAcademicDetails = course.RequiresAcademicDetails;
         ViewBag.TurnstileSiteKey = _turnstile.SiteKey;
     }

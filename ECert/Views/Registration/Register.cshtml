@@ -1,7 +1,6 @@
 @model PublicRegistrationViewModel
 @{
     ViewData["Title"] = "التسجيل في الدورة";
-    var countries = ViewBag.Countries as List<ECert.Models.PhoneCountry> ?? new();
     var courseRequiresAcademic = ViewBag.RequiresAcademicDetails as bool? ?? false;
 }
 <div class="row justify-content-center">
@@ -41,40 +40,18 @@
                     </fieldset>
 
                     <div class="mb-3">
-                        <label asp-for="CountryId" class="form-label"></label>
-                        <select asp-for="CountryId" class="form-select" id="countrySelect" autocomplete="country-name">
-                            <option value="">اختر الدولة</option>
-                            @foreach (var c in countries)
-                            {
-                                <option value="@c.PhoneCountryId" data-code="@c.CountryCode" data-min="@c.MinPhoneLength" data-max="@c.MaxPhoneLength" data-prefixes="@c.Prefixes">@c.CountryName (@c.CountryCode)</option>
-                            }
-                        </select>
-                        <span asp-validation-for="CountryId" class="text-danger"></span>
+                        <label class="form-label">الدولة</label>
+                        <input type="text" class="form-control" value="@ViewBag.CountryName" readonly aria-label="الدولة" />
+                        <small class="text-muted">جميع التسجيلات تُسجّل على دولة اليمن.</small>
                     </div>
                     <div class="mb-3">
                         <label asp-for="Phone" class="form-label"></label>
                         <div class="input-group">
-                            <span class="input-group-text" id="countryCodeDisplay">+---</span>
+                            <span class="input-group-text">@ViewBag.CountryCode</span>
                             <input asp-for="Phone" class="form-control" placeholder="أدخل رقم الهاتف" id="phoneInput" inputmode="numeric" autocomplete="tel-national" />
                         </div>
                         <span asp-validation-for="Phone" class="text-danger"></span>
                         <small class="text-muted" id="phoneHint"></small>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Email" class="form-label"></label>
-                        <input asp-for="Email" class="form-control" placeholder="example@email.com (اختياري)" autocomplete="email" />
-                        <span asp-validation-for="Email" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="HeardFrom" class="form-label"></label>
-                        <select asp-for="HeardFrom" class="form-select">
-                            <option value="">اختر (اختياري)</option>
-                            <option value="Social Media">وسائل التواصل الاجتماعي</option>
-                            <option value="Friend">صديق أو قريب</option>
-                            <option value="Google">محرك البحث</option>
-                            <option value="Advertisement">إعلان</option>
-                            <option value="Other">أخرى</option>
-                        </select>
                     </div>
 
                     @if (courseRequiresAcademic)
@@ -167,8 +144,12 @@
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const courseRequiresAcademic = @courseRequiresAcademic.ToString().ToLowerInvariant();
-        const countrySelect = document.getElementById('countrySelect');
-        const codeDisplay = document.getElementById('countryCodeDisplay');
+        const country = {
+            code: @Html.Raw(System.Text.Json.JsonSerializer.Serialize((string)ViewBag.CountryCode)),
+            min: @((int)ViewBag.MinPhoneLength),
+            max: @((int)ViewBag.MaxPhoneLength),
+            prefixes: @Html.Raw(System.Text.Json.JsonSerializer.Serialize((string)ViewBag.PhonePrefixes))
+        };
         const phoneInput = document.getElementById('phoneInput');
         const phoneHint = document.getElementById('phoneHint');
         const academicSection = document.getElementById('academicDetails');
@@ -178,18 +159,11 @@
         const college = createSearchSelect('college', '/AcademicCatalog/Colleges', () => university.idInput.value);
         const specialization = createSearchSelect('specialization', '/AcademicCatalog/Specializations', () => college.idInput.value);
 
-        function updateCountryHint() {
-            const opt = countrySelect.options[countrySelect.selectedIndex];
-            const code = opt.dataset.code || '+---';
-            const min = opt.dataset.min || '';
-            const max = opt.dataset.max || '';
-            const prefixes = opt.dataset.prefixes || '';
-            codeDisplay.textContent = code;
-            if (min && max) {
-                let hint = `الرقم يجب أن يكون ${min === max ? min + ' أرقام' : 'بين ' + min + ' و ' + max + ' أرقام'}`;
-                if (prefixes) hint += ` | يبدأ بـ: ${prefixes}`;
-                phoneHint.textContent = hint;
-            } else phoneHint.textContent = '';
+        function updatePhoneHint() {
+            let hint = `الرقم يجب أن يكون ${country.min === country.max ? country.min + ' أرقام' : 'بين ' + country.min + ' و ' + country.max + ' أرقام'}`;
+            const prefixes = (country.prefixes || '').split(',').map(p => p.trim()).filter(Boolean);
+            if (prefixes.length) hint += ` | يبدأ بـ: ${prefixes.join(', ')}`;
+            phoneHint.textContent = hint;
         }
 
         function setAcademicVisibility() {
@@ -303,9 +277,8 @@
             }
         }
 
-        countrySelect.addEventListener('change', updateCountryHint);
         academicToggle?.addEventListener('change', setAcademicVisibility);
-        updateCountryHint();
+        updatePhoneHint();
         if (university.idInput.value) {
             college.input.disabled = false;
             college.input.placeholder = 'اكتب اسم الكلية للبحث';
@@ -318,22 +291,19 @@
         setAcademicVisibility();
 
         document.getElementById('regForm').addEventListener('submit', function (e) {
-            const opt = countrySelect.options[countrySelect.selectedIndex];
-            if (opt.value) {
-                const min = parseInt(opt.dataset.min) || 0;
-                const max = parseInt(opt.dataset.max) || 99;
-                const prefixes = (opt.dataset.prefixes || '').split(',').filter(p => p.trim());
-                let phone = phoneInput.value.trim();
-                if (phone.startsWith('0')) phone = phone.substring(1);
-                if (phone && !/^\d+$/.test(phone)) {
-                    e.preventDefault(); alert('رقم الهاتف يجب أن يحتوي على أرقام فقط'); return;
-                }
-                if (phone && (phone.length < min || phone.length > max)) {
-                    e.preventDefault(); alert(`رقم الهاتف يجب أن يكون بين ${min} و ${max} أرقام`); return;
-                }
-                if (phone && prefixes.length > 0 && !prefixes.some(p => phone.startsWith(p.trim()))) {
-                    e.preventDefault(); alert(`رقم الهاتف يجب أن يبدأ بأحد البادئات: ${prefixes.join(', ')}`); return;
-                }
+            const min = country.min || 0;
+            const max = country.max || 99;
+            const prefixes = (country.prefixes || '').split(',').map(p => p.trim()).filter(Boolean);
+            let phone = phoneInput.value.trim();
+            if (phone.startsWith('0')) phone = phone.substring(1);
+            if (phone && !/^\d+$/.test(phone)) {
+                e.preventDefault(); alert('رقم الهاتف يجب أن يحتوي على أرقام فقط'); return;
+            }
+            if (phone && (phone.length < min || phone.length > max)) {
+                e.preventDefault(); alert(`رقم الهاتف يجب أن يكون بين ${min} و ${max} أرقام`); return;
+            }
+            if (phone && prefixes.length > 0 && !prefixes.some(p => phone.startsWith(p))) {
+                e.preventDefault(); alert(`رقم الهاتف يجب أن يبدأ بأحد البادئات: ${prefixes.join(', ')}`); return;
             }
 
             if (!academicSection.hidden && (!university.idInput.value || !college.idInput.value || !specialization.idInput.value || !academicLevel.value)) {
