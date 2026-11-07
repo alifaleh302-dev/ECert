@@ -207,6 +207,7 @@
                         option.selected = chosenInstructors.indexOf(option.value) !== -1;
                     });
                 });
+                if (window.ECertMultiSelect) window.ECertMultiSelect.syncAll(courseTable);
             }
         });
     }

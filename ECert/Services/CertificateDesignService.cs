@@ -28,7 +28,17 @@ public sealed class CertificateDesignService
         };
 
     public static readonly IReadOnlySet<string> AllowedElementTypes =
-        new HashSet<string>(new[] { "text", "field", "divider", "qr" }, StringComparer.OrdinalIgnoreCase);
+        new HashSet<string>(new[] { "text", "field", "divider", "qr", "barcode" }, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Field keys a barcode element may encode, with the labels shown in the editor.</summary>
+    public static readonly IReadOnlyDictionary<string, string> BarcodeSources =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["certificate_number"] = "رقم الشهادة",
+            ["verification_code"] = "رمز التحقق",
+            ["verification_url"] = "رابط التحقق",
+            ["public_id"] = "المعرّف العام"
+        };
 
     private static readonly IReadOnlySet<string> AllowedFontFamilies =
         new HashSet<string>(new[] { "Tajawal", "Arial", "Tahoma", "Georgia", "Courier New" }, StringComparer.OrdinalIgnoreCase);
@@ -126,8 +136,21 @@ public sealed class CertificateDesignService
             "status" => MapStatus(certificate.Status),
             "verification_code" => certificate.VerificationCode ?? string.Empty,
             "verification_url" => verificationUrl,
+            "public_id" => certificate.PublicId ?? string.Empty,
             _ => string.Empty
         };
+
+    /// <summary>
+    /// Resolves the value a barcode element encodes. <paramref name="sourceKey"/> is a field key
+    /// (see <see cref="BarcodeSources"/>); an unknown key falls back to the certificate number so a
+    /// barcode is never silently blank.
+    /// </summary>
+    public static string ResolveBarcodeValue(string? sourceKey, Certificate certificate, string verificationUrl)
+    {
+        var key = (sourceKey ?? string.Empty).Trim();
+        if (!BarcodeSources.ContainsKey(key)) key = "certificate_number";
+        return ResolveFieldValue(key, certificate, verificationUrl);
+    }
 
     public static bool IsValidElementType(string value)
         => AllowedElementTypes.Contains(value?.Trim() ?? string.Empty);

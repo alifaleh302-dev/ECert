@@ -62,11 +62,13 @@
                 {
                     var isDivider = string.Equals(element.ElementType, "divider", StringComparison.OrdinalIgnoreCase);
                     var isQr = string.Equals(element.ElementType, "qr", StringComparison.OrdinalIgnoreCase);
+                    var isBarcode = string.Equals(element.ElementType, "barcode", StringComparison.OrdinalIgnoreCase);
+                    var isImage = isQr || isBarcode;
                     var style = $"left:{Percentage(element.X, Model.DesignCanvasWidth)};top:{Percentage(element.Y, Model.DesignCanvasHeight)};width:{Percentage(element.Width, Model.DesignCanvasWidth)};height:{Percentage(element.Height, Model.DesignCanvasHeight)};z-index:{element.ZIndex};color:{element.FontColor};font-family:'{element.FontFamily}',sans-serif;font-size:{FontSize(element.FontSize)};font-weight:{element.FontWeight};text-align:{element.TextAlign};justify-content:{(element.TextAlign == "right" ? "flex-start" : element.TextAlign == "left" ? "flex-end" : "center")};transform:rotate({element.Rotation}deg);transform-origin:center;";
                     <div class="certificate-design__element @(isDivider ? "certificate-design__element--divider" : string.Empty)" style="@style">
-                        @if (isQr)
+                        @if (isImage)
                         {
-                            <img src="@element.ImageSrc" alt="رمز التحقق (QR)" style="width:100%;height:100%;object-fit:contain;" />
+                            <img src="@element.ImageSrc" alt="@(isQr ? "رمز التحقق (QR)" : "باركود الشهادة")" style="width:100%;height:100%;object-fit:contain;" />
                         }
                         else if (!isDivider)
                         {

@@ -6,6 +6,10 @@
     ViewData["PageDesc"] = "رفع بيانات الشهادات الصادرة من النظام القديم (Excel) مع مراجعة قابلة للتعديل قبل الاستيراد";
     Layout = "_AdminLayout";
 }
+
+@section Styles {
+    <link href="~/css/multiselect.css" rel="stylesheet" asp-append-version="true" />
+}
 <div class="page-header">
     <partial name="_PageHeader" />
     <div class="page-actions d-flex gap-2 flex-wrap">
@@ -110,7 +114,7 @@ else
                 </div>
                 <div class="col-md-4">
                     <label class="a-label small" for="applyInstructors">مدربون يُطبَّقون على كل الدورات</label>
-                    <select id="applyInstructors" class="form-select form-select-sm" multiple size="3">
+                    <select id="applyInstructors" class="form-select form-select-sm" multiple size="3" data-multiselect data-placeholder="اختر المدربين...">
                         @foreach (var item in Model.Instructors)
                         {
                             <option value="@item.Id">@item.Name</option>
@@ -155,7 +159,7 @@ else
                                 </select>
                             </td>
                             <td>
-                                <select class="form-select form-select-sm js-course-field" data-field="instructorIds" multiple size="3">
+                                <select class="form-select form-select-sm js-course-field" data-field="instructorIds" multiple size="3" data-multiselect data-placeholder="اختر المدربين...">
                                     @foreach (var item in Model.Instructors)
                                     {
                                         <option value="@item.Id" selected="@(group.InstructorIds.Contains(item.Id))">@item.Name</option>
@@ -298,5 +302,6 @@ else
 }
 
 @section Scripts {
+    <script src="~/js/multiselect.js" asp-append-version="true"></script>
     <script src="~/js/legacy-certificate-import.js" asp-append-version="true"></script>
 }

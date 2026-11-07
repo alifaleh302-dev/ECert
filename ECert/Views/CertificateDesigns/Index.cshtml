@@ -118,6 +118,7 @@
                     <button type="button" class="ped-add-btn" id="addTextBtn"><i class="bi bi-type"></i> نص</button>
                     <button type="button" class="ped-add-btn" id="addDividerBtn"><i class="bi bi-dash-lg"></i> فاصل</button>
                     <button type="button" class="ped-add-btn" id="addQrBtn"><i class="bi bi-qr-code"></i> رمز QR</button>
+                    <button type="button" class="ped-add-btn" id="addBarcodeBtn"><i class="bi bi-upc-scan"></i> باركود</button>
                 </div>
                 <div class="ped-group-title">حقول ديناميكية (تتعبأ تلقائياً عند التحقق)</div>
                 @foreach (var group in fieldGroups)
@@ -217,6 +218,16 @@
                             </optgroup>
                         }
                     </select>
+                </div>
+                <div class="ped-prop d-none" id="barcodeWrap">
+                    <label for="selectedBarcodeSource">محتوى الباركود</label>
+                    <select class="ped-select" id="selectedBarcodeSource">
+                        @foreach (var source in ECert.Services.CertificateDesignService.BarcodeSources)
+                        {
+                            <option value="@source.Key">@source.Value</option>
+                        }
+                    </select>
+                    <div class="ped-help mt-1">يُشفَّر بصيغة Code 128 ويدعم الحروف والأرقام والشرطات.</div>
                 </div>
                 <div class="ped-prop">
                     <label>الخط <span class="pv" id="fontFamilyLabel">Tajawal</span></label>
@@ -329,6 +340,11 @@
             <text>FIELD_LABELS['@key'] = '@Model.FieldLabels[key]';</text>
         }
     }
+    const BARCODE_LABELS = {};
+    @foreach (var source in ECert.Services.CertificateDesignService.BarcodeSources)
+    {
+        <text>BARCODE_LABELS['@source.Key'] = '@source.Value';</text>
+    }
 
     // ---------- History ----------
     let history = [];
@@ -371,12 +387,14 @@
         if (el.elementType === 'field') return sampleValues[el.fieldKey] || 'بيان ديناميكي';
         if (el.elementType === 'divider') return '';
         if (el.elementType === 'qr') return '';
+        if (el.elementType === 'barcode') return sampleValues[el.fieldKey] || 'EC-2026-0042';
         return el.content || 'نص جديد';
     }
     function labelFor(el) {
         if (el.elementType === 'field') return FIELD_LABELS[el.fieldKey] || el.fieldKey || 'بيان';
         if (el.elementType === 'divider') return 'فاصل بصري';
         if (el.elementType === 'qr') return 'رمز QR للتحقق';
+        if (el.elementType === 'barcode') return 'باركود: ' + (BARCODE_LABELS[el.fieldKey] || 'رقم الشهادة');
         return (el.content || 'نص').replace(/\s+/g, ' ').slice(0, 22);
     }
     function styleFor(el) {
@@ -391,6 +409,10 @@
             s.borderTop = '2px solid ' + (el.fontColor || '#172033');
             s.height = '0px';
             s.display = 'block';
+        } else if (el.elementType === 'barcode') {
+            s.justifyContent = 'center';
+            s.fontFamily = "'Courier New', monospace";
+            s.letterSpacing = '2px';
         } else {
             s.textAlign = el.textAlign || 'center';
             s.justifyContent = (el.textAlign === 'right') ? 'flex-start' : (el.textAlign === 'left') ? 'flex-end' : 'center';
@@ -458,7 +480,7 @@
         const ordered = elements.map((el, i) => ({ el, i })).filter(o => o.el.isVisible);
         for (const o of ordered) {
             const node = document.createElement('div');
-            node.className = 'ped-el' + (o.el.elementType === 'divider' ? ' el-divider' : '') + (o.el.elementType === 'qr' ? ' el-qr' : '');
+            node.className = 'ped-el' + (o.el.elementType === 'divider' ? ' el-divider' : '') + (o.el.elementType === 'qr' ? ' el-qr' : '') + (o.el.elementType === 'barcode' ? ' el-barcode' : '');
             node.dataset.index = o.i;
             Object.assign(node.style, styleFor(o.el));
             node.textContent = contentFor(o.el);
@@ -646,11 +668,11 @@
     function addElement(type, fieldKey) {
         pushHistory();
         const count = elements.length;
-        const w = type === 'divider' ? 420 : (type === 'qr' ? 160 : 560);
-        const h = type === 'divider' ? 4 : (type === 'qr' ? 160 : 58);
+        const w = type === 'divider' ? 420 : (type === 'qr' ? 160 : (type === 'barcode' ? 320 : 560));
+        const h = type === 'divider' ? 4 : (type === 'qr' ? 160 : (type === 'barcode' ? 80 : 58));
         const el = {
             elementType: type,
-            fieldKey: type === 'field' ? (fieldKey || 'trainee_name') : '',
+            fieldKey: type === 'field' ? (fieldKey || 'trainee_name') : (type === 'barcode' ? 'certificate_number' : ''),
             content: type === 'text' ? 'نص جديد' : '',
             x: clamp(Math.round((canvasW - w) / 2), 0, canvasW - 20),
             y: clamp(100 + (count % 6) * 82, 0, canvasH - 20),
@@ -752,7 +774,7 @@
             const el = elements[i];
             const row = document.createElement('div');
             row.className = 'ped-layer' + (i === selected ? ' active' : '');
-            const icon = el.elementType === 'field' ? '<i class="bi bi-link-45deg"></i>' : el.elementType === 'divider' ? '<i class="bi bi-dash-lg"></i>' : el.elementType === 'qr' ? '<i class="bi bi-qr-code"></i>' : '<i class="bi bi-type"></i>';
+            const icon = el.elementType === 'field' ? '<i class="bi bi-link-45deg"></i>' : el.elementType === 'divider' ? '<i class="bi bi-dash-lg"></i>' : el.elementType === 'qr' ? '<i class="bi bi-qr-code"></i>' : el.elementType === 'barcode' ? '<i class="bi bi-upc-scan"></i>' : '<i class="bi bi-type"></i>';
             row.innerHTML =
                 '<div class="ly-icon">' + icon + '</div>' +
                 '<div class="ly-name">' + labelFor(el) + '</div>' +
@@ -785,12 +807,14 @@
             : '<i class="bi bi-sliders2"></i> إعدادات القالب';
         syncCanvasInputs();
         if (!el) return;
-        $('elTypeBadge').textContent = el.elementType === 'field' ? 'بيان ديناميكي' : el.elementType === 'divider' ? 'فاصل بصري' : el.elementType === 'qr' ? 'رمز QR' : 'نص ثابت';
+        $('elTypeBadge').textContent = el.elementType === 'field' ? 'بيان ديناميكي' : el.elementType === 'divider' ? 'فاصل بصري' : el.elementType === 'qr' ? 'رمز QR' : el.elementType === 'barcode' ? 'باركود' : 'نص ثابت';
         $('elIndexLabel').textContent = 'العنصر #' + (selected + 1) + ' من ' + elements.length;
         $('contentWrap').classList.toggle('d-none', el.elementType !== 'text');
         $('fieldWrap').classList.toggle('d-none', el.elementType !== 'field');
+        $('barcodeWrap').classList.toggle('d-none', el.elementType !== 'barcode');
         if (el.elementType === 'text') $('selectedContent').value = el.content || '';
         if (el.elementType === 'field') $('selectedFieldKey').value = el.fieldKey || 'trainee_name';
+        if (el.elementType === 'barcode') $('selectedBarcodeSource').value = el.fieldKey || 'certificate_number';
         $('selectedFontFamily').value = el.fontFamily || 'Tajawal';
         $('fontFamilyLabel').textContent = el.fontFamily || 'Tajawal';
         $('selectedFontSize').value = el.fontSize;
@@ -905,6 +929,7 @@
     $('addTextBtn').addEventListener('click', () => addElement('text'));
     $('addDividerBtn').addEventListener('click', () => addElement('divider'));
     $('addQrBtn').addEventListener('click', () => addElement('qr'));
+    $('addBarcodeBtn').addEventListener('click', () => addElement('barcode'));
     document.querySelectorAll('.quick-field').forEach(b => b.addEventListener('click', () => addElement('field', b.dataset.field)));
 
     $('saveDraftBtn').addEventListener('click', () => submitForm(false));
@@ -913,6 +938,7 @@
     // element property inputs
     $('selectedContent').addEventListener('change', e => updateSelected('content', e.target.value, true));
     $('selectedFieldKey').addEventListener('change', e => { updateSelected('fieldKey', e.target.value, true); refreshPropsPanel(); });
+    $('selectedBarcodeSource').addEventListener('change', e => { updateSelected('fieldKey', e.target.value, true); refreshLayers(); });
     $('selectedFontFamily').addEventListener('change', e => { updateSelected('fontFamily', e.target.value, true); refreshPropsPanel(); });
     $('selectedFontSize').addEventListener('change', e => updateSelected('fontSize', e.target.value, true));
     $('selectedWeight').addEventListener('change', e => updateSelected('fontWeight', e.target.value, true));

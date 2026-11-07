@@ -47,6 +47,7 @@ builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<SiteLayoutDataFilter>();
 builder.Services.AddSingleton<CertificateSecurityService>();
 builder.Services.AddSingleton<CertificateQrService>();
+builder.Services.AddSingleton<CertificateBarcodeService>();
 builder.Services.AddSingleton<VerifyRequestGuardService>();
 builder.Services.AddSingleton<LoginAttemptGuard>();
 builder.Services.AddScoped<CertificateSchemaMigrationService>();

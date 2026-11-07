@@ -75,6 +75,7 @@
     .ped-el.el-divider .ped-el-inner { display: none; }
     .ped-el.el-qr { padding: 0; background: repeating-conic-gradient(#e2e8f0 0% 25%, #f8fafc 0% 50%) 50% / 12px 12px; }
     .ped-el.el-qr::after { content: "\F3F8"; font-family: "bootstrap-icons"; font-size: 26px; color: #475569; }
+    .ped-el.el-barcode { padding: 0 8px; background: repeating-linear-gradient(90deg, #cbd5e1 0 2px, #f8fafc 2px 5px); border: 1px dashed #cbd5e1; border-radius: 4px; font-size: 12px; color: #475569; }
 
     /* selection overlay */
     .ped-overlay { position: absolute; pointer-events: none; z-index: 9999; }
