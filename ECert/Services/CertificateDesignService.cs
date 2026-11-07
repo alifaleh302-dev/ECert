@@ -28,7 +28,7 @@ public sealed class CertificateDesignService
         };
 
     public static readonly IReadOnlySet<string> AllowedElementTypes =
-        new HashSet<string>(new[] { "text", "field", "divider" }, StringComparer.OrdinalIgnoreCase);
+        new HashSet<string>(new[] { "text", "field", "divider", "qr" }, StringComparer.OrdinalIgnoreCase);
 
     private static readonly IReadOnlySet<string> AllowedFontFamilies =
         new HashSet<string>(new[] { "Tajawal", "Arial", "Tahoma", "Georgia", "Courier New" }, StringComparer.OrdinalIgnoreCase);
@@ -104,7 +104,8 @@ public sealed class CertificateDesignService
             Element("field", "issue_date", "", 190, 505, 360, 42, 18, "#334155", "600", 5),
             Element("field", "certificate_number", "", 570, 505, 360, 42, 18, "#334155", "600", 6),
             Element("field", "status", "", 350, 590, 420, 42, 17, "#15803d", "700", 7),
-            Element("field", "verification_code", "", 280, 665, 560, 34, 14, "#64748b", "500", 8)
+            Element("field", "verification_code", "", 280, 665, 560, 34, 14, "#64748b", "500", 8),
+            Element("qr", "", "", 900, 610, 150, 150, 14, "#172033", "600", 9)
         };
 
         return design;

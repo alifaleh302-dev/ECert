@@ -23,6 +23,7 @@ public class CertificatesController : Controller
     private readonly IConfiguration _configuration;
     private readonly TurnstileService _turnstile;
     private readonly CertificateDesignService _certificateDesignService;
+    private readonly CertificateQrService _qrService;
 
     public CertificatesController(
         ECertDbContext db,
@@ -32,7 +33,8 @@ public class CertificatesController : Controller
         VerifyRequestGuardService verifyGuard,
         IConfiguration configuration,
         TurnstileService turnstile,
-        CertificateDesignService certificateDesignService)
+        CertificateDesignService certificateDesignService,
+        CertificateQrService qrService)
     {
         _db = db;
         _audit = audit;
@@ -42,6 +44,7 @@ public class CertificatesController : Controller
         _configuration = configuration;
         _turnstile = turnstile;
         _certificateDesignService = certificateDesignService;
+        _qrService = qrService;
     }
 
     private bool HasPermission(string perm) => User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
@@ -383,7 +386,7 @@ public class CertificatesController : Controller
     {
         using var export = new ExcelExport("الشهادات",
             "رقم الشهادة", "اسم الطالب (العربية)", "اسم الطالب (English)", "الدورة (English)",
-            "الدورة (العربية)", "تاريخ الإصدار", "الحالة", "المعرف العام", "رمز التحقق", "رابط QR");
+            "الدورة (العربية)", "تاريخ الإصدار", "الحالة", "المصدر", "المعرف العام", "رمز التحقق", "رابط QR");
 
         foreach (var certificate in certificates)
         {
@@ -395,6 +398,7 @@ public class CertificatesController : Controller
                 certificate.CourseNameArabic,
                 certificate.IssueDate.ToString("yyyy-MM-dd"),
                 ExcelLabels.CertificateStatus(certificate.Status),
+                string.Equals(certificate.Source, "Legacy", StringComparison.OrdinalIgnoreCase) ? "قديمة (مستوردة)" : "نظام",
                 certificate.PublicId,
                 certificate.VerificationCode,
                 BuildVerificationUrl(certificate));
@@ -454,6 +458,9 @@ public class CertificatesController : Controller
                     Content = string.Equals(e.ElementType, "field", StringComparison.OrdinalIgnoreCase)
                         ? CertificateDesignService.ResolveFieldValue(e.FieldKey, certificate, verificationUrl)
                         : e.Content,
+                    ImageSrc = string.Equals(e.ElementType, "qr", StringComparison.OrdinalIgnoreCase)
+                        ? _qrService.BuildDataUri(verificationUrl, QrModulePixels(e))
+                        : null,
                     X = e.X,
                     Y = e.Y,
                     Width = e.Width,
@@ -499,6 +506,32 @@ public class CertificatesController : Controller
 
     private string BuildVerificationUrl(Certificate certificate)
         => _certificateSecurity.BuildVerificationUrl(certificate.PublicId, GetPublicBaseUrl());
+
+    /// <summary>Chooses a module size that keeps the rendered QR crisp without producing a huge PNG.</summary>
+    private static int QrModulePixels(CertificateDesignElement element)
+        => Math.Clamp(Math.Max(element.Width, element.Height) / 25, 3, 14);
+
+    /// <summary>
+    /// Serves the verification QR as a PNG. Used by the certificate list and by the old-system
+    /// import report so the QR can be downloaded or embedded anywhere without a data URI.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpGet]
+    [EnableRateLimiting("public-verification")]
+    public async Task<IActionResult> QrImage(string publicId, string? sig, int size = 8)
+    {
+        if (!IsVerifyRequestAllowed())
+            return StatusCode(StatusCodes.Status429TooManyRequests);
+
+        if (string.IsNullOrWhiteSpace(publicId) || !_certificateSecurity.VerifySignature(publicId, sig))
+            return NotFound();
+
+        var exists = await _db.Certificates.AsNoTracking().AnyAsync(c => c.PublicId == publicId.Trim());
+        if (!exists) return NotFound();
+
+        var url = _certificateSecurity.BuildVerificationUrl(publicId.Trim(), GetPublicBaseUrl());
+        return File(_qrService.BuildPng(url, size), "image/png");
+    }
 
     private string GetPublicBaseUrl()
     {

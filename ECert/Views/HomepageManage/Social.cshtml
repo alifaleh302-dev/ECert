@@ -22,6 +22,7 @@
 <div class="row g-4">
     <div class="col-12 col-md-8">
         <form method="post" action="/HomepageManage/SaveSocial">
+            @Html.AntiForgeryToken()
             <div class="a-card">
                 <div class="a-card__header"><strong>الروابط الحالية</strong></div>
                 <div class="a-card__body a-card__body--flush">
@@ -58,6 +59,7 @@
                                         </td>
                                         <td data-label="إجراء">
                                             <form method="post" action="/HomepageManage/DeleteSocial" class="d-inline" onsubmit="return confirm('حذف؟')">
+                                                @Html.AntiForgeryToken()
                                                 <input type="hidden" name="id" value="@l.SocialLinkId" />
                                                 <button class="btn btn-outline-danger btn-icon" title="حذف"><i class="bi bi-trash"></i></button>
                                             </form>
@@ -79,6 +81,7 @@
             <div class="a-card__header"><strong>إضافة منصة</strong></div>
             <div class="a-card__body">
                 <form method="post" action="/HomepageManage/AddSocial">
+                    @Html.AntiForgeryToken()
                     <div class="mb-3">
                         <label class="form-label">اسم المنصة</label>
                         <input type="text" name="platformName" class="form-control" placeholder="WhatsApp" required />

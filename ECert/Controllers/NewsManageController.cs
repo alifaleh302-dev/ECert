@@ -55,6 +55,7 @@ public class NewsManageController : Controller
     public async Task<IActionResult> Create(Post model, IFormFile? image)
     {
         if (!HasPermission("manage-news")) return Forbid();
+        if (!ModelState.IsValid) return View(model);
         model.PostType = "News";
         model.Author = User.Identity?.Name ?? "";
         model.CreatedAt = DateTime.Now;
@@ -82,6 +83,7 @@ public class NewsManageController : Controller
     public async Task<IActionResult> Edit(Post model, IFormFile? image)
     {
         if (!HasPermission("manage-news")) return Forbid();
+        if (!ModelState.IsValid) return View(model);
         var news = await _db.Posts.FirstOrDefaultAsync(p => p.PostId == model.PostId && p.PostType == "News");
         if (news == null) return NotFound();
         news.Title = model.Title;
@@ -108,6 +110,7 @@ public class NewsManageController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Publish(int id)
     {
         if (!HasPermission("manage-news")) return Forbid();
@@ -121,6 +124,7 @@ public class NewsManageController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Unpublish(int id)
     {
         if (!HasPermission("manage-news")) return Forbid();
@@ -133,6 +137,7 @@ public class NewsManageController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
         if (!HasPermission("manage-news")) return Forbid();

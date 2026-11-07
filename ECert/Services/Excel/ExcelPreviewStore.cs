@@ -38,6 +38,34 @@ public static class ExcelPreviewStore
         }
     }
 
+    /// <summary>Reads a stored preview without consuming it, so the user can keep editing it.</summary>
+    public static TPayload? Peek<TPayload>(string category, string? token) where TPayload : class
+    {
+        if (string.IsNullOrWhiteSpace(token) || token.Length != 32) return null;
+
+        var path = PathFor(category, token);
+        if (!File.Exists(path)) return null;
+
+        try
+        {
+            return JsonSerializer.Deserialize<TPayload>(File.ReadAllText(path));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Overwrites an existing preview in place, keeping the same token valid.</summary>
+    public static void Replace<TPayload>(string category, string token, TPayload payload)
+    {
+        if (string.IsNullOrWhiteSpace(token) || token.Length != 32) return;
+
+        var path = PathFor(category, token);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, JsonSerializer.Serialize(payload));
+    }
+
     public static bool IsExpired(DateTime createdAtUtc) => createdAtUtc < DateTime.UtcNow - Lifetime;
 
     private static string PathFor(string category, string token)

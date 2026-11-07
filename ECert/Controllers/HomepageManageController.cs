@@ -20,11 +20,11 @@ public class HomepageManageController : Controller
         _env = env;
     }
 
-    private bool IsSuperAdmin() => User.IsInRole("SuperAdmin");
+    private bool CanManage() => User.HasPermission(AdminPermissions.ManageHomepage);
 
     public IActionResult Index()
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         ViewData["Title"] = "إدارة الصفحة الرئيسية";
         return View();
     }
@@ -32,16 +32,17 @@ public class HomepageManageController : Controller
     // ===== SLIDES =====
     public async Task<IActionResult> Slides()
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         ViewData["Title"] = "إدارة الشرائح";
         var slides = await _db.HeroSlides.OrderBy(s => s.SortOrder).ToListAsync();
         return View(slides);
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveSlide(HeroSlide model, IFormFile? ImageFile)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
 
         if (ImageFile != null && ImageFile.Length > 0)
         {
@@ -92,9 +93,10 @@ public class HomepageManageController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteSlide(int id)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var slide = await _db.HeroSlides.FindAsync(id);
         if (slide != null)
         {
@@ -111,9 +113,10 @@ public class HomepageManageController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> MoveSlide(int id, int direction)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var slides = await _db.HeroSlides.OrderBy(s => s.SortOrder).ToListAsync();
         var slide = slides.FirstOrDefault(s => s.HeroSlideId == id);
         if (slide == null) return NotFound();
@@ -131,16 +134,17 @@ public class HomepageManageController : Controller
     // ===== ANIMATED TEXTS =====
     public async Task<IActionResult> AnimatedTexts()
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         ViewData["Title"] = "النصوص المتحركة";
         var texts = await _db.HeroAnimatedTexts.OrderBy(t => t.SortOrder).ToListAsync();
         return View(texts);
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddAnimatedText(string text)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         if (!string.IsNullOrWhiteSpace(text))
         {
             var order = await _db.HeroAnimatedTexts.MaxAsync(t => (int?)t.SortOrder) + 1 ?? 1;
@@ -152,9 +156,10 @@ public class HomepageManageController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteAnimatedText(int id)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var text = await _db.HeroAnimatedTexts.FindAsync(id);
         if (text != null) { _db.HeroAnimatedTexts.Remove(text); await _db.SaveChangesAsync(); }
         TempData["Success"] = "تم حذف النص";
@@ -162,9 +167,10 @@ public class HomepageManageController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ToggleAnimatedText(int id)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var text = await _db.HeroAnimatedTexts.FindAsync(id);
         if (text != null) { text.IsActive = !text.IsActive; await _db.SaveChangesAsync(); }
         return RedirectToAction("AnimatedTexts");
@@ -173,16 +179,17 @@ public class HomepageManageController : Controller
     // ===== SECTIONS =====
     public async Task<IActionResult> Sections()
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         ViewData["Title"] = "إدارة الأقسام";
         var sections = await _db.HomepageSections.OrderBy(s => s.SortOrder).ToListAsync();
         return View(sections);
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ToggleSection(int id)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var section = await _db.HomepageSections.FindAsync(id);
         if (section != null) { section.IsVisible = !section.IsVisible; await _db.SaveChangesAsync(); }
         TempData["Success"] = "تم تحديث القسم";
@@ -190,9 +197,10 @@ public class HomepageManageController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> MoveSection(int id, int direction)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var sections = await _db.HomepageSections.OrderBy(s => s.SortOrder).ToListAsync();
         var section = sections.FirstOrDefault(s => s.HomepageSectionId == id);
         if (section == null) return NotFound();
@@ -210,16 +218,17 @@ public class HomepageManageController : Controller
     // ===== STATS =====
     public async Task<IActionResult> Stats()
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         ViewData["Title"] = "إدارة الإحصائيات";
         var stats = await _db.StatCards.OrderBy(s => s.SortOrder).ToListAsync();
         return View(stats);
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveStats(List<StatCard> stats)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         foreach (var s in stats)
         {
             var existing = await _db.StatCards.FindAsync(s.StatCardId);
@@ -240,7 +249,7 @@ public class HomepageManageController : Controller
     // ===== ABOUT & FOOTER =====
     public async Task<IActionResult> AboutFooter()
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         ViewData["Title"] = "من نحن والفوتر";
 
         var model = new HomepageContentSettingsViewModel
@@ -262,7 +271,7 @@ public class HomepageManageController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveAboutFooter(HomepageContentSettingsViewModel model)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
 
         await UpsertSiteSettingAsync("AboutTitle", model.AboutTitle?.Trim(), "Content");
         await UpsertSiteSettingAsync("AboutSummary", model.AboutSummary?.Trim(), "Content");
@@ -281,7 +290,7 @@ public class HomepageManageController : Controller
     // ===== CONTACT =====
     public async Task<IActionResult> Contact()
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         ViewData["Title"] = "معلومات التواصل";
         var contact = await _db.ContactInfos.FirstOrDefaultAsync();
         if (contact == null)
@@ -294,9 +303,10 @@ public class HomepageManageController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveContact(ContactInfo model)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var existing = await _db.ContactInfos.FirstOrDefaultAsync();
         if (existing == null) { _db.ContactInfos.Add(model); }
         else
@@ -322,16 +332,17 @@ public class HomepageManageController : Controller
     // ===== SOCIAL =====
     public async Task<IActionResult> Social()
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         ViewData["Title"] = "روابط التواصل الاجتماعي";
         var links = await _db.SocialLinks.OrderBy(s => s.SortOrder).ToListAsync();
         return View(links);
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveSocial(List<SocialLink> links)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         foreach (var l in links)
         {
             var existing = await _db.SocialLinks.FindAsync(l.SocialLinkId);
@@ -348,9 +359,10 @@ public class HomepageManageController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddSocial(string platformName, string iconClass, string url)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         if (!string.IsNullOrWhiteSpace(platformName))
         {
             var order = await _db.SocialLinks.MaxAsync(s => (int?)s.SortOrder) + 1 ?? 1;
@@ -362,9 +374,10 @@ public class HomepageManageController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteSocial(int id)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var link = await _db.SocialLinks.FindAsync(id);
         if (link != null) { _db.SocialLinks.Remove(link); await _db.SaveChangesAsync(); }
         TempData["Success"] = "تم حذف المنصة";
@@ -374,7 +387,7 @@ public class HomepageManageController : Controller
     // ===== THEME =====
     public async Task<IActionResult> Theme()
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         ViewData["Title"] = "الألوان والهوية البصرية";
         var theme = await _db.ThemeSettings.FirstOrDefaultAsync();
         if (theme == null)
@@ -387,9 +400,10 @@ public class HomepageManageController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveTheme(ThemeSetting model)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         var existing = await _db.ThemeSettings.FirstOrDefaultAsync();
         if (existing == null) { _db.ThemeSettings.Add(model); }
         else
@@ -408,7 +422,7 @@ public class HomepageManageController : Controller
     // ===== SITE SETTINGS =====
     public async Task<IActionResult> SiteSettings()
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
         ViewData["Title"] = "إعدادات الموقع";
         var settings = await _db.SiteSettings.ToListAsync();
         ViewBag.Settings = settings;
@@ -416,9 +430,10 @@ public class HomepageManageController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveSiteSettings(string siteName, string metaDescription, string seoKeywords, string? copyrightText, IFormFile? LogoFile, IFormFile? FaviconFile)
     {
-        if (!IsSuperAdmin()) return Forbid();
+        if (!CanManage()) return Forbid();
 
         await UpsertSetting("SiteName", siteName);
         await UpsertSetting("MetaDescription", metaDescription);

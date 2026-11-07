@@ -68,6 +68,12 @@ public class PaymentsController : Controller
         var invoice = await _db.Invoices.FindAsync(model.InvoiceId);
         if (invoice == null) return NotFound();
 
+        if (model.Amount <= 0)
+        {
+            TempData["Error"] = "المبلغ يجب أن يكون أكبر من صفر!";
+            return RedirectToAction("Add", new { invoiceId = model.InvoiceId });
+        }
+
         // Validate reference number for non-cash payments
         if (model.PaymentMethod != "Cash" && string.IsNullOrWhiteSpace(model.ReferenceNumber))
         {

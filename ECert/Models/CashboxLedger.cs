@@ -67,8 +67,6 @@ public class CashboxWithdrawal
 
 public static class CashboxRoles
 {
-    public const string Manager = "Admin";                 // مدير المركز (دور Admin)
-    public const string Treasurer = "Finance";             // المالي — ينشئ الترحيلات
     public const string SystemManager = "SuperAdmin";      // مدير النظام — فقط من يسحب من الصندوق
 
     public const string PermTransfer = "manage-cashbox";   // صلاحية ترحيل الرصيد

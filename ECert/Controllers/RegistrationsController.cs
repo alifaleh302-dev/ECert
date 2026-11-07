@@ -283,7 +283,7 @@ public class RegistrationsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id, string? returnUrl)
     {
-        var isSuperAdmin = User.HasClaim(c => c.Type == "Role" && c.Value == "SuperAdmin");
+        var isSuperAdmin = User.IsSuperAdmin();
         if (!isSuperAdmin) return Forbid();
 
         var reg = await _db.Registrations.FindAsync(id);

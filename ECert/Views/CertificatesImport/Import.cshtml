@@ -1,0 +1,302 @@
+@model ECert.ViewModels.LegacyCertificateImportPageViewModel
+@using ECert.ViewModels
+@{
+    ViewData["Title"] = "استيراد شهادات قديمة";
+    ViewData["PageIcon"] = "bi-cloud-arrow-up";
+    ViewData["PageDesc"] = "رفع بيانات الشهادات الصادرة من النظام القديم (Excel) مع مراجعة قابلة للتعديل قبل الاستيراد";
+    Layout = "_AdminLayout";
+}
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions d-flex gap-2 flex-wrap">
+        <a asp-controller="Certificates" asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للشهادات</a>
+        <a asp-action="DownloadTemplate" class="btn btn-outline-primary"><i class="bi bi-download"></i> تنزيل القالب</a>
+    </div>
+</div>
+
+<div class="a-note a-note--info mb-4">
+    <i class="bi bi-shield-check" aria-hidden="true"></i>
+    <div>
+        <strong>استيراد آمن قبل الحفظ.</strong>
+        ارفع ملف XLSX يحوي (الاسم بالعربية، الاسم بالإنجليزية، رقم الشهادة، اسم الدورة، تاريخ الإصدار).
+        تُحفظ أرقام الشهادات كما هي ليتحقق منها الطلاب، ويُولّد النظام لكل شهادة قديمة باركود (QR) ورابط تحقق.
+        حدّد لكل دورة تصنيفها ومدربيها قبل الاعتماد.
+    </div>
+</div>
+
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="a-note a-note--danger mb-4" role="alert"><div asp-validation-summary="All"></div></div>
+}
+
+@if (Model.Preview is null)
+{
+    <div class="a-card">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-sliders" aria-hidden="true"></i> بيانات الاستيراد</h2>
+        </div>
+        <div class="a-card__body">
+            <form asp-action="Import" method="post" enctype="multipart/form-data" class="a-form__grid">
+                @Html.AntiForgeryToken()
+                <div class="a-field a-field--full">
+                    <label asp-for="File" class="a-field__label a-label--required">ملف XLSX</label>
+                    <input asp-for="File" type="file" class="form-control" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required />
+                    <div class="a-hint">الحد الأقصى 10 ميجابايت و5000 صف. استخدم القالب المرفق لضمان صحة الأعمدة. يُدعم الملف المحتوي على معادلات (تُقرأ القيم المحفوظة).</div>
+                </div>
+                <div class="a-field">
+                    <label asp-for="DefaultCategoryId" class="a-field__label">تصنيف افتراضي (اختياري)</label>
+                    <select asp-for="DefaultCategoryId" class="form-select">
+                        <option value="">-- بدون --</option>
+                        @foreach (var item in Model.Categories)
+                        {
+                            <option value="@item.Id">@item.Name</option>
+                        }
+                    </select>
+                    <div class="a-hint">يُعبّأ لكل دورة تلقائياً، ويمكن تعديله لكل دورة لاحقاً.</div>
+                </div>
+                <div class="a-field">
+                    <label asp-for="DefaultInstructorId" class="a-field__label">مدرب افتراضي (اختياري)</label>
+                    <select asp-for="DefaultInstructorId" class="form-select">
+                        <option value="">-- بدون --</option>
+                        @foreach (var item in Model.Instructors)
+                        {
+                            <option value="@item.Id">@item.Name</option>
+                        }
+                    </select>
+                    <div class="a-hint">يُعبّأ لكل دورة تلقائياً، ويمكن إضافة مدربين آخرين لكل دورة.</div>
+                </div>
+                <div class="a-field a-field--full">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> فحص ومعاينة الملف</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+else
+{
+    var preview = Model.Preview;
+    <section class="a-kpis mb-4" aria-label="ملخص الملف">
+        <partial name="_KpiCard" model="@(new KpiCard { Label = "إجمالي الصفوف", Value = preview.TotalRows.ToString(), Icon = "bi-list-ol", Tone = "info" })" />
+        <partial name="_KpiCard" model="@(new KpiCard { Label = "صفوف سليمة", Value = preview.ValidRows.ToString(), Icon = "bi-check-circle", Tone = "success" })" />
+        <partial name="_KpiCard" model="@(new KpiCard { Label = "مكررة (تُتجاهل)", Value = preview.DuplicateRows.ToString(), Icon = "bi-files", Tone = "warning" })" />
+        <partial name="_KpiCard" model="@(new KpiCard { Label = "تحتاج تصحيحاً", Value = preview.InvalidRows.ToString(), Icon = "bi-exclamation-triangle", Tone = "danger" })" />
+        <partial name="_KpiCard" model="@(new KpiCard { Label = "دورات الملف", Value = preview.Courses.Count.ToString(), Icon = "bi-book", Tone = "brand" })" />
+    </section>
+
+    @if (preview.HasFormulas)
+    {
+        <div class="a-note a-note--warning mb-4" role="status">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            <div>الملف يحوي معادلات؛ استُخدمت القيم المحفوظة داخله. إن ظهرت قيمة خطأ (مثل <code dir="ltr">#REF!</code>) فصحّح المعادلة في Excel أو انسخ القيم فقط ثم أعد الرفع.</div>
+        </div>
+    }
+
+    <div class="a-card mb-4">
+        <div class="a-card__header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h2 class="a-card__title mb-0"><i class="bi bi-book" aria-hidden="true"></i> دورات الملف وإعداداتها</h2>
+            <span class="small text-muted">يجب ضبط كل دورة (تصنيف + مدرب واحد على الأقل) قبل الاعتماد.</span>
+        </div>
+        <div class="a-card__body">
+            <div class="row g-2 align-items-end mb-3 p-3 rounded" style="background:var(--a-surface-2,#f8fafc);">
+                <div class="col-md-4">
+                    <label class="a-label small" for="applyCategory">تصنيف يُطبَّق على كل الدورات</label>
+                    <select id="applyCategory" class="form-select form-select-sm">
+                        <option value="">-- اختر --</option>
+                        @foreach (var item in Model.Categories)
+                        {
+                            <option value="@item.Id">@item.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="a-label small" for="applyInstructors">مدربون يُطبَّقون على كل الدورات</label>
+                    <select id="applyInstructors" class="form-select form-select-sm" multiple size="3">
+                        @foreach (var item in Model.Instructors)
+                        {
+                            <option value="@item.Id">@item.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="applyDefaultsBtn"><i class="bi bi-magic"></i> تطبيق على الكل</button>
+                </div>
+            </div>
+
+            <div class="a-table-wrap">
+                <table class="table a-table align-middle mb-0" id="courseTable">
+                    <thead>
+                        <tr>
+                            <th>اسم الدورة</th>
+                            <th>الاسم بالإنجليزية</th>
+                            <th>التصنيف</th>
+                            <th>المدربون</th>
+                            <th>الإجراء</th>
+                            <th>الدورة الموجودة</th>
+                            <th></th>
+                            <th>الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var group in preview.Courses)
+                    {
+                        <tr data-course-key="@group.Key" class="@(group.IsConfigured ? "" : "table-warning")">
+                            <td>
+                                <strong>@group.NameArabic</strong>
+                                <span class="d-block small text-muted">@preview.Rows.Count(r => string.Equals(r.CourseKey, group.Key, StringComparison.OrdinalIgnoreCase)) شهادة</span>
+                            </td>
+                            <td><input type="text" class="form-control form-control-sm js-course-field" dir="ltr" data-field="nameEnglish" value="@group.NameEnglish" /></td>
+                            <td>
+                                <select class="form-select form-select-sm js-course-field" data-field="categoryId">
+                                    <option value="">-- اختر --</option>
+                                    @foreach (var item in Model.Categories)
+                                    {
+                                        <option value="@item.Id" selected="@(group.CategoryId == item.Id)">@item.Name</option>
+                                    }
+                                </select>
+                            </td>
+                            <td>
+                                <select class="form-select form-select-sm js-course-field" data-field="instructorIds" multiple size="3">
+                                    @foreach (var item in Model.Instructors)
+                                    {
+                                        <option value="@item.Id" selected="@(group.InstructorIds.Contains(item.Id))">@item.Name</option>
+                                    }
+                                </select>
+                            </td>
+                            <td>
+                                <div class="d-flex flex-column gap-1">
+                                    <label class="form-check form-check-inline m-0">
+                                        <input type="radio" class="form-check-input js-course-action" name="action-@group.Key" value="create" checked="@(group.Action == LegacyCourseAction.Create)" />
+                                        <span class="form-check-label small">إنشاء جديدة</span>
+                                    </label>
+                                    <label class="form-check form-check-inline m-0">
+                                        <input type="radio" class="form-check-input js-course-action" name="action-@group.Key" value="link" checked="@(group.Action == LegacyCourseAction.Link)" />
+                                        <span class="form-check-label small">ربط بموجودة</span>
+                                    </label>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="js-link-box" hidden="@(group.Action != LegacyCourseAction.Link)">
+                                    <input type="text" class="form-control form-control-sm js-link-search mb-1" placeholder="ابحث عن دورة..." autocomplete="off" />
+                                    <select class="form-select form-select-sm js-course-field" data-field="linkedCourseId">
+                                        <option value="">-- اختر الدورة --</option>
+                                        @foreach (var match in group.MatchingCourses)
+                                        {
+                                            <option value="@match.Id" selected="@(group.LinkedCourseId == match.Id)">@match.Name</option>
+                                        }
+                                    </select>
+                                </div>
+                            </td>
+                            <td><button type="button" class="btn btn-sm btn-outline-primary js-save-course"><i class="bi bi-save"></i></button></td>
+                            <td class="js-course-status">
+                                @if (group.IsConfigured)
+                                {
+                                    <span class="a-badge a-badge--success">جاهزة</span>
+                                }
+                                else
+                                {
+                                    <span class="a-badge a-badge--warning">تحتاج ضبطاً</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="a-note a-note--info mb-4">
+        <i class="bi bi-info-circle" aria-hidden="true"></i>
+        <div>
+            عدد الدورات الجديدة: <strong id="newCourseCount">@preview.NewCourseCount</strong> —
+            عدد الدورات المرتبطة: <strong id="linkedCourseCount">@preview.LinkedCourseCount</strong>.
+        </div>
+    </div>
+
+    @if (preview.ValidRows == 0)
+    {
+        <div class="a-note a-note--danger mb-4" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i><div>لا يوجد أي صف صالح للاستيراد. صحّح الصفوف المعلّمة ثم أعد المحاولة.</div></div>
+    }
+
+    <div class="a-card">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-table" aria-hidden="true"></i> صفوف الشهادات</h2>
+        </div>
+        <div class="a-card__body a-card__body--flush">
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover align-middle mb-0" id="legacyPreviewTable">
+                    <thead>
+                        <tr>
+                            <th>الصف</th>
+                            <th>الاسم بالعربية</th>
+                            <th>الاسم بالإنجليزية</th>
+                            <th>رقم الشهادة</th>
+                            <th>اسم الدورة</th>
+                            <th>تاريخ الإصدار</th>
+                            <th>التحقق</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in preview.Rows)
+                    {
+                        <tr data-row="@row.RowNumber" class="@(row.IsValid ? "" : (row.IsDuplicate ? "table-warning" : "table-danger"))">
+                            <td>@row.RowNumber</td>
+                            <td><input type="text" class="form-control form-control-sm js-field" data-field="fullNameArabic" value="@row.FullNameArabic" /></td>
+                            <td><input type="text" class="form-control form-control-sm js-field" dir="ltr" data-field="fullNameEnglish" value="@row.FullNameEnglish" /></td>
+                            <td><input type="text" class="form-control form-control-sm js-field" dir="ltr" data-field="certificateNumber" value="@row.CertificateNumber" /></td>
+                            <td>
+                                <select class="form-select form-select-sm js-field" data-field="courseKey">
+                                    @foreach (var group in preview.Courses)
+                                    {
+                                        <option value="@group.Key" selected="@(string.Equals(group.Key, row.CourseKey, StringComparison.OrdinalIgnoreCase))">@group.NameArabic</option>
+                                    }
+                                </select>
+                            </td>
+                            <td><input type="date" class="form-control form-control-sm js-field" data-field="issueDate" value="@(row.IssueDate?.ToString("yyyy-MM-dd"))" /></td>
+                            <td class="js-status">
+                                @if (row.IsValid)
+                                {
+                                    <span class="a-badge a-badge--success">سليم</span>
+                                }
+                                else if (row.IsDuplicate)
+                                {
+                                    <span class="a-badge a-badge--warning" title="@string.Join("، ", row.Errors)">مكرر (يُتجاهل)</span>
+                                }
+                                else
+                                {
+                                    <span class="a-error">@string.Join("، ", row.Errors)</span>
+                                }
+                            </td>
+                            <td><button type="button" class="btn btn-sm btn-outline-primary js-save-row"><i class="bi bi-save"></i></button></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <form asp-action="ConfirmImport" method="post" class="mt-4 d-flex gap-2 flex-wrap align-items-center">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="token" value="@preview.Token" />
+        <button type="submit" class="btn btn-success" id="confirmImportBtn" disabled="@(!preview.CanCommit)"><i class="bi bi-check2-circle"></i> اعتماد الاستيراد</button>
+        <a asp-action="Import" class="btn btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i> إلغاء ورفع ملف آخر</a>
+        <span class="small text-muted">سيتم استيراد <strong id="confirmCount">@preview.ValidRows</strong> شهادة.</span>
+    </form>
+
+    <script type="application/json" id="legacyImportConfig">
+        @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new
+        {
+            token = preview.Token,
+            editRowUrl = Url.Action("EditRow"),
+            editCourseUrl = Url.Action("EditCourse"),
+            applyDefaultsUrl = Url.Action("ApplyCourseDefaults"),
+            searchCoursesUrl = Url.Action("SearchCourses")
+        }))
+    </script>
+}
+
+@section Scripts {
+    <script src="~/js/legacy-certificate-import.js" asp-append-version="true"></script>
+}

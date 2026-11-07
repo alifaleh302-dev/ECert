@@ -2,6 +2,7 @@ using System.Data;
 using ECert.Data;
 using ECert.Models;
 using ECert.Models.ViewModels;
+using ECert.Services;
 using ECert.Services.Excel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,18 +16,15 @@ public class ReportsController : Controller
     private readonly ECertDbContext _db;
     public ReportsController(ECertDbContext db) => _db = db;
 
-    private bool HasPermission(string perm) =>
-        User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
-
     private bool CanTransfer =>
-        User.IsInRole(CashboxRoles.SystemManager)
-        || User.HasClaim(c => c.Type == "Permission" && c.Value == CashboxRoles.PermTransfer);
+        User.IsSuperAdmin()
+        || User.HasPermission(CashboxRoles.PermTransfer);
 
     public IActionResult Index() => RedirectToAction("CourseRevenue");
 
     public async Task<IActionResult> CourseRevenue(int? courseId)
     {
-        if (!HasPermission("view-reports")) return Forbid();
+        if (!User.HasPermission(AdminPermissions.ViewReports)) return Forbid();
 
         // Razor iterates ViewBag values as dynamic; anonymous-type properties are
         // inaccessible to the generated view and cause RuntimeBinderException.
@@ -98,7 +96,7 @@ public class ReportsController : Controller
 
     public async Task<IActionResult> ExportCourseRevenueXlsx()
     {
-        if (!HasPermission("view-reports")) return Forbid();
+        if (!User.HasPermission(AdminPermissions.ViewReports)) return Forbid();
 
         var courses = await _db.Courses.Include(c => c.Registrations)
             .ThenInclude(r => r.Invoice).ThenInclude(i => i!.Payments).ToListAsync();

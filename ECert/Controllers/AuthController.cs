@@ -82,16 +82,14 @@ public class AuthController : Controller
         if (user.MustChangePassword)
             return RedirectToAction("ChangePassword");
 
-        // Redirect based on role
-        var roleName = user.UserRoles.FirstOrDefault()?.Role?.RoleName ?? "Admin";
-        return roleName switch
-        {
-            "SuperAdmin" => RedirectToAction("Index", "Dashboard"),
-            "Admin" => RedirectToAction("Index", "ManagerDashboard"),
-            "Media" => RedirectToAction("Index", "MediaDashboard"),
-            "Finance" => RedirectToAction("Index", "FinanceDashboard"),
-            _ => RedirectToAction("Index", "Dashboard")
-        };
+        // Every administrative role lands on the single permission-aware dashboard.
+        // An account whose role holds no permission has nothing to do in the admin area,
+        // so it is sent to the public site instead of a dashboard it could not open.
+        var hasAdminPermission = user.UserRoles
+            .Any(userRole => userRole.Role!.RolePermissions.Count > 0);
+        return hasAdminPermission
+            ? RedirectToAction("Index", "Dashboard")
+            : RedirectToAction("Index", "Home");
     }
 
     [Authorize]
@@ -138,6 +136,6 @@ public class AuthController : Controller
     public async Task<IActionResult> Logout()
     {
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        return RedirectToAction("Index", "Home");
+        return RedirectToAction("Login", "Auth");
     }
 }

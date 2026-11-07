@@ -20,7 +20,8 @@ public class InvoicesController : Controller
 
     public async Task<IActionResult> Index(string? status, string? search)
     {
-        if (!HasPermission("view-invoices")) return Forbid();
+        // The section is opened by the read-only view-invoices permission or the finance umbrella.
+        if (!User.CanAccessSection("Invoices")) return Forbid();
         var query = _db.Invoices.Include(i => i.Payments).AsQueryable();
         if (!string.IsNullOrEmpty(status)) query = query.Where(i => i.Status == status);
         if (!string.IsNullOrEmpty(search))

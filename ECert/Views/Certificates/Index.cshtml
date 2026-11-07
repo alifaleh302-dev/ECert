@@ -10,6 +10,7 @@
     <partial name="_PageHeader" />
     <div class="page-actions d-flex flex-wrap gap-2 mt-3">
         <a asp-action="Issue" class="btn btn-primary"><i class="bi bi-plus-circle"></i> إصدار شهادات</a>
+        <a asp-controller="CertificatesImport" asp-action="Import" class="btn btn-outline-primary"><i class="bi bi-cloud-arrow-up"></i> استيراد شهادات قديمة</a>
         <a asp-action="ExportFiltered"
            asp-route-search="@Model.Search"
            asp-route-courseId="@Model.CourseId"
@@ -97,6 +98,7 @@
                                 <th>اسم المتدرب</th>
                                 <th>الدورة</th>
                                 <th>تاريخ الإصدار</th>
+                                <th>المصدر</th>
                                 <th>الحالة</th>
                                 <th>رابط QR</th>
                             </tr>
@@ -119,6 +121,16 @@
                                     </td>
                                     <td>@cert.CourseName</td>
                                     <td>@cert.IssueDate.ToString("yyyy-MM-dd")</td>
+                                    <td>
+                                        @if (string.Equals(cert.Source, "Legacy", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <span class="a-badge a-badge--info">قديمة (مستوردة)</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="a-badge a-badge--neutral">نظام</span>
+                                        }
+                                    </td>
                                     <td>
                                         @if (cert.Status?.Trim().ToLowerInvariant() == "revoked")
                                         {

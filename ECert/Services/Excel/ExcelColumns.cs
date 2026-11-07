@@ -37,6 +37,9 @@ public static class ExcelColumns
     public const string Specialization = "specialization";
     public const string AcademicLevel = "academiclevel";
 
+    public const string CertificateNumber = "certificatenumber";
+    public const string IssueDate = "issuedate";
+
     public static readonly IReadOnlyDictionary<string, string[]> CourseAliases =
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
@@ -73,5 +76,15 @@ public static class ExcelColumns
             [College] = ["College", "الكلية", "الكليه"],
             [Specialization] = ["Specialization", "التخصص"],
             [AcademicLevel] = ["AcademicLevel", "المستوى الدراسي", "المستوي الدراسي"]
+        };
+
+    public static readonly IReadOnlyDictionary<string, string[]> LegacyCertificateAliases =
+        new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            [FullNameArabic] = ["FullNameArabic", "الاسم بالعربية", "الاسم العربي", "اسم الطالب", "اسم الطالب بالعربية", "اسم المتدرب", "اسم المتدرب بالعربية", "الاسم"],
+            [FullNameEnglish] = ["FullNameEnglish", "الاسم بالإنجليزية", "الاسم الانجليزي", "الاسم بالانجليزية", "اسم الطالب بالانجليزية", "اسم المتدرب بالانجليزية"],
+            [CertificateNumber] = ["CertificateNumber", "رقم الشهادة", "رقم الشهاده", "رقم الشهادات", "الشهادة", "رقم شهادة"],
+            [CourseName] = ["CourseName", "اسم الدورة", "اسم الدوره", "الدورة", "الدوره", "اسم البرنامج", "البرنامج التدريبي"],
+            [IssueDate] = ["IssueDate", "تاريخ الإصدار", "تاريخ الاصدار", "تاريخ الإصدار (ميلادي)", "تاريخ الشهادة", "تاريخ الشهاده"]
         };
 }

@@ -61,21 +61,32 @@
                         </td>
                         <td>
                             <form method="post" action="/HomepageManage/MoveSlide" class="d-inline">
+                                @Html.AntiForgeryToken()
                                 <input type="hidden" name="id" value="@s.HeroSlideId" />
                                 <input type="hidden" name="direction" value="-1" />
                                 <button class="btn btn-sm btn-outline-secondary" @(i == 0 ? "disabled" : "")><i class="bi bi-arrow-up"></i></button>
                             </form>
                             <form method="post" action="/HomepageManage/MoveSlide" class="d-inline">
+                                @Html.AntiForgeryToken()
                                 <input type="hidden" name="id" value="@s.HeroSlideId" />
                                 <input type="hidden" name="direction" value="1" />
                                 <button class="btn btn-sm btn-outline-secondary" @(i == Model.Count - 1 ? "disabled" : "")><i class="bi bi-arrow-down"></i></button>
                             </form>
                         </td>
                         <td>
-                            <button class="btn btn-sm btn-outline-primary" onclick="editSlide(@s.HeroSlideId, '@Html.Raw(s.Title?.Replace("'", "\\'"))', '@Html.Raw(s.Description?.Replace("'", "\\'"))', '@s.Button1Text', '@s.Button1Url', '@s.Button2Text', '@s.Button2Url', @(s.IsActive.ToString().ToLower()))">
+                            <button type="button" class="btn btn-sm btn-outline-primary js-edit-slide"
+                                    data-slide-id="@s.HeroSlideId"
+                                    data-slide-title="@s.Title"
+                                    data-slide-desc="@s.Description"
+                                    data-slide-b1t="@s.Button1Text"
+                                    data-slide-b1u="@s.Button1Url"
+                                    data-slide-b2t="@s.Button2Text"
+                                    data-slide-b2u="@s.Button2Url"
+                                    data-slide-active="@(s.IsActive.ToString().ToLower())">
                                 <i class="bi bi-pencil"></i>
                             </button>
                             <form method="post" action="/HomepageManage/DeleteSlide" class="d-inline" onsubmit="return confirm('حذف الشريحة؟')">
+                                @Html.AntiForgeryToken()
                                 <input type="hidden" name="id" value="@s.HeroSlideId" />
                                 <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
                             </form>
@@ -92,6 +103,7 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <form method="post" action="/HomepageManage/SaveSlide" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
                 <div class="modal-header">
                     <h5 class="modal-title">شريحة جديدة</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -169,5 +181,12 @@ function editSlide(id, title, desc, b1t, b1u, b2t, b2u, active) {
     document.getElementById('f_active').value = active.toString();
     new bootstrap.Modal(document.getElementById('slideModal')).show();
 }
+document.querySelectorAll('.js-edit-slide').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        editSlide(btn.dataset.slideId, btn.dataset.slideTitle, btn.dataset.slideDesc,
+            btn.dataset.slideB1t, btn.dataset.slideB1u, btn.dataset.slideB2t,
+            btn.dataset.slideB2u, btn.dataset.slideActive === 'true');
+    });
+});
 </script>
 }

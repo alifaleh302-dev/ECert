@@ -26,6 +26,8 @@ public class CertificateSchemaMigrationService
         await EnsureColumnAsync("SignatureVersion", "INT NOT NULL DEFAULT 1");
         await EnsureColumnAsync("TraineeNameArabic", "VARCHAR(150) NULL");
         await EnsureColumnAsync("TraineeNameEnglish", "VARCHAR(150) NULL");
+        await EnsureColumnAsync("Source", "VARCHAR(20) NOT NULL DEFAULT 'New'");
+        await EnsureColumnAsync("CertificatePrefix", "VARCHAR(12) NULL");
 
         // These columns are used by NotificationService after certificate issuance.
         // Older production databases may predate them, causing IssueBulk to fail after
@@ -43,6 +45,7 @@ public class CertificateSchemaMigrationService
         await EnsureUniqueIndexAsync("IX_Certificates_CertificateNumber", "CertificateNumber");
         await EnsureUniqueIndexAsync("IX_Certificates_PublicId", "PublicId");
         await EnsureUniqueIndexAsync("IX_Certificates_VerificationCode", "VerificationCode");
+        await EnsureIndexAsync("IX_Certificates_Source", "Source");
     }
 
     private Task RemoveLegacyTemplateSchemaAsync()
@@ -181,6 +184,14 @@ WHERE TABLE_SCHEMA = DATABASE()
             return;
 
         await _db.Database.ExecuteSqlRawAsync($"CREATE UNIQUE INDEX `{indexName}` ON `Certificates`(`{columnName}`);");
+    }
+
+    private async Task EnsureIndexAsync(string indexName, string columnName)
+    {
+        if (await IndexExistsAsync(indexName))
+            return;
+
+        await _db.Database.ExecuteSqlRawAsync($"CREATE INDEX `{indexName}` ON `Certificates`(`{columnName}`);");
     }
 
     private async Task NormalizeCertificateDataAsync()

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ECert.Tests/ECert.Tests.csproj" />
+  <Project Path="ECert/ECert.csproj" />
+</Solution>

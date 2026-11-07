@@ -20,14 +20,14 @@ public class RolesController : Controller
         _audit = audit;
     }
 
-    private bool IsSuperAdmin => User.IsInRole("SuperAdmin");
+    private bool CanManageRoles => User.HasPermission(AdminPermissions.ManageRoles);
 
-    private IActionResult? RequireSuperAdmin()
-        => IsSuperAdmin ? null : Forbid();
+    private IActionResult? RequireRoleManager()
+        => CanManageRoles ? null : Forbid();
 
     public async Task<IActionResult> Index()
     {
-        if (RequireSuperAdmin() is { } denied) return denied;
+        if (RequireRoleManager() is { } denied) return denied;
 
         var roles = await _db.Roles
             .Include(r => r.RolePermissions)
@@ -43,7 +43,7 @@ public class RolesController : Controller
     [HttpGet]
     public async Task<IActionResult> Create()
     {
-        if (RequireSuperAdmin() is { } denied) return denied;
+        if (RequireRoleManager() is { } denied) return denied;
         await PopulatePermissionsAsync();
         return View(new RoleFormViewModel());
     }
@@ -52,7 +52,7 @@ public class RolesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(RoleFormViewModel model)
     {
-        if (RequireSuperAdmin() is { } denied) return denied;
+        if (RequireRoleManager() is { } denied) return denied;
 
         var permissionIds = await ValidateRoleFormAsync(model);
         if (!ModelState.IsValid)
@@ -89,7 +89,7 @@ public class RolesController : Controller
     [HttpGet]
     public async Task<IActionResult> Edit(int id)
     {
-        if (RequireSuperAdmin() is { } denied) return denied;
+        if (RequireRoleManager() is { } denied) return denied;
 
         var role = await _db.Roles
             .Include(r => r.RolePermissions)
@@ -114,7 +114,7 @@ public class RolesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id, RoleFormViewModel model)
     {
-        if (RequireSuperAdmin() is { } denied) return denied;
+        if (RequireRoleManager() is { } denied) return denied;
 
         var role = await _db.Roles
             .Include(r => r.RolePermissions)
@@ -151,7 +151,7 @@ public class RolesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        if (RequireSuperAdmin() is { } denied) return denied;
+        if (RequireRoleManager() is { } denied) return denied;
 
         var role = await _db.Roles
             .Include(r => r.UserRoles)
@@ -180,10 +180,12 @@ public class RolesController : Controller
 
     private async Task PopulatePermissionsAsync()
     {
-        ViewBag.Permissions = await _db.Permissions
-            .Where(p => p.PermissionName != "manage-roles")
+        // Filtered in memory: EF cannot translate IReadOnlySet.Contains, and the set is small.
+        var permissions = await _db.Permissions.ToListAsync();
+        ViewBag.Permissions = permissions
+            .Where(p => !AdminPermissions.SuperAdminOnly.Contains(p.PermissionName))
             .OrderBy(p => p.PermissionName)
-            .ToListAsync();
+            .ToList();
     }
 
     private async Task<List<int>> ValidateRoleFormAsync(RoleFormViewModel model, int? existingRoleId = null)
@@ -202,10 +204,12 @@ public class RolesController : Controller
             ModelState.AddModelError(nameof(model.RoleName), "يوجد دور آخر بالاسم نفسه");
         }
 
-        var validPermissionIds = await _db.Permissions
-            .Where(p => p.PermissionName != "manage-roles" && permissionIds.Contains(p.PermissionId))
+        // SuperAdminOnly is filtered in memory (EF cannot translate IReadOnlySet.Contains).
+        var offeredPermissionIds = (await _db.Permissions.ToListAsync())
+            .Where(p => !AdminPermissions.SuperAdminOnly.Contains(p.PermissionName))
             .Select(p => p.PermissionId)
-            .ToListAsync();
+            .ToHashSet();
+        var validPermissionIds = permissionIds.Where(id => offeredPermissionIds.Contains(id)).Distinct().ToList();
 
         if (!permissionIds.Any())
         {

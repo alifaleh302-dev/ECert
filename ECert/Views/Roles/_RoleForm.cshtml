@@ -1,15 +1,10 @@
 @model RoleFormViewModel
 @{
     var permissions = ViewBag.Permissions as List<Permission> ?? new();
-    var permissionGroups = permissions.GroupBy(permission => permission.PermissionName switch
-    {
-        "manage-registrations" or "manage-courses" or "manage-instructors" or "manage-categories" => "إدارة التدريب",
-        "manage-finance" or "view-invoices" or "manage-payments" or "view-reports" => "الإدارة المالية",
-        "issue-certificates" or "manage-certificate-designs" or "manage-certificate-template" => "الشهادات",
-        "manage-posts" or "manage-news" => "المحتوى",
-        "manage-users" or "view-audit-log" => "النظام",
-        _ => "صلاحيات أخرى"
-    }).OrderBy(group => group.Key);
+    var permissionGroups = permissions
+        .GroupBy(permission => AdminPermissions.Catalog
+            .FirstOrDefault(definition => definition.Name == permission.PermissionName)?.Group ?? "صلاحيات أخرى")
+        .OrderBy(group => group.Key);
 }
 
 <div asp-validation-summary="ModelOnly" class="a-error mb-3"></div>

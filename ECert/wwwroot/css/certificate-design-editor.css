@@ -73,6 +73,8 @@
     .ped-el:active { cursor: grabbing; }
     .ped-el.el-divider { cursor: grab; padding: 0; border-top: 2px solid currentColor; height: 0 !important; background: transparent !important; }
     .ped-el.el-divider .ped-el-inner { display: none; }
+    .ped-el.el-qr { padding: 0; background: repeating-conic-gradient(#e2e8f0 0% 25%, #f8fafc 0% 50%) 50% / 12px 12px; }
+    .ped-el.el-qr::after { content: "\F3F8"; font-family: "bootstrap-icons"; font-size: 26px; color: #475569; }
 
     /* selection overlay */
     .ped-overlay { position: absolute; pointer-events: none; z-index: 9999; }

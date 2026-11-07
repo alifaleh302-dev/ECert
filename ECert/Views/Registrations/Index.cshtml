@@ -1,4 +1,5 @@
 @using ECert.Models
+@using ECert.Services
 @{
     ViewData["Title"] = "إدارة التسجيلات";
     ViewData["PageIcon"] = "bi-clipboard-check";
@@ -6,7 +7,7 @@
     Layout = "_AdminLayout";
 
     var registrations = ViewBag.Registrations as List<Registration> ?? new();
-    var isSuperAdmin = User.HasClaim(c => c.Type == "Role" && c.Value == "SuperAdmin");
+    var isSuperAdmin = User.IsSuperAdmin();
     var activeStatus = (string?)ViewBag.Status ?? string.Empty;
     var activeSearch = (string?)ViewBag.Search ?? string.Empty;
     var selectedCourseId = (int?)ViewBag.CourseId;

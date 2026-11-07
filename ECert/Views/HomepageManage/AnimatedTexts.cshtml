@@ -38,10 +38,12 @@
                                 </td>
                                 <td>
                                     <form method="post" action="/HomepageManage/ToggleAnimatedText" class="d-inline">
+                                        @Html.AntiForgeryToken()
                                         <input type="hidden" name="id" value="@t.HeroAnimatedTextId" />
                                         <button class="btn btn-sm btn-outline-warning"><i class="bi bi-toggle-on"></i></button>
                                     </form>
                                     <form method="post" action="/HomepageManage/DeleteAnimatedText" class="d-inline" onsubmit="return confirm('حذف؟')">
+                                        @Html.AntiForgeryToken()
                                         <input type="hidden" name="id" value="@t.HeroAnimatedTextId" />
                                         <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
                                     </form>
@@ -58,6 +60,7 @@
             <div class="a-card__header"><strong>إضافة نص جديد</strong></div>
             <div class="a-card__body">
                 <form method="post" action="/HomepageManage/AddAnimatedText">
+                    @Html.AntiForgeryToken()
                     <div class="mb-3">
                         <label class="form-label">النص</label>
                         <input type="text" name="text" class="form-control" placeholder="مثال: طور مهاراتك" required />

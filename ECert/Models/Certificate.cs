@@ -73,5 +73,19 @@ public class Certificate
     [Display(Name = "إصدار التوقيع")]
     public int SignatureVersion { get; set; } = 1;
 
+    /// <summary>
+    /// Where the certificate came from: "New" for certificates issued inside the system,
+    /// "Legacy" for records imported from the old (Excel-based) system.
+    /// </summary>
+    [Required]
+    [StringLength(20)]
+    [Display(Name = "المصدر")]
+    public string Source { get; set; } = "New";
+
+    /// <summary>Prefix used when the legacy certificate number was imported; kept for reference and de-duplication.</summary>
+    [StringLength(12)]
+    [Display(Name = "بادئة رقم الشهادة")]
+    public string? CertificatePrefix { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 }
