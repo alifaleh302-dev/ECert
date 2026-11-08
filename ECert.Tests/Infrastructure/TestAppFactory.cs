@@ -83,6 +83,46 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
     }
 
     /// <summary>
+    /// Seeds two hero slides whose URL fields carry a stored-XSS payload, so a rendering test can
+    /// assert the homepage neutralises them instead of emitting javascript: into an href. Two
+    /// slides are needed because the background-image style attribute only renders in slider mode.
+    /// </summary>
+    public async Task SeedHostileHeroSlideAsync()
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        for (var i = 0; i < 2; i++)
+        {
+            db.HeroSlides.Add(new ECert.Models.HeroSlide
+            {
+                Title = "شريحة اختبار",
+                ImageUrl = "/uploads/x.png');background:red/*",
+                Button1Text = "اضغط",
+                Button1Url = "javascript:alert(1)",
+                SortOrder = 100 + i,
+                IsActive = true
+            });
+        }
+        db.SocialLinks.Add(new ECert.Models.SocialLink
+        {
+            PlatformName = "Test",
+            IconClass = "bi bi-link",
+            Url = "javascript:alert(2)",
+            IsActive = true
+        });
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Removes the rows created by <see cref="SeedHostileHeroSlideAsync"/>.</summary>
+    public async Task RemoveHostileHeroSlideAsync()
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        await db.HeroSlides.Where(s => s.Title == "شريحة اختبار").ExecuteDeleteAsync();
+        await db.SocialLinks.Where(s => s.PlatformName == "Test" && s.Url == "javascript:alert(2)").ExecuteDeleteAsync();
+    }
+
+    /// <summary>
     /// Installs a known password on the seeded admin account so tests can sign in. The account is
     /// created by the seeder with a random bootstrap password and a forced password change, both of
     /// which would otherwise require the change-password dance before any admin action.

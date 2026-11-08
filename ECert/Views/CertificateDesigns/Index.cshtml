@@ -777,11 +777,13 @@
             const icon = el.elementType === 'field' ? '<i class="bi bi-link-45deg"></i>' : el.elementType === 'divider' ? '<i class="bi bi-dash-lg"></i>' : el.elementType === 'qr' ? '<i class="bi bi-qr-code"></i>' : el.elementType === 'barcode' ? '<i class="bi bi-upc-scan"></i>' : '<i class="bi bi-type"></i>';
             row.innerHTML =
                 '<div class="ly-icon">' + icon + '</div>' +
-                '<div class="ly-name">' + labelFor(el) + '</div>' +
+                '<div class="ly-name"></div>' +
                 '<button type="button" class="ly-btn ly-eye' + (el.isVisible ? '' : ' off') + '" title="إظهار/إخفاء"><i class="bi ' + (el.isVisible ? 'bi-eye' : 'bi-eye-slash') + '"></i></button>' +
                 '<button type="button" class="ly-btn" title="أعلى"><i class="bi bi-chevron-up"></i></button>' +
                 '<button type="button" class="ly-btn" title="أسفل"><i class="bi bi-chevron-down"></i></button>' +
                 '<button type="button" class="ly-btn danger" title="حذف"><i class="bi bi-x-lg"></i></button>';
+            // Assign as text: the label is derived from user-editable element content.
+            row.querySelector('.ly-name').textContent = labelFor(el);
             row.addEventListener('click', e => {
                 e.stopPropagation();
                 if (e.target.closest('.ly-eye')) {

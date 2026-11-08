@@ -107,6 +107,31 @@ public class QaRegressionTests
         Assert.NotEqual(HttpStatusCode.InternalServerError, response.StatusCode);
     }
 
+    // XSS: admin-editable hero-slide and social-link URLs were written straight into href, and
+    // Razor escapes quotes but leaves the scheme intact, so a stored "javascript:" value would run
+    // for every visitor. The hero image also sat in an unquoted style attribute whose url() could
+    // be escaped. SafeUrl now rejects disallowed schemes and neutralises url() metacharacters.
+    [Fact]
+    public async Task Homepage_neutralises_stored_javascript_urls_and_css_breakout()
+    {
+        await _fixture.Factory.SeedHostileHeroSlideAsync();
+        try
+        {
+            var client = AppClient.Create(_fixture.Factory);
+            var html = await client.GetStringAsync("/");
+
+            Assert.DoesNotContain("javascript:alert", html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("href=\"javascript:", html, StringComparison.OrdinalIgnoreCase);
+            // The slide image URL must not break out of the url() context.
+            Assert.DoesNotContain("');background:red", html);
+            Assert.Contains("%3B", html); // the semicolon was neutralised
+        }
+        finally
+        {
+            await _fixture.Factory.RemoveHostileHeroSlideAsync();
+        }
+    }
+
     private async Task<AppClient> SignInAdminAsync()
     {
         var client = AppClient.Create(_fixture.Factory);

@@ -144,7 +144,7 @@
                             <div class="footer-social d-flex gap-2 flex-wrap">
                                 @foreach (var link in socialLinks)
                                 {
-                                    <a href="@link.Url" target="_blank" rel="noopener noreferrer" title="@link.PlatformName" aria-label="@link.PlatformName"><i class="bi @link.IconClass"></i></a>
+                                    <a href="@SafeUrl.ForAttribute(link.Url, "#")" target="_blank" rel="noopener noreferrer" title="@link.PlatformName" aria-label="@link.PlatformName"><i class="bi @link.IconClass"></i></a>
                                 }
                             </div>
                         }

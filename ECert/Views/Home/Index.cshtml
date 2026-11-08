@@ -37,7 +37,10 @@
             @for (int i = 0; i < slides.Count; i++)
             {
                 var slide = slides[i];
-                <div class="hero-slide @(i == 0 ? "active" : "")" @( !string.IsNullOrEmpty(slide.ImageUrl) ? $"style=background-image:url('{slide.ImageUrl}')" : "")>
+                <div class="hero-slide @(i == 0 ? "active" : "")"@if (!string.IsNullOrEmpty(slide.ImageUrl))
+                {
+                    <text> style="background-image:url('@SafeUrl.CssUrl(slide.ImageUrl)')"</text>
+                }>
                     <div class="container position-relative" style="z-index:2;">
                         <div class="row align-items-center">
                             <div class="col-lg-7 text-center text-lg-start">
@@ -53,13 +56,13 @@
                                 <div class="d-flex gap-3 justify-content-center justify-content-lg-start flex-wrap">
                                     @if (!string.IsNullOrEmpty(slide.Button1Text))
                                     {
-                                        <a href="@slide.Button1Url" class="btn btn-light btn-lg px-4 rounded-pill shadow">
+                                        <a href="@SafeUrl.ForAttribute(slide.Button1Url, "#")" class="btn btn-light btn-lg px-4 rounded-pill shadow">
                                             <i class="bi bi-grid-3x3-gap-fill"></i> @slide.Button1Text
                                         </a>
                                     }
                                     @if (!string.IsNullOrEmpty(slide.Button2Text))
                                     {
-                                        <a href="@slide.Button2Url" class="btn btn-outline-light btn-lg px-4 rounded-pill">
+                                        <a href="@SafeUrl.ForAttribute(slide.Button2Url, "#")" class="btn btn-outline-light btn-lg px-4 rounded-pill">
                                             <i class="bi bi-shield-check"></i> @slide.Button2Text
                                         </a>
                                     }
@@ -95,13 +98,13 @@
                     <div class="d-flex gap-3 justify-content-center justify-content-lg-start flex-wrap mb-4">
                         @if (slide != null && !string.IsNullOrEmpty(slide.Button1Text))
                         {
-                            <a href="@slide.Button1Url" class="btn btn-light btn-lg px-4 rounded-pill shadow">
+                            <a href="@SafeUrl.ForAttribute(slide.Button1Url, "#")" class="btn btn-light btn-lg px-4 rounded-pill shadow">
                                 <i class="bi bi-grid-3x3-gap-fill"></i> @slide.Button1Text
                             </a>
                         }
                         @if (slide != null && !string.IsNullOrEmpty(slide.Button2Text))
                         {
-                            <a href="@slide.Button2Url" class="btn btn-outline-light btn-lg px-4 rounded-pill">
+                            <a href="@SafeUrl.ForAttribute(slide.Button2Url, "#")" class="btn btn-outline-light btn-lg px-4 rounded-pill">
                                 <i class="bi bi-shield-check"></i> @slide.Button2Text
                             </a>
                         }
