@@ -1143,7 +1143,9 @@ a.a-kpi:focus-visible {
 /* --------------------------------------------------------------------------
    15. Utilities
    -------------------------------------------------------------------------- */
-.a-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: var(--a-5); }
+/* Two-up detail layout. The track minimum is capped at 100% so a single column can
+   still shrink below 360px on phones instead of overflowing the viewport. */
+.a-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); gap: var(--a-5); }
 .a-stack { display: flex; flex-direction: column; gap: var(--a-5); }
 .a-row { display: flex; align-items: center; gap: var(--a-2); flex-wrap: wrap; }
 .a-muted { color: var(--a-text-3); }
