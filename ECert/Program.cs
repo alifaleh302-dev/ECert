@@ -189,10 +189,13 @@ using (var scope = app.Services.CreateScope())
         // (CourseNameSchemaMigrationService selects every mapped column).
         var certificateMigration = scope.ServiceProvider.GetRequiredService<CertificateSchemaMigrationService>();
         await certificateMigration.EnsureAsync();
-        var courseNameMigration = scope.ServiceProvider.GetRequiredService<CourseNameSchemaMigrationService>();
-        await courseNameMigration.EnsureAsync();
+        // The Courses columns must exist before any migration that loads the Course entity
+        // (CourseNameSchemaMigrationService selects every mapped column), and the EF model now
+        // maps PartnerName/PartnerLogoUrl too.
         var courseSchemaMigration = scope.ServiceProvider.GetRequiredService<CourseSchemaMigrationService>();
         await courseSchemaMigration.EnsureAsync();
+        var courseNameMigration = scope.ServiceProvider.GetRequiredService<CourseNameSchemaMigrationService>();
+        await courseNameMigration.EnsureAsync();
         var courseInstructorMigration = scope.ServiceProvider.GetRequiredService<CourseInstructorSchemaMigrationService>();
         await courseInstructorMigration.EnsureAsync();
         var coursePartnerMigration = scope.ServiceProvider.GetRequiredService<CoursePartnerSchemaMigrationService>();

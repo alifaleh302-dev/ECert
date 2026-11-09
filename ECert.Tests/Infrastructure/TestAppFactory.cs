@@ -17,10 +17,15 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
     /// <summary>Password the tests install on the seeded <c>admin</c> account.</summary>
     public const string AdminPassword = "Admin@12345";
 
-    private readonly string _databaseName = "ecert_test_" + Guid.NewGuid().ToString("N")[..12];
+    private readonly string _databaseName;
     private readonly MySqlConnectionStringBuilder _serverBuilder;
+    private bool _ownsDatabase;
 
-    public TestAppFactory()
+    /// <param name="existingDatabaseName">
+    /// When supplied, the factory attaches to that database instead of creating a throwaway one.
+    /// Used to boot a second host against a schema left by a previous host.
+    /// </param>
+    public TestAppFactory(string? existingDatabaseName = null)
     {
         _serverBuilder = new MySqlConnectionStringBuilder
         {
@@ -32,8 +37,66 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
             AllowPublicKeyRetrieval = true
         };
 
-        CreateDatabase();
+        _databaseName = existingDatabaseName ?? "ecert_test_" + Guid.NewGuid().ToString("N")[..12];
+        _ownsDatabase = existingDatabaseName is null;
+        if (_ownsDatabase)
+            CreateDatabase();
     }
+
+    public string DatabaseName => _databaseName;
+
+    /// <summary>Relinquishes ownership so disposal leaves the database for a follow-up host.</summary>
+    public void Detach() => _ownsDatabase = false;
+
+    /// <summary>Drops a database by name using the default test server settings.</summary>
+    public static void DropDatabaseByName(string databaseName)
+    {
+        var builder = new MySqlConnectionStringBuilder
+        {
+            Server = Environment.GetEnvironmentVariable("ECERT_TEST_MYSQL_SERVER") ?? "127.0.0.1",
+            Port = uint.TryParse(Environment.GetEnvironmentVariable("ECERT_TEST_MYSQL_PORT"), out var port) ? port : 3306,
+            UserID = Environment.GetEnvironmentVariable("ECERT_TEST_MYSQL_USER") ?? "ecert",
+            Password = Environment.GetEnvironmentVariable("ECERT_TEST_MYSQL_PASSWORD") ?? "ecert_pass",
+            SslMode = MySqlSslMode.None,
+            AllowPublicKeyRetrieval = true
+        };
+        try
+        {
+            MySqlConnection.ClearAllPools();
+            using var connection = new MySqlConnection(builder.ConnectionString);
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = $"DROP DATABASE IF EXISTS `{databaseName}`;";
+            command.ExecuteNonQuery();
+        }
+        catch
+        {
+            // Cleanup is best-effort; a leftover throwaway database must not fail the run.
+        }
+    }
+
+    /// <summary>Runs arbitrary SQL against this factory's database, for shaping a legacy schema.</summary>
+    public async Task ExecuteRawAsync(string sql)
+    {
+        await using var connection = new MySqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>True when the given column exists on the table in this factory's database.</summary>
+    public async Task<bool> ColumnExistsAsync(string table, string column) =>
+        await WithDbAsync(async db =>
+        {
+            var connection = db.Database.GetDbConnection();
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @t AND COLUMN_NAME = @c;";
+            var t = command.CreateParameter(); t.ParameterName = "@t"; t.Value = table; command.Parameters.Add(t);
+            var c = command.CreateParameter(); c.ParameterName = "@c"; c.Value = column; command.Parameters.Add(c);
+            return Convert.ToInt32(await command.ExecuteScalarAsync()) > 0;
+        });
 
     public string ConnectionString
     {
@@ -277,7 +340,8 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
     public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
-        DropDatabase();
+        if (_ownsDatabase)
+            DropDatabase();
         GC.SuppressFinalize(this);
     }
 }
