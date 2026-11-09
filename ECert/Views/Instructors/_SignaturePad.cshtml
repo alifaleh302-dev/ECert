@@ -1,0 +1,38 @@
+@model string?
+@{
+    var hasExisting = !string.IsNullOrEmpty(Model);
+}
+
+<style>
+    .sig-pad { border: 1px dashed var(--bs-border-color, #cbd5e1); border-radius: 12px; background: #fff; position: relative; overflow: hidden; }
+    .sig-pad canvas { display: block; width: 100%; height: 180px; touch-action: none; cursor: crosshair; }
+    .sig-pad__hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: .9rem; pointer-events: none; }
+    .sig-pad__tools { display: flex; gap: .5rem; margin-top: .5rem; }
+</style>
+
+<div class="a-field">
+    <label class="a-label">التوقيع المباشر</label>
+    <div class="sig-pad" data-signature-pad data-file-input="signatureFileInput">
+        <canvas aria-label="منطقة رسم التوقيع" role="img"></canvas>
+        <span class="sig-pad__hint" data-signature-hint>ارسم التوقيع هنا بالفأرة أو باللمس</span>
+    </div>
+    <div class="sig-pad__tools">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-signature-undo><i class="bi bi-arrow-counterclockwise"></i> تراجع</button>
+        <button type="button" class="btn btn-outline-danger btn-sm" data-signature-clear><i class="bi bi-eraser"></i> مسح</button>
+    </div>
+    <span class="a-hint">يُحفظ التوقيع كصورة شفافة تُدمج تلقائياً في شهادات دورات هذا المدرب.</span>
+
+    @if (hasExisting)
+    {
+        <div class="mt-2">
+            <div class="small text-muted mb-1">التوقيع المحفوظ حالياً:</div>
+            <img src="@Model" alt="التوقيع الحالي" style="max-height:90px;background:#fff;border:1px solid var(--bs-border-color,#cbd5e1);border-radius:8px;padding:4px;" />
+            <div class="form-check mt-2">
+                <input type="checkbox" class="form-check-input" id="removeSignature" name="removeSignature" value="true" />
+                <label class="form-check-label" for="removeSignature">إزالة التوقيع المحفوظ</label>
+            </div>
+        </div>
+    }
+
+    <input type="file" id="signatureFileInput" name="signature" accept="image/png" class="d-none" />
+</div>

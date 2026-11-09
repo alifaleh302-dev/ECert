@@ -76,6 +76,11 @@
     .ped-el.el-qr { padding: 0; background: repeating-conic-gradient(#e2e8f0 0% 25%, #f8fafc 0% 50%) 50% / 12px 12px; }
     .ped-el.el-qr::after { content: "\F3F8"; font-family: "bootstrap-icons"; font-size: 26px; color: #475569; }
     .ped-el.el-barcode { padding: 0 8px; background: repeating-linear-gradient(90deg, #cbd5e1 0 2px, #f8fafc 2px 5px); border: 1px dashed #cbd5e1; border-radius: 4px; font-size: 12px; color: #475569; }
+    .ped-el.el-partner-logo { padding: 0; background: repeating-conic-gradient(#eef2f7 0% 25%, #f8fafc 0% 50%) 50% / 12px 12px; border: 1px dashed #cbd5e1; border-radius: 6px; }
+    .ped-el.el-partner-logo::after { content: "\f1dd"; font-family: "bootstrap-icons"; font-size: 30px; color: #94a3b8; }
+    .ped-el.el-partner-signature, .ped-el.el-signature { padding: 0 8px; background: rgba(148,163,184,.08); border: 1px dashed #cbd5e1; border-radius: 6px; }
+    .ped-el.el-partner-signature::after { content: "\f604"; font-family: "bootstrap-icons"; font-size: 26px; color: #94a3b8; }
+    .ped-el.el-signature::after { content: "\f4d6"; font-family: "bootstrap-icons"; font-size: 26px; color: #94a3b8; }
 
     /* selection overlay */
     .ped-overlay { position: absolute; pointer-events: none; z-index: 9999; }
@@ -147,18 +152,18 @@
     .ped-app.preview-mode .ped-overlay, .ped-app.preview-mode .ped-guide, .ped-app.preview-mode .ped-grid { display: none; }
 
     /* toolbar responsive */
-    @@media (max-width: 1199.98px) {
+    @media (max-width: 1199.98px) {
         .ped-panel { width: 258px; }
         .ped-name-input { width: 170px; }
     }
-    @@media (max-width: 991.98px) {
+    @media (max-width: 991.98px) {
         .ped-app { height: auto; min-height: 0; border-radius: 14px; }
         .ped-body { flex-direction: column; }
         .ped-panel { width: 100%; max-height: 260px; order: 3; border: 0 !important; border-top: 1px solid var(--ped-line) !important; }
         .ped-canvas-area { order: 1; min-height: 480px; }
         .ped-name-input { width: 150px; }
     }
-    @@media (max-width: 575.98px) {
+    @media (max-width: 575.98px) {
         .ped-toolbar { padding: .45rem; }
         .ped-tbtn-label span.txt { display: none; }
         .ped-canvas-area { min-height: 400px; }

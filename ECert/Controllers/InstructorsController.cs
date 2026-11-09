@@ -32,6 +32,35 @@ public class InstructorsController : Controller
         return $"/uploads/instructors/{fileName}";
     }
 
+    /// <summary>
+    /// Stores a signature captured on screen (PNG). Validation reuses the shared image guard so a
+    /// crafted upload cannot smuggle a non-image payload through the signature field.
+    /// </summary>
+    private async Task<(string? Path, string? Error)> SaveSignatureAsync(IFormFile? signature)
+    {
+        if (signature == null || signature.Length == 0) return (null, null);
+
+        var (valid, error) = await ImageUploadValidator.ValidateAsync(signature);
+        if (!valid) return (null, error);
+
+        var uploadsDir = Path.Combine(_env.WebRootPath, "uploads", "signatures");
+        Directory.CreateDirectory(uploadsDir);
+        var fileName = $"{Guid.NewGuid()}.png";
+        using var stream = new FileStream(Path.Combine(uploadsDir, fileName), FileMode.Create);
+        await signature.CopyToAsync(stream);
+        return ($"/uploads/signatures/{fileName}", null);
+    }
+
+    private void DeleteSignature(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url) || !url.StartsWith("/uploads/signatures/", StringComparison.Ordinal))
+            return;
+
+        var path = Path.Combine(_env.WebRootPath, url.TrimStart('/'));
+        if (System.IO.File.Exists(path))
+            System.IO.File.Delete(path);
+    }
+
     public async Task<IActionResult> Index(string? search)
     {
         if (!HasPermission("manage-instructors")) return Forbid();
@@ -52,13 +81,22 @@ public class InstructorsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(Instructor instructor, IFormFile? photo)
+    public async Task<IActionResult> Create(Instructor instructor, IFormFile? photo, IFormFile? signature)
     {
         if (!HasPermission("manage-instructors")) return Forbid();
         if (!ModelState.IsValid) return View(instructor);
         instructor.CreatedAt = DateTime.Now;
         var photoPath = await SavePhoto(photo);
         if (photoPath != null) instructor.PhotoUrl = photoPath;
+
+        var (sigPath, sigError) = await SaveSignatureAsync(signature);
+        if (sigError != null)
+        {
+            ModelState.AddModelError(string.Empty, sigError);
+            return View(instructor);
+        }
+        if (sigPath != null) instructor.SignatureImageUrl = sigPath;
+
         _db.Instructors.Add(instructor);
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Create", "Instructor", instructor.InstructorId, null, instructor.FullName);
@@ -77,7 +115,7 @@ public class InstructorsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Instructor instructor, IFormFile? photo)
+    public async Task<IActionResult> Edit(Instructor instructor, IFormFile? photo, IFormFile? signature, bool removeSignature = false)
     {
         if (!HasPermission("manage-instructors")) return Forbid();
         if (!ModelState.IsValid) return View(instructor);
@@ -91,6 +129,24 @@ public class InstructorsController : Controller
         existing.IsActive = instructor.IsActive;
         var photoPath = await SavePhoto(photo);
         if (photoPath != null) existing.PhotoUrl = photoPath;
+
+        var (sigPath, sigError) = await SaveSignatureAsync(signature);
+        if (sigError != null)
+        {
+            ModelState.AddModelError(string.Empty, sigError);
+            return View(existing);
+        }
+        if (sigPath != null)
+        {
+            DeleteSignature(existing.SignatureImageUrl);
+            existing.SignatureImageUrl = sigPath;
+        }
+        else if (removeSignature)
+        {
+            DeleteSignature(existing.SignatureImageUrl);
+            existing.SignatureImageUrl = null;
+        }
+
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Update", "Instructor", instructor.InstructorId, null, instructor.FullName);
         TempData["Success"] = "تم تعديل بيانات المدرب بنجاح.";

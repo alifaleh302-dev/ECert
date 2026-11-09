@@ -65,6 +65,8 @@
                 <img id="photoPreview" class="a-media-preview a-media-preview--avatar" src="" alt="معاينة الصورة الجديدة" hidden />
             </div>
 
+            <partial name="_SignaturePad" model="@Model.SignatureImageUrl" />
+
             <div class="form-check mb-0">
                 <input asp-for="IsActive" class="form-check-input" />
                 <label asp-for="IsActive" class="form-check-label">نشط</label>
@@ -79,6 +81,7 @@
 </div>
 
 @section Scripts {
+<script src="~/js/signature-pad.js" asp-append-version="true"></script>
 <script>
     function previewPhoto(input) {
         const preview = document.getElementById('photoPreview');

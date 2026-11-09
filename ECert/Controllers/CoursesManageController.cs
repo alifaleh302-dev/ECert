@@ -46,6 +46,41 @@ public class CoursesManageController : Controller
         return ($"/uploads/courses/{fileName}", null);
     }
 
+    /// <summary>Stores a partner logo or signature under wwwroot/uploads/partners and returns its public path.</summary>
+    private async Task<(string? Path, string? Error)> SavePartnerArtworkAsync(IFormFile? file)
+    {
+        if (file == null || file.Length == 0) return (null, null);
+
+        var (valid, error) = await ImageUploadValidator.ValidateAsync(file);
+        if (!valid) return (null, error);
+
+        var uploadsDir = Path.Combine(_env.WebRootPath, "uploads", "partners");
+        Directory.CreateDirectory(uploadsDir);
+        var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+        using var stream = new FileStream(Path.Combine(uploadsDir, fileName), FileMode.Create);
+        await file.CopyToAsync(stream);
+        return ($"/uploads/partners/{fileName}", null);
+    }
+
+    private void DeletePartnerArtwork(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url) || !url.StartsWith("/uploads/partners/", StringComparison.Ordinal))
+            return;
+
+        var path = Path.Combine(_env.WebRootPath, url.TrimStart('/'));
+        if (System.IO.File.Exists(path))
+            System.IO.File.Delete(path);
+    }
+
+    private void DeletePartnerArtwork(ICollection<CoursePartner> partners)
+    {
+        foreach (var partner in partners)
+        {
+            DeletePartnerArtwork(partner.LogoUrl);
+            DeletePartnerArtwork(partner.SignatureUrl);
+        }
+    }
+
     public async Task<IActionResult> Index(string? search)
     {
         if (!HasPermission("manage-courses")) return Forbid();
@@ -394,6 +429,81 @@ public class CoursesManageController : Controller
         }
     }
 
+    /// <summary>
+    /// Reconciles a course's partner rows with the submitted form. Rows bind positionally with
+    /// their uploads, so a row can be renamed or reordered without its artwork landing on the
+    /// wrong organisation. A row with a blank name and no artwork is treated as removed.
+    /// </summary>
+    private async Task<(bool Ok, string? Error)> SyncCoursePartnersAsync(
+        Course course, IReadOnlyList<CoursePartnerFormRow> rows)
+    {
+        var existing = await _db.CoursePartners.Where(p => p.CourseId == course.CourseId).ToListAsync();
+        var normalized = new List<CoursePartner>();
+
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var form = rows[i];
+            var name = (form.Name ?? string.Empty).Trim();
+            var current = existing.FirstOrDefault(p => p.SortOrder == i);
+            var hasLogo = form.Logo is { Length: > 0 };
+            var hasSignature = form.Signature is { Length: > 0 };
+            var keepsSignature = !form.RemoveSignature && current?.SignatureUrl != null;
+
+            if (string.IsNullOrEmpty(name) && !hasLogo && !hasSignature && !keepsSignature)
+            {
+                if (current != null)
+                {
+                    DeletePartnerArtwork(current.LogoUrl);
+                    DeletePartnerArtwork(current.SignatureUrl);
+                    _db.CoursePartners.Remove(current);
+                }
+                continue;
+            }
+
+            if (string.IsNullOrEmpty(name))
+                return (false, $"يرجى إدخال اسم الجهة الداعمة رقم {i + 1} أو إزالة صفها بالكامل.");
+
+            var row = current ?? new CoursePartner { CourseId = course.CourseId };
+            row.Name = name.Length > 150 ? name[..150] : name;
+            row.SortOrder = normalized.Count;
+
+            if (hasLogo)
+            {
+                var (path, error) = await SavePartnerArtworkAsync(form.Logo);
+                if (error != null) return (false, error);
+                DeletePartnerArtwork(row.LogoUrl);
+                row.LogoUrl = path;
+            }
+
+            if (hasSignature)
+            {
+                var (path, error) = await SavePartnerArtworkAsync(form.Signature);
+                if (error != null) return (false, error);
+                DeletePartnerArtwork(row.SignatureUrl);
+                row.SignatureUrl = path;
+            }
+            else if (form.RemoveSignature)
+            {
+                DeletePartnerArtwork(row.SignatureUrl);
+                row.SignatureUrl = null;
+            }
+
+            if (current == null)
+                _db.CoursePartners.Add(row);
+            normalized.Add(row);
+        }
+
+        // Rows the form no longer carries at all (e.g. removed client-side) are deleted.
+        foreach (var orphan in existing.Where(p => !normalized.Contains(p)).ToList())
+        {
+            DeletePartnerArtwork(orphan.LogoUrl);
+            DeletePartnerArtwork(orphan.SignatureUrl);
+            _db.CoursePartners.Remove(orphan);
+        }
+
+        return (true, null);
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(Course course, IFormFile? image)
@@ -423,8 +533,18 @@ public class CoursesManageController : Controller
             return View(course);
         }
         if (imgPath != null) course.ImageUrl = imgPath;
+
         _db.Courses.Add(course);
         await _db.SaveChangesAsync();
+
+        var (partnersOk, partnerError) = await SyncCoursePartnersAsync(course, course.PartnerRows);
+        if (!partnersOk)
+        {
+            ModelState.AddModelError(string.Empty, partnerError ?? "تعذر حفظ الجهات الداعمة.");
+            await LoadCourseFormOptions();
+            return View(course);
+        }
+
         await SyncCourseInstructorsAsync(course.CourseId, course.SelectedInstructorIds);
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Create", "Course", course.CourseId, null, $"{course.CourseNameEnglish} / {course.CourseNameArabic}");
@@ -439,6 +559,7 @@ public class CoursesManageController : Controller
         var course = await _db.Courses
             .Include(c => c.Instructor)
             .Include(c => c.CourseInstructors).ThenInclude(ci => ci.Instructor)
+            .Include(c => c.Partners)
             .FirstOrDefaultAsync(c => c.CourseId == id);
         if (course == null) return NotFound();
         course.SelectedInstructorIds = course.CourseInstructors
@@ -449,6 +570,11 @@ public class CoursesManageController : Controller
             .ToList();
         if (course.SelectedInstructorIds.Count == 0 && course.InstructorId > 0)
             course.SelectedInstructorIds.Add(course.InstructorId);
+        course.PartnerRows = course.Partners
+            .OrderBy(p => p.SortOrder)
+            .ThenBy(p => p.CoursePartnerId)
+            .Select(p => new CoursePartnerFormRow { Name = p.Name })
+            .ToList();
         await LoadCourseFormOptions();
         return View(course);
     }
@@ -513,6 +639,14 @@ public class CoursesManageController : Controller
             existing.ImageUrl = imgPath;
         }
 
+        var (partnersOk, partnerError) = await SyncCoursePartnersAsync(existing, course.PartnerRows);
+        if (!partnersOk)
+        {
+            ModelState.AddModelError(string.Empty, partnerError ?? "تعذر حفظ الجهات الداعمة.");
+            await LoadCourseFormOptions();
+            return View(existing);
+        }
+
         await SyncCourseInstructorsAsync(existing.CourseId, course.SelectedInstructorIds);
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Update", "Course", course.CourseId, null, $"{course.CourseNameEnglish} / {course.CourseNameArabic}");
@@ -552,6 +686,9 @@ public class CoursesManageController : Controller
 
         course.Status = "Archived";
         course.ImageUrl = null;
+        var partners = await _db.CoursePartners.Where(p => p.CourseId == id).ToListAsync();
+        DeletePartnerArtwork(partners);
+        _db.CoursePartners.RemoveRange(partners);
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Delete", "Course", id);
         TempData["Success"] = "تم أرشفة الدورة.";

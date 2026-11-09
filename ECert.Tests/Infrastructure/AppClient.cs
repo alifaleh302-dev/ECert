@@ -114,4 +114,27 @@ public sealed class AppClient
 
         return await _http.PostAsync(action, form);
     }
+
+    /// <summary>Posts a form carrying several files, each under its own field name.</summary>
+    public async Task<HttpResponseMessage> PostMultipartAsync(
+        string tokenPath,
+        string action,
+        IEnumerable<KeyValuePair<string, string>> fields,
+        IEnumerable<(string Field, string FileName, byte[] Content, string ContentType)> files)
+    {
+        var token = await GetTokenAsync(tokenPath);
+        using var form = new MultipartFormDataContent();
+        foreach (var field in fields)
+            form.Add(new StringContent(field.Value), field.Key);
+        form.Add(new StringContent(token), "__RequestVerificationToken");
+
+        foreach (var (field, fileName, content, contentType) in files)
+        {
+            var file = new ByteArrayContent(content);
+            file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+            form.Add(file, field, fileName);
+        }
+
+        return await _http.PostAsync(action, form);
+    }
 }

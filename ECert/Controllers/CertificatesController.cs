@@ -359,6 +359,7 @@ public class CertificatesController : Controller
             .AsNoTracking()
             .Include(c => c.Registration)
             .ThenInclude(r => r!.Course)
+            .ThenInclude(course => course!.Partners)
             .FirstOrDefaultAsync(c => c.CertificateNumber == normalizedCode || c.VerificationCode == normalizedCode);
 
         return await BuildVerifyResultAsync(certificate, code);
@@ -380,6 +381,7 @@ public class CertificatesController : Controller
             .AsNoTracking()
             .Include(c => c.Registration)
             .ThenInclude(r => r!.Course)
+            .ThenInclude(course => course!.Partners)
             .FirstOrDefaultAsync(c => c.PublicId == normalizedPublicId);
 
         return await BuildVerifyResultAsync(certificate, normalizedPublicId);
@@ -451,7 +453,13 @@ public class CertificatesController : Controller
             model.DesignBorderColor = design.BorderColor;
             model.DesignBorderWidth = design.BorderWidth;
             model.DesignBorderRadius = design.BorderRadius;
+            model.DesignBackgroundImageUrl = design.BackgroundImageUrl;
             var verificationUrl = BuildVerificationUrl(certificate);
+            var partners = certificate.Registration?.Course?.Partners
+                .OrderBy(p => p.SortOrder)
+                .ThenBy(p => p.CoursePartnerId)
+                .ToList() ?? new List<CoursePartner>();
+            var signatureUrl = await ResolveSignatureUrlAsync(certificate.Registration?.Course);
             model.DesignElements = design.Elements
                 .Where(e => e.IsVisible)
                 .OrderBy(e => e.SortOrder)
@@ -467,7 +475,10 @@ public class CertificatesController : Controller
                             ? _barcodeService.BuildDataUri(
                                 CertificateDesignService.ResolveBarcodeValue(e.FieldKey, certificate, verificationUrl),
                                 BarcodeModuleWidth(e), BarcodeHeight(e))
-                            : null,
+                            : ResolvePartnerArtwork(e, partners)
+                                ?? (string.Equals(e.ElementType, "instructor_signature", StringComparison.OrdinalIgnoreCase)
+                                    ? signatureUrl
+                                    : null),
                     X = e.X,
                     Y = e.Y,
                     Width = e.Width,
@@ -513,6 +524,53 @@ public class CertificatesController : Controller
 
     private string BuildVerificationUrl(Certificate certificate)
         => _certificateSecurity.BuildVerificationUrl(certificate.PublicId, GetPublicBaseUrl());
+
+    /// <summary>
+    /// Returns the signature image of the first active instructor assigned to the course, or null
+    /// when none of them has one. Used by the <c>instructor_signature</c> design element.
+    /// Falls back to the course's primary instructor because legacy courses may have no
+    /// <c>CourseInstructors</c> join row.
+    /// </summary>
+    private async Task<string?> ResolveSignatureUrlAsync(Course? course)
+    {
+        if (course == null) return null;
+
+        var signature = await _db.CourseInstructors
+            .AsNoTracking()
+            .Where(ci => ci.CourseId == course.CourseId
+                && ci.Instructor != null
+                && ci.Instructor.IsActive
+                && ci.Instructor.SignatureImageUrl != null)
+            .OrderBy(ci => ci.SortOrder)
+            .ThenBy(ci => ci.CourseInstructorId)
+            .Select(ci => ci.Instructor!.SignatureImageUrl)
+            .FirstOrDefaultAsync();
+
+        if (signature != null) return signature;
+
+        if (course.InstructorId == 0) return null;
+
+        return await _db.Instructors
+            .AsNoTracking()
+            .Where(i => i.InstructorId == course.InstructorId && i.IsActive && i.SignatureImageUrl != null)
+            .Select(i => i.SignatureImageUrl)
+            .FirstOrDefaultAsync();
+    }
+
+    /// <summary>
+    /// Resolves the artwork for a partner element. The element's field key selects which partner
+    /// slot it renders (0 = first partner), so a template can show several organisations.
+    /// </summary>
+    private static string? ResolvePartnerArtwork(CertificateDesignElement element, IReadOnlyList<CoursePartner> partners)
+    {
+        var type = element.ElementType?.Trim().ToLowerInvariant();
+        if (type != "partner_logo" && type != "partner_signature") return null;
+
+        var slot = CertificateDesignService.ParsePartnerSlot(element.FieldKey);
+        if (slot >= partners.Count) return null;
+
+        return type == "partner_logo" ? partners[slot].LogoUrl : partners[slot].SignatureUrl;
+    }
 
     /// <summary>Chooses a module size that keeps the rendered QR crisp without producing a huge PNG.</summary>
     private static int QrModulePixels(CertificateDesignElement element)

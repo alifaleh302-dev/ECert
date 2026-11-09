@@ -90,6 +90,16 @@ public class Course
     public int? CertificateDesignId { get; set; }
     public CertificateDesign? CertificateDesign { get; set; }
 
+    /// <summary>Name of the legacy single partner organisation; superseded by <see cref="Partners"/>.</summary>
+    [StringLength(150)]
+    [Display(Name = "الجهة الشريكة")]
+    public string? PartnerName { get; set; }
+
+    /// <summary>Legacy single partner logo; superseded by <see cref="Partners"/>.</summary>
+    [StringLength(400)]
+    [Display(Name = "شعار الجهة الشريكة")]
+    public string? PartnerLogoUrl { get; set; }
+
     [Display(Name = "حالة الدورة")]
     [StringLength(40)]
     public string Status { get; set; } = "Draft";
@@ -104,8 +114,15 @@ public class Course
     public ICollection<Registration> Registrations { get; set; } = new List<Registration>();
     public ICollection<CourseInstructor> CourseInstructors { get; set; } = new List<CourseInstructor>();
 
+    /// <summary>Supporting organisations credited on this course's certificates, each with a logo and signature.</summary>
+    public ICollection<CoursePartner> Partners { get; set; } = new List<CoursePartner>();
+
     [NotMapped]
     public List<int> SelectedInstructorIds { get; set; } = new();
+
+    /// <summary>Form binding for the partner rows (name + uploaded artwork), in display order.</summary>
+    [NotMapped]
+    public List<CoursePartnerFormRow> PartnerRows { get; set; } = new();
 
     [NotMapped]
     public IReadOnlyList<Instructor> AssignedInstructors

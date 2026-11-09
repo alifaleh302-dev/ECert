@@ -68,6 +68,16 @@ CREATE TABLE IF NOT EXISTS `CertificateDesignElements` (
             await _db.Database.ExecuteSqlRawAsync("ALTER TABLE `CertificateDesignElements` ADD COLUMN `Rotation` INT NOT NULL DEFAULT 0");
         }
 
+        var backgroundImageColumnExists = await _db.Database
+            .SqlQueryRaw<int>("SELECT COUNT(*) AS `Value` FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'CertificateDesigns' AND COLUMN_NAME = 'BackgroundImageUrl'")
+            .SingleAsync() > 0;
+        if (!backgroundImageColumnExists)
+        {
+            await _db.Database.ExecuteSqlRawAsync("ALTER TABLE `CertificateDesigns` ADD COLUMN `BackgroundImageUrl` VARCHAR(400) NULL");
+        }
+
+        await EnsureColumnAsync("Instructors", "SignatureImageUrl", "VARCHAR(400) NULL");
+
         var courseDesignColumnExists = await _db.Database
             .SqlQueryRaw<int>("SELECT COUNT(*) AS `Value` FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Courses' AND COLUMN_NAME = 'CertificateDesignId'")
             .SingleAsync() > 0;
@@ -102,6 +112,40 @@ CREATE TABLE IF NOT EXISTS `CertificateDesignElements` (
                 duplicate.IsPublished = false;
 
             await _db.SaveChangesAsync();
+        }
+    }
+
+    private async Task EnsureColumnAsync(string tableName, string columnName, string definitionSql)
+    {
+        if (await ColumnExistsAsync(tableName, columnName)) return;
+        await _db.Database.ExecuteSqlRawAsync($"ALTER TABLE `{tableName}` ADD COLUMN `{columnName}` {definitionSql}");
+    }
+
+    private async Task<bool> ColumnExistsAsync(string tableName, string columnName)
+    {
+        var connection = _db.Database.GetDbConnection();
+        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+        try
+        {
+            if (shouldClose) await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = @"
+SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @tableName AND COLUMN_NAME = @columnName;";
+            var tableParameter = command.CreateParameter();
+            tableParameter.ParameterName = "@tableName";
+            tableParameter.Value = tableName;
+            command.Parameters.Add(tableParameter);
+            var columnParameter = command.CreateParameter();
+            columnParameter.ParameterName = "@columnName";
+            columnParameter.Value = columnName;
+            command.Parameters.Add(columnParameter);
+            return Convert.ToInt32(await command.ExecuteScalarAsync()) > 0;
+        }
+        finally
+        {
+            if (shouldClose && connection.State == System.Data.ConnectionState.Open)
+                await connection.CloseAsync();
         }
     }
 }

@@ -55,6 +55,7 @@ builder.Services.AddScoped<AcademicSchemaMigrationService>();
 builder.Services.AddScoped<CourseNameSchemaMigrationService>();
 builder.Services.AddScoped<CourseSchemaMigrationService>();
 builder.Services.AddScoped<CourseInstructorSchemaMigrationService>();
+builder.Services.AddScoped<CoursePartnerSchemaMigrationService>();
 builder.Services.AddScoped<RegistrationNameSchemaMigrationService>();
 builder.Services.AddScoped<RegistrationInvoiceService>();
 builder.Services.AddScoped<InvoiceSchemaMigrationService>();
@@ -194,6 +195,8 @@ using (var scope = app.Services.CreateScope())
         await courseSchemaMigration.EnsureAsync();
         var courseInstructorMigration = scope.ServiceProvider.GetRequiredService<CourseInstructorSchemaMigrationService>();
         await courseInstructorMigration.EnsureAsync();
+        var coursePartnerMigration = scope.ServiceProvider.GetRequiredService<CoursePartnerSchemaMigrationService>();
+        await coursePartnerMigration.EnsureAsync();
         var registrationNameMigration = scope.ServiceProvider.GetRequiredService<RegistrationNameSchemaMigrationService>();
         await registrationNameMigration.EnsureAsync();
         var invoiceMigration = scope.ServiceProvider.GetRequiredService<InvoiceSchemaMigrationService>();

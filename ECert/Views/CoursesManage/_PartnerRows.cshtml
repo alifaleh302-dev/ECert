@@ -1,0 +1,41 @@
+@model ECert.Models.Course
+@using System.Text.Json
+@*
+    Repeater for a course's supporting organisations. Each row carries a name plus an optional
+    logo and signature. The row index binds the uploads, so a rename or reorder never attaches
+    artwork to the wrong organisation. Rows are rendered by wwwroot/js/course-partners.js.
+*@
+@{
+    // Prefer saved artwork from the database, but keep any names the user just typed when the form
+    // is re-rendered after a validation error (uploaded files cannot be replayed).
+    var saved = (Model.Partners ?? new List<CoursePartner>())
+        .OrderBy(p => p.SortOrder).ThenBy(p => p.CoursePartnerId).ToList();
+    var typed = Model.PartnerRows ?? new List<CoursePartnerFormRow>();
+    var count = Math.Max(saved.Count, typed.Count);
+    var seed = new List<object>();
+    for (var i = 0; i < count; i++)
+    {
+        var partner = i < saved.Count ? saved[i] : null;
+        var name = i < typed.Count && !string.IsNullOrWhiteSpace(typed[i].Name)
+            ? typed[i].Name
+            : partner?.Name ?? string.Empty;
+        seed.Add(new
+        {
+            name,
+            logoUrl = partner?.LogoUrl,
+            signatureUrl = partner?.SignatureUrl
+        });
+    }
+}
+<div class="a-field a-field--full">
+    <label class="a-label">الجهات الداعمة</label>
+    <span class="a-hint">
+        أضف جهة داعمة لكل شعار وتوقيع تريد ظهوره على الشهادة. ترتيب الجهات هنا هو نفسه ترتيب عناصر
+        «شعار الشريك» و«توقيع الشريك» في مصمم الشهادات (الجهة الأولى ← العنصر رقم 1).
+    </span>
+    <div id="partnerRows" class="d-flex flex-column gap-3 mt-2"></div>
+    <button type="button" id="addPartnerRow" class="btn btn-outline-secondary btn-sm mt-2">
+        <i class="bi bi-plus-lg"></i> إضافة جهة داعمة
+    </button>
+</div>
+<script type="application/json" id="partnerRowsData">@Html.Raw(JsonSerializer.Serialize(seed))</script>

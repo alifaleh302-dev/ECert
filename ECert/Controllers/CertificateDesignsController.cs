@@ -15,11 +15,42 @@ public class CertificateDesignsController : Controller
 {
     private readonly ECertDbContext _db;
     private readonly AuditLogService _audit;
+    private readonly IWebHostEnvironment _env;
 
-    public CertificateDesignsController(ECertDbContext db, AuditLogService audit)
+    public CertificateDesignsController(ECertDbContext db, AuditLogService audit, IWebHostEnvironment env)
     {
         _db = db;
         _audit = audit;
+        _env = env;
+    }
+
+    /// <summary>
+    /// Stores the uploaded template background under wwwroot/uploads/designs and returns its
+    /// public path, or an error when the file is not a valid raster image.
+    /// </summary>
+    private async Task<(string? Path, string? Error)> SaveBackgroundImageAsync(IFormFile? image)
+    {
+        if (image == null || image.Length == 0) return (null, null);
+
+        var (valid, error) = await ImageUploadValidator.ValidateAsync(image);
+        if (!valid) return (null, error);
+
+        var uploadsDir = Path.Combine(_env.WebRootPath, "uploads", "designs");
+        Directory.CreateDirectory(uploadsDir);
+        var fileName = $"{Guid.NewGuid()}{Path.GetExtension(image.FileName)}";
+        using var stream = new FileStream(Path.Combine(uploadsDir, fileName), FileMode.Create);
+        await image.CopyToAsync(stream);
+        return ($"/uploads/designs/{fileName}", null);
+    }
+
+    private void DeleteBackgroundImage(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url) || !url.StartsWith("/uploads/designs/", StringComparison.Ordinal))
+            return;
+
+        var path = Path.Combine(_env.WebRootPath, url.TrimStart('/'));
+        if (System.IO.File.Exists(path))
+            System.IO.File.Delete(path);
     }
 
     private async Task<bool> CanManageAsync()
@@ -86,7 +117,7 @@ public class CertificateDesignsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Save(CertificateDesignEditorPostModel model)
+    public async Task<IActionResult> Save(CertificateDesignEditorPostModel model, IFormFile? backgroundImage)
     {
         if (!await CanManageAsync()) return Forbid();
 
@@ -105,6 +136,13 @@ public class CertificateDesignsController : Controller
 
         if (model.CertificateDesignId > 0 && current == null)
             return NotFound();
+
+        var (newBackground, backgroundError) = await SaveBackgroundImageAsync(backgroundImage);
+        if (backgroundError != null)
+        {
+            TempData["Error"] = backgroundError;
+            return RedirectToAction(nameof(Index), new { id = model.CertificateDesignId > 0 ? model.CertificateDesignId : (int?)null });
+        }
 
         var saveAsDraft = !model.Publish && current?.IsPublished == true;
         CertificateDesign design;
@@ -138,6 +176,24 @@ public class CertificateDesignsController : Controller
         design.BorderColor = CertificateDesignService.NormalizeColor(model.BorderColor, "#c9a227");
         design.BorderWidth = Math.Clamp(model.BorderWidth, 0, 24);
         design.BorderRadius = Math.Clamp(model.BorderRadius, 0, 80);
+
+        if (newBackground != null)
+        {
+            if (design.CertificateDesignId > 0)
+                DeleteBackgroundImage(current?.BackgroundImageUrl);
+            design.BackgroundImageUrl = newBackground;
+        }
+        else if (model.RemoveBackgroundImage)
+        {
+            DeleteBackgroundImage(current?.BackgroundImageUrl);
+            design.BackgroundImageUrl = null;
+        }
+        else if (design.CertificateDesignId == 0)
+        {
+            // A brand-new draft copy inherits the published artwork so it still renders.
+            design.BackgroundImageUrl = current?.BackgroundImageUrl;
+        }
+
         design.UpdatedBy = TrimTo(User.Identity?.Name, 100, "system");
         design.UpdatedAt = DateTime.Now;
         design.IsPublished = model.Publish;
@@ -219,10 +275,19 @@ public class CertificateDesignsController : Controller
                 return new List<CertificateDesignElement>();
             }
 
+            // Partner elements store their partner slot (0-based) in FieldKey; everything else keeps
+            // the key empty because it carries no dynamic reference.
+            var isPartnerSlot = CertificateDesignService.PartnerSlotElementTypes.Contains(type);
+            var normalizedFieldKey = type == "field"
+                ? fieldKey
+                : isPartnerSlot
+                    ? CertificateDesignService.ParsePartnerSlot(fieldKey).ToString()
+                    : string.Empty;
+
             var element = new CertificateDesignElement
             {
                 ElementType = type,
-                FieldKey = type == "field" ? fieldKey : string.Empty,
+                FieldKey = normalizedFieldKey,
                 Content = TrimTo(payload.Content, 1000, string.Empty),
                 X = Math.Clamp(payload.X, 0, canvasWidth - 20),
                 Y = Math.Clamp(payload.Y, 0, canvasHeight - 20),

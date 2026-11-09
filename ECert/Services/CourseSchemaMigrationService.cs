@@ -20,6 +20,8 @@ public sealed class CourseSchemaMigrationService
     {
         await EnsureColumnAsync("TotalSeats", "INT NOT NULL DEFAULT 0");
         await EnsureColumnAsync("BookedSeats", "INT NOT NULL DEFAULT 0");
+        await EnsureColumnAsync("PartnerName", "VARCHAR(150) NULL");
+        await EnsureColumnAsync("PartnerLogoUrl", "VARCHAR(400) NULL");
     }
 
     private async Task EnsureColumnAsync(string columnName, string definitionSql)

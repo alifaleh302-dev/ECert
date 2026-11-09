@@ -81,6 +81,7 @@
                         </select>
                         <span class="a-hint">يمكن تخصيص قالب مستقل لهذه الدورة. عند تركه فارغاً سيُستخدم القالب العام المنشور.</span>
                     </div>
+                    <partial name="_PartnerRows" model="Model" />
                     <div class="a-field a-field--full">
                         <label class="a-label" for="instructorSearch">المدربون</label>
                         <div class="search-select">
@@ -294,4 +295,5 @@ function previewImage(input, previewId) {
     } else { preview.hidden = true; }
 }
 </script>
+<script src="~/js/course-partners.js" asp-append-version="true"></script>
 }

@@ -3,9 +3,16 @@
 
 @{
     ViewData["Title"] = "نتيجة التحقق";
-    var headingClass = Model.IsValid ? "text-success" : Model.CertificateFound ? "text-warning" : "text-danger";
-    var iconClass = Model.IsValid ? "bi-check-circle-fill" : Model.CertificateFound ? "bi-exclamation-triangle-fill" : "bi-x-circle-fill";
-    var statusClass = Model.IsValid ? "text-bg-success" : Model.CertificateFound ? "text-bg-warning" : "text-bg-danger";
+    var state = Model.IsValid ? "ok" : Model.CertificateFound ? "warn" : "bad";
+    var iconClass = Model.IsValid ? "bi-patch-check-fill" : Model.CertificateFound ? "bi-exclamation-triangle-fill" : "bi-x-circle-fill";
+    var statusTitle = Model.IsValid
+        ? "شهادة سارية وموثّقة"
+        : Model.CertificateFound
+            ? "الشهادة غير قابلة للاعتماد"
+            : "تعذّر العثور على الشهادة";
+    var statusDesc = Model.CertificateFound
+        ? Model.Message
+        : "تأكد من كتابة رقم الشهادة أو رمز التحقق بشكل صحيح، ثم أعد المحاولة.";
 
     string Percentage(int value, int total)
         => $"{(value * 100d / Math.Max(total, 1)).ToString("0.###", CultureInfo.InvariantCulture)}%";
@@ -14,124 +21,155 @@
         => $"{(value * 100d / Math.Max(Model.DesignCanvasWidth, 1)).ToString("0.###", CultureInfo.InvariantCulture)}cqw";
 }
 
-<style>
-    .verify-shell { max-width: 1180px; margin-inline: auto; }
-    .verify-status { border-radius: 18px; border: 1px solid rgba(15, 23, 42, .08); box-shadow: 0 10px 28px rgba(15, 23, 42, .06); }
-    .certificate-viewport { overflow: hidden; border-radius: 18px; background: #e8edf4; padding: clamp(.55rem, 1.2vw, 1rem); box-shadow: 0 18px 44px rgba(15, 23, 42, .15); }
-    .certificate-design { position: relative; width: 100%; aspect-ratio: var(--certificate-ratio); container-type: inline-size; overflow: hidden; isolation: isolate; box-shadow: 0 3px 14px rgba(15, 23, 42, .14); }
-    .certificate-design__element { position: absolute; display: flex; align-items: center; overflow-wrap: anywhere; white-space: pre-wrap; line-height: 1.35; }
-    .certificate-design__element--divider { border-top: max(1px, .16cqw) solid currentColor; height: 0 !important; align-items: unset; }
-    .certificate-design__watermark { position: absolute; inset: auto 2.8% 3% auto; z-index: 50; display: inline-flex; align-items: center; gap: .35rem; padding: .3rem .55rem; border-radius: 999px; font-size: clamp(.62rem, 1.6cqw, .82rem); font-weight: 700; color: #166534; background: rgba(240, 253, 244, .88); border: 1px solid rgba(22, 101, 52, .24); backdrop-filter: blur(4px); }
-    .certificate-design__watermark.is-not-valid { color: #9a3412; background: rgba(255, 247, 237, .9); border-color: rgba(154, 52, 18, .24); }
-    .certificate-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .65rem; }
-    .certificate-fallback { max-width: 680px; margin-inline: auto; }
-    @@media (max-width: 575.98px) {
-        .verify-shell { padding-inline: .15rem; }
-        .verify-status .card-body { padding: 1rem !important; }
-        .certificate-viewport { border-radius: 13px; padding: .42rem; }
-        .certificate-actions .btn { flex: 1 1 auto; }
-    }
-    @@media print {
-        .site-header, .site-footer, .verify-status, .certificate-actions, .verify-back { display: none !important; }
-        .certificate-viewport { padding: 0; overflow: visible; box-shadow: none; background: transparent; }
-        .certificate-design { box-shadow: none; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-        .certificate-design__watermark { display: none; }
-    }
-</style>
+@section Styles {
+    <link href="~/css/certificate-verify.css" rel="stylesheet" asp-append-version="true" />
+}
 
-<div class="verify-shell py-4 py-md-5">
+<div class="cv-page py-4 py-md-5">
+    <header class="cv-head">
+        <div>
+            <h1 class="cv-head__title">نتيجة التحقق من الشهادة</h1>
+            <p class="cv-head__sub">عرض عام للبيانات الأساسية اللازمة للتحقق من صحة الشهادة.</p>
+        </div>
+        <a asp-action="Verify" class="cv-back"><i class="bi bi-arrow-right"></i> تحقق من شهادة أخرى</a>
+    </header>
+
     @if (Model.CertificateFound && Model.HasPublishedDesign)
     {
-        <section class="verify-status card border-0 mb-3" aria-live="polite">
-            <div class="card-body py-3 px-3 px-md-4 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
-                <div class="d-flex align-items-center gap-2">
-                    <i class="bi @iconClass @headingClass fs-4" aria-hidden="true"></i>
-                    <div>
-                        <strong class="@headingClass">@(Model.IsValid ? "شهادة موثّقة" : "تنبيه حول حالة الشهادة")</strong>
-                        <span class="text-muted d-block d-sm-inline ms-sm-2 small">@Model.Message</span>
-                    </div>
-                </div>
-                <span class="badge @statusClass align-self-start align-self-md-auto">@Model.Status</span>
-            </div>
-        </section>
-
-        <section class="certificate-viewport" aria-label="الشهادة الرقمية للمتدرب">
-            <div class="certificate-design"
-                 style="--certificate-ratio: @Model.DesignCanvasWidth / @Model.DesignCanvasHeight; background-color: @Model.DesignBackgroundColor; border: @Model.DesignBorderWidth.ToString(CultureInfo.InvariantCulture)px solid @Model.DesignBorderColor; border-radius: @Model.DesignBorderRadius.ToString(CultureInfo.InvariantCulture)px;">
-                @foreach (var element in Model.DesignElements)
-                {
-                    var isDivider = string.Equals(element.ElementType, "divider", StringComparison.OrdinalIgnoreCase);
-                    var isQr = string.Equals(element.ElementType, "qr", StringComparison.OrdinalIgnoreCase);
-                    var isBarcode = string.Equals(element.ElementType, "barcode", StringComparison.OrdinalIgnoreCase);
-                    var isImage = isQr || isBarcode;
-                    var style = $"left:{Percentage(element.X, Model.DesignCanvasWidth)};top:{Percentage(element.Y, Model.DesignCanvasHeight)};width:{Percentage(element.Width, Model.DesignCanvasWidth)};height:{Percentage(element.Height, Model.DesignCanvasHeight)};z-index:{element.ZIndex};color:{element.FontColor};font-family:'{element.FontFamily}',sans-serif;font-size:{FontSize(element.FontSize)};font-weight:{element.FontWeight};text-align:{element.TextAlign};justify-content:{(element.TextAlign == "right" ? "flex-start" : element.TextAlign == "left" ? "flex-end" : "center")};transform:rotate({element.Rotation}deg);transform-origin:center;";
-                    <div class="certificate-design__element @(isDivider ? "certificate-design__element--divider" : string.Empty)" style="@style">
-                        @if (isImage)
-                        {
-                            <img src="@element.ImageSrc" alt="@(isQr ? "رمز التحقق (QR)" : "باركود الشهادة")" style="width:100%;height:100%;object-fit:contain;" />
-                        }
-                        else if (!isDivider)
-                        {
-                            @element.Content
-                        }
-                    </div>
-                }
-                <div class="certificate-design__watermark @(Model.IsValid ? string.Empty : "is-not-valid")">
-                    <i class="bi @(Model.IsValid ? "bi-patch-check-fill" : "bi-exclamation-triangle-fill")" aria-hidden="true"></i>
-                    @(Model.IsValid ? "متحقق منها رقمياً" : "تحقق من حالة الشهادة")
+        <section class="cv-status cv-status--@state" aria-live="polite">
+            <span class="cv-status__mark"><i class="bi @iconClass" aria-hidden="true"></i></span>
+            <div class="cv-status__text">
+                <p class="cv-status__title">@statusTitle</p>
+                <p class="cv-status__desc">@statusDesc</p>
+                <div class="cv-status__meta">
+                    <span class="cv-chip"><i class="bi bi-hash"></i><span class="cv-code">@Model.CertificateNumber</span></span>
+                    <span class="cv-chip"><i class="bi bi-calendar3"></i> @Model.IssueDate?.ToString("yyyy-MM-dd")</span>
+                    <span class="cv-chip"><i class="bi bi-info-circle"></i> @Model.Status</span>
                 </div>
             </div>
         </section>
 
-        <div class="certificate-actions mt-3">
-            <a asp-action="Verify" class="btn btn-outline-primary"><i class="bi bi-search"></i> تحقق من شهادة أخرى</a>
+        <section class="cv-stage" aria-label="الشهادة الرقمية للمتدرب">
+            <div class="cv-stage__frame">
+                <div class="cv-paper"
+                     style="--certificate-ratio: @Model.DesignCanvasWidth / @Model.DesignCanvasHeight; background-color: @Model.DesignBackgroundColor; border: @Model.DesignBorderWidth.ToString(CultureInfo.InvariantCulture)px solid @Model.DesignBorderColor; border-radius: @Model.DesignBorderRadius.ToString(CultureInfo.InvariantCulture)px;">
+                    @if (!string.IsNullOrWhiteSpace(Model.DesignBackgroundImageUrl))
+                    {
+                        <img class="cv-paper__bg" src="@SafeUrl.ForAttribute(Model.DesignBackgroundImageUrl, "#")" alt="" aria-hidden="true" />
+                    }
+                    @foreach (var element in Model.DesignElements)
+                    {
+                        var isDivider = string.Equals(element.ElementType, "divider", StringComparison.OrdinalIgnoreCase);
+                        var isQr = string.Equals(element.ElementType, "qr", StringComparison.OrdinalIgnoreCase);
+                        var isBarcode = string.Equals(element.ElementType, "barcode", StringComparison.OrdinalIgnoreCase);
+                        var isPartnerLogo = string.Equals(element.ElementType, "partner_logo", StringComparison.OrdinalIgnoreCase);
+                        var isPartnerSignature = string.Equals(element.ElementType, "partner_signature", StringComparison.OrdinalIgnoreCase);
+                        var isInstructorSignature = string.Equals(element.ElementType, "instructor_signature", StringComparison.OrdinalIgnoreCase);
+                        var isSignature = isPartnerSignature || isInstructorSignature;
+                        // Artwork elements render nothing when the course has nothing to place.
+                        if ((isPartnerLogo || isSignature) && string.IsNullOrWhiteSpace(element.ImageSrc))
+                        {
+                            continue;
+                        }
+                        var isImage = isQr || isBarcode || isPartnerLogo || isSignature;
+                        var imageAlt = isQr ? "رمز التحقق (QR)" : isBarcode ? "باركود الشهادة" : isPartnerLogo ? "شعار الجهة الداعمة" : isPartnerSignature ? "توقيع الجهة الداعمة" : "توقيع المدرب";
+                        // QR/barcode pixels are generated server-side (data: URIs), so they bypass the
+                        // URL guard; logo and signature paths are admin-supplied and must be sanitised.
+                        var imageSrc = isQr || isBarcode ? element.ImageSrc : SafeUrl.ForAttribute(element.ImageSrc, "#");
+                        var style = $"left:{Percentage(element.X, Model.DesignCanvasWidth)};top:{Percentage(element.Y, Model.DesignCanvasHeight)};width:{Percentage(element.Width, Model.DesignCanvasWidth)};height:{Percentage(element.Height, Model.DesignCanvasHeight)};z-index:{element.ZIndex};color:{element.FontColor};font-family:'{element.FontFamily}',sans-serif;font-size:{FontSize(element.FontSize)};font-weight:{element.FontWeight};text-align:{element.TextAlign};justify-content:{(element.TextAlign == "right" ? "flex-start" : element.TextAlign == "left" ? "flex-end" : "center")};transform:rotate({element.Rotation}deg);transform-origin:center;";
+                        <div class="cv-el @(isDivider ? "cv-el--divider" : string.Empty)" style="@style">
+                            @if (isImage)
+                            {
+                                <img src="@imageSrc" alt="@imageAlt" style="width:100%;height:100%;object-fit:contain;" />
+                            }
+                            else if (!isDivider)
+                            {
+                                @element.Content
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="cv-strip">
+                <span class="cv-strip__item"><span class="cv-dot cv-dot--@state"></span> حالة الشهادة: <strong>@Model.Status</strong></span>
+                <span class="cv-strip__item"><i class="bi bi-shield-check"></i> وثيقة صادرة عن الجهة المصدرة، وتُعرض هنا بغرض التحقق.</span>
+            </div>
+        </section>
+
+        <section class="cv-details" aria-label="بيانات الشهادة">
+            <div class="cv-details__head"><i class="bi bi-card-text"></i> بيانات الشهادة</div>
+            <div class="cv-details__grid">
+                <div class="cv-field">
+                    <span class="cv-field__label">رقم الشهادة</span>
+                    <span class="cv-field__value cv-code">@Model.CertificateNumber</span>
+                </div>
+                <div class="cv-field">
+                    <span class="cv-field__label">اسم المتدرب</span>
+                    <span class="cv-field__value">@(Model.TraineeNameArabic ?? Model.TraineeName)</span>
+                </div>
+                <div class="cv-field">
+                    <span class="cv-field__label">الاسم بالإنجليزية</span>
+                    <span class="cv-field__value" dir="ltr">@(Model.TraineeNameEnglish ?? Model.TraineeName)</span>
+                </div>
+                <div class="cv-field">
+                    <span class="cv-field__label">الدورة</span>
+                    <span class="cv-field__value">@Model.CourseNameArabic<span class="cv-sub" dir="ltr">@Model.CourseNameEnglish</span></span>
+                </div>
+                <div class="cv-field">
+                    <span class="cv-field__label">تاريخ الإصدار</span>
+                    <span class="cv-field__value">@Model.IssueDate?.ToString("yyyy-MM-dd")</span>
+                </div>
+                <div class="cv-field">
+                    <span class="cv-field__label">الحالة</span>
+                    <span class="cv-field__value">@Model.Status</span>
+                </div>
+            </div>
+        </section>
+
+        <div class="cv-actions">
+            <button type="button" class="btn btn-outline-primary" onclick="window.print()"><i class="bi bi-printer"></i> طباعة الشهادة</button>
+            <a asp-action="Verify" class="btn btn-primary"><i class="bi bi-search"></i> تحقق من شهادة أخرى</a>
         </div>
     }
     else
     {
-        <div class="card shadow-sm border-0 certificate-fallback">
-            <div class="card-body p-4 p-md-5 text-center">
-                <div class="mb-3 @headingClass" style="font-size:4rem;" aria-hidden="true"><i class="bi @iconClass"></i></div>
+        <div class="cv-empty">
+            <div class="cv-empty__mark cv-empty__mark--@state" aria-hidden="true"><i class="bi @iconClass"></i></div>
+            <h2 class="cv-empty__title">@statusTitle</h2>
+            <p class="cv-empty__text">@statusDesc</p>
 
-                @if (Model.IsValid)
-                {
-                    <h3 class="@headingClass mb-2">تم التحقق من الشهادة</h3>
-                    <p class="text-muted mb-4">الشهادة موجودة وحالتها سارية. تظهر هنا البيانات العامة اللازمة للتحقق فقط.</p>
-                }
-                else if (Model.CertificateFound)
-                {
-                    <h3 class="@headingClass mb-2">الشهادة غير قابلة للاعتماد</h3>
-                    <p class="text-muted mb-4">@Model.Message</p>
-                }
-                else
-                {
-                    <h3 class="@headingClass mb-3">تعذر التحقق من الشهادة</h3>
-                    <p class="text-muted mb-2">@Model.Message</p>
-                    @if (!string.IsNullOrWhiteSpace(Model.SearchCode))
-                    {
-                        <p class="small text-muted mb-0">المدخل الذي تم التحقق منه: <code>@Model.SearchCode</code></p>
-                    }
-                }
-
-                @if (Model.CertificateFound)
-                {
-                    <div class="table-responsive text-start">
-                        <table class="table table-borderless align-middle mb-0">
-                            <caption class="visually-hidden">بيانات الشهادة ونتيجة حالتها</caption>
-                            <tbody>
-                                <tr><th scope="row" class="w-50">رقم الشهادة</th><td><code>@Model.CertificateNumber</code></td></tr>
-                                <tr><th scope="row">اسم المتدرب بالعربية</th><td>@(Model.TraineeNameArabic ?? Model.TraineeName)</td></tr>
-                                <tr><th scope="row">اسم المتدرب بالإنجليزية</th><td dir="ltr">@(Model.TraineeNameEnglish ?? Model.TraineeName)</td></tr>
-                                <tr><th scope="row">الدورة</th><td><span dir="ltr">@Model.CourseNameEnglish</span><span class="d-block text-muted">@Model.CourseNameArabic</span></td></tr>
-                                <tr><th scope="row">تاريخ الإصدار</th><td>@Model.IssueDate?.ToString("yyyy-MM-dd")</td></tr>
-                                <tr><th scope="row">الحالة</th><td><span class="badge @statusClass">@Model.Status</span></td></tr>
-                            </tbody>
-                        </table>
+            @if (Model.CertificateFound)
+            {
+                <div class="cv-details">
+                    <div class="cv-details__head"><i class="bi bi-card-text"></i> بيانات الشهادة</div>
+                    <div class="cv-details__grid">
+                        <div class="cv-field">
+                            <span class="cv-field__label">رقم الشهادة</span>
+                            <span class="cv-field__value cv-code">@Model.CertificateNumber</span>
+                        </div>
+                        <div class="cv-field">
+                            <span class="cv-field__label">اسم المتدرب</span>
+                            <span class="cv-field__value">@(Model.TraineeNameArabic ?? Model.TraineeName)</span>
+                        </div>
+                        <div class="cv-field">
+                            <span class="cv-field__label">الدورة</span>
+                            <span class="cv-field__value">@Model.CourseNameArabic<span class="cv-sub" dir="ltr">@Model.CourseNameEnglish</span></span>
+                        </div>
+                        <div class="cv-field">
+                            <span class="cv-field__label">الحالة</span>
+                            <span class="cv-field__value">@Model.Status</span>
+                        </div>
                     </div>
-                }
+                </div>
+            }
+            else if (!string.IsNullOrWhiteSpace(Model.SearchCode))
+            {
+                <p class="cv-empty__entered">المدخل الذي تم التحقق منه: <span class="cv-code">@Model.SearchCode</span></p>
+            }
 
-                <hr class="my-4" />
-                <a asp-action="Verify" class="btn btn-outline-primary verify-back"><i class="bi bi-search"></i> تحقق من شهادة أخرى</a>
+            <div class="cv-actions">
+                <a asp-action="Verify" class="btn btn-primary"><i class="bi bi-search"></i> تحقق من شهادة أخرى</a>
             </div>
         </div>
     }

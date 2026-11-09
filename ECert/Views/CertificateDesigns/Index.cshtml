@@ -119,6 +119,9 @@
                     <button type="button" class="ped-add-btn" id="addDividerBtn"><i class="bi bi-dash-lg"></i> فاصل</button>
                     <button type="button" class="ped-add-btn" id="addQrBtn"><i class="bi bi-qr-code"></i> رمز QR</button>
                     <button type="button" class="ped-add-btn" id="addBarcodeBtn"><i class="bi bi-upc-scan"></i> باركود</button>
+                    <button type="button" class="ped-add-btn" id="addPartnerLogoBtn"><i class="bi bi-building"></i> شعار الشريك</button>
+                    <button type="button" class="ped-add-btn" id="addPartnerSignatureBtn"><i class="bi bi-vector-pen"></i> توقيع الشريك</button>
+                    <button type="button" class="ped-add-btn" id="addSignatureBtn"><i class="bi bi-person-check"></i> توقيع المدرب</button>
                 </div>
                 <div class="ped-group-title">حقول ديناميكية (تتعبأ تلقائياً عند التحقق)</div>
                 @foreach (var group in fieldGroups)
@@ -177,6 +180,15 @@
                     </div>
                 </div>
                 <div class="ped-prop">
+                    <label>صورة القالب (خلفية مرفوعة)</label>
+                    <input type="file" class="ped-input" id="backgroundImageInput" name="backgroundImage" form="templateForm" accept="image/png,image/jpeg,image/webp" />
+                    <div class="ped-help mt-1">تُرسم خلف العناصر. الصيغ: PNG أو JPG أو WEBP وبحد أقصى 5 ميغابايت.</div>
+                    <div id="backgroundPreviewWrap" class="mt-2" style="display:none;">
+                        <img id="backgroundPreview" alt="معاينة خلفية القالب" style="width:100%;border-radius:8px;border:1px solid var(--ped-line);" />
+                        <button type="button" class="ped-btn-ghost mt-1" id="removeBackgroundBtn" style="width:100%;justify-content:center;"><i class="bi bi-trash3"></i><span class="txt">إزالة الصورة</span></button>
+                    </div>
+                </div>
+                <div class="ped-prop">
                     <label for="borderColor">لون الإطار</label>
                     <div class="ped-color-row">
                         <input type="color" class="ped-color-input" id="borderColor" value="@Model.Design.BorderColor" />
@@ -218,6 +230,11 @@
                             </optgroup>
                         }
                     </select>
+                </div>
+                <div class="ped-prop d-none" id="partnerSlotWrap">
+                    <label for="selectedPartnerSlot">ترتيب الجهة الداعمة</label>
+                    <select class="ped-select" id="selectedPartnerSlot"></select>
+                    <div class="ped-help mt-1">يربط هذا العنصر بجهة داعمة محددة حسب ترتيبها في صفحة الدورة. أضف عنصراً لكل جهة لعرض عدة جهات.</div>
                 </div>
                 <div class="ped-prop d-none" id="barcodeWrap">
                     <label for="selectedBarcodeSource">محتوى الباركود</label>
@@ -279,7 +296,7 @@
     </div>
 
     <!-- form -->
-    <form id="templateForm" asp-action="Save" method="post" class="d-none">
+    <form id="templateForm" asp-action="Save" method="post" enctype="multipart/form-data" class="d-none">
         @Html.AntiForgeryToken()
         <input type="hidden" name="CertificateDesignId" value="@Model.Design.CertificateDesignId" />
         <input type="hidden" name="CanvasWidth" id="hfCanvasWidth" value="@Model.Design.CanvasWidth" />
@@ -288,6 +305,7 @@
         <input type="hidden" name="BorderColor" id="hfBorderColor" value="@Model.Design.BorderColor" />
         <input type="hidden" name="BorderWidth" id="hfBorderWidth" value="@Model.Design.BorderWidth" />
         <input type="hidden" name="BorderRadius" id="hfBorderRadius" value="@Model.Design.BorderRadius" />
+        <input type="hidden" name="RemoveBackgroundImage" id="hfRemoveBackground" value="false" />
         <input type="hidden" name="Publish" id="publishInput" value="false" />
         <input type="hidden" name="ElementsJson" id="elementsJson" />
     </form>
@@ -322,6 +340,7 @@
     let gridOn = true;
     let snapOn = true;
     let previewMode = false;
+    let backgroundImageUrl = @Html.Raw(JsonSerializer.Serialize(Model.Design.BackgroundImageUrl));
     let elements = @Html.Raw(templateJson);
     if (!Array.isArray(elements)) elements = [];
 
@@ -350,7 +369,7 @@
     let history = [];
     let historyIndex = -1;
     const MAX_HISTORY = 60;
-    function snapshot() { return JSON.stringify({ canvasW, canvasH, cProps, elements }); }
+    function snapshot() { return JSON.stringify({ canvasW, canvasH, cProps, elements, backgroundImageUrl }); }
     function pushHistory() {
         const snap = snapshot();
         history = history.slice(0, historyIndex + 1);
@@ -364,6 +383,7 @@
     function restore(snap) {
         const s = JSON.parse(snap);
         canvasW = s.canvasW; canvasH = s.canvasH; cProps = s.cProps; elements = s.elements;
+        backgroundImageUrl = s.backgroundImageUrl || null;
         selected = -1;
         syncCanvasInputs();
         render();
@@ -382,11 +402,21 @@
     // ---------- Helpers ----------
     const $ = id => document.getElementById(id);
     const clamp = (n, min, max) => Math.max(min, Math.min(max, Number(n) || 0));
+    const isPartnerSlot = type => type === 'partner_logo' || type === 'partner_signature';
+    function slotOf(el) {
+        if (el.elementType === 'instructor_signature') return -1;
+        const n = parseInt(el.fieldKey, 10);
+        return Number.isFinite(n) && n >= 0 ? n : 0;
+    }
     function scale() { const r = canvasEl.getBoundingClientRect(); return r.width / canvasW; }
     function contentFor(el) {
         if (el.elementType === 'field') return sampleValues[el.fieldKey] || 'بيان ديناميكي';
         if (el.elementType === 'divider') return '';
         if (el.elementType === 'qr') return '';
+        // Artwork placeholders are drawn by CSS, so keep the node text empty.
+        if (el.elementType === 'partner_logo') return '';
+        if (el.elementType === 'partner_signature') return '';
+        if (el.elementType === 'instructor_signature') return '';
         if (el.elementType === 'barcode') return sampleValues[el.fieldKey] || 'EC-2026-0042';
         return el.content || 'نص جديد';
     }
@@ -394,6 +424,9 @@
         if (el.elementType === 'field') return FIELD_LABELS[el.fieldKey] || el.fieldKey || 'بيان';
         if (el.elementType === 'divider') return 'فاصل بصري';
         if (el.elementType === 'qr') return 'رمز QR للتحقق';
+        if (el.elementType === 'partner_logo') return 'شعار الجهة الداعمة #' + (slotOf(el) + 1);
+        if (el.elementType === 'partner_signature') return 'توقيع الجهة الداعمة #' + (slotOf(el) + 1);
+        if (el.elementType === 'instructor_signature') return 'توقيع المدرب';
         if (el.elementType === 'barcode') return 'باركود: ' + (BARCODE_LABELS[el.fieldKey] || 'رقم الشهادة');
         return (el.content || 'نص').replace(/\s+/g, ' ').slice(0, 22);
     }
@@ -413,6 +446,10 @@
             s.justifyContent = 'center';
             s.fontFamily = "'Courier New', monospace";
             s.letterSpacing = '2px';
+        } else if (el.elementType === 'partner_logo' || el.elementType === 'partner_signature' || el.elementType === 'instructor_signature') {
+            s.justifyContent = 'center';
+            s.fontSize = Math.max(20, Math.min(el.width, el.height) * 0.5) + 'px';
+            s.color = el.fontColor || '#94a3b8';
         } else {
             s.textAlign = el.textAlign || 'center';
             s.justifyContent = (el.textAlign === 'right') ? 'flex-start' : (el.textAlign === 'left') ? 'flex-end' : 'center';
@@ -467,6 +504,22 @@
         canvasEl.style.borderRadius = cProps.borderRadius + 'px';
         stageEl.style.width = (canvasW * zoom) + 'px';
         stageEl.style.height = (canvasH * zoom) + 'px';
+
+        if (backgroundImageUrl) {
+            const bg = document.createElement('img');
+            bg.className = 'ped-bg-image';
+            bg.src = backgroundImageUrl;
+            bg.alt = '';
+            bg.style.position = 'absolute';
+            bg.style.inset = '0';
+            bg.style.width = '100%';
+            bg.style.height = '100%';
+            bg.style.objectFit = 'fill';
+            bg.style.zIndex = '0';
+            bg.style.pointerEvents = 'none';
+            canvasEl.appendChild(bg);
+        }
+
         const grid = document.createElement('div');
         grid.className = 'ped-grid';
         grid.style.backgroundSize = (28 * zoom) + 'px ' + (28 * zoom) + 'px';
@@ -480,7 +533,7 @@
         const ordered = elements.map((el, i) => ({ el, i })).filter(o => o.el.isVisible);
         for (const o of ordered) {
             const node = document.createElement('div');
-            node.className = 'ped-el' + (o.el.elementType === 'divider' ? ' el-divider' : '') + (o.el.elementType === 'qr' ? ' el-qr' : '') + (o.el.elementType === 'barcode' ? ' el-barcode' : '');
+            node.className = 'ped-el' + (o.el.elementType === 'divider' ? ' el-divider' : '') + (o.el.elementType === 'qr' ? ' el-qr' : '') + (o.el.elementType === 'barcode' ? ' el-barcode' : '') + (o.el.elementType === 'partner_logo' ? ' el-partner-logo' : '') + (o.el.elementType === 'partner_signature' ? ' el-partner-signature' : '') + (o.el.elementType === 'instructor_signature' ? ' el-signature' : '');
             node.dataset.index = o.i;
             Object.assign(node.style, styleFor(o.el));
             node.textContent = contentFor(o.el);
@@ -668,11 +721,19 @@
     function addElement(type, fieldKey) {
         pushHistory();
         const count = elements.length;
-        const w = type === 'divider' ? 420 : (type === 'qr' ? 160 : (type === 'barcode' ? 320 : 560));
-        const h = type === 'divider' ? 4 : (type === 'qr' ? 160 : (type === 'barcode' ? 80 : 58));
+        const isLogo = type === 'partner_logo';
+        const isPartnerSig = type === 'partner_signature';
+        const isSig = type === 'instructor_signature';
+        const w = type === 'divider' ? 420 : (type === 'qr' ? 160 : (type === 'barcode' ? 320 : (isLogo ? 170 : (isPartnerSig ? 240 : (isSig ? 240 : 560)))));
+        const h = type === 'divider' ? 4 : (type === 'qr' ? 160 : (type === 'barcode' ? 80 : (isLogo ? 170 : (isPartnerSig ? 90 : (isSig ? 90 : 58)))));
+        // Each new partner element targets the next free slot so a second click shows a second partner.
+        const usedSlots = elements.filter(e => isPartnerSlot(e.elementType)).map(slotOf);
+        const nextSlot = isPartnerSlot(type) ? (usedSlots.length ? Math.max(...usedSlots) + 1 : 0) : 0;
         const el = {
             elementType: type,
-            fieldKey: type === 'field' ? (fieldKey || 'trainee_name') : (type === 'barcode' ? 'certificate_number' : ''),
+            fieldKey: type === 'field' ? (fieldKey || 'trainee_name')
+                : (type === 'barcode' ? 'certificate_number'
+                    : (isPartnerSlot(type) ? String(nextSlot) : '')),
             content: type === 'text' ? 'نص جديد' : '',
             x: clamp(Math.round((canvasW - w) / 2), 0, canvasW - 20),
             y: clamp(100 + (count % 6) * 82, 0, canvasH - 20),
@@ -774,7 +835,7 @@
             const el = elements[i];
             const row = document.createElement('div');
             row.className = 'ped-layer' + (i === selected ? ' active' : '');
-            const icon = el.elementType === 'field' ? '<i class="bi bi-link-45deg"></i>' : el.elementType === 'divider' ? '<i class="bi bi-dash-lg"></i>' : el.elementType === 'qr' ? '<i class="bi bi-qr-code"></i>' : el.elementType === 'barcode' ? '<i class="bi bi-upc-scan"></i>' : '<i class="bi bi-type"></i>';
+            const icon = el.elementType === 'field' ? '<i class="bi bi-link-45deg"></i>' : el.elementType === 'divider' ? '<i class="bi bi-dash-lg"></i>' : el.elementType === 'qr' ? '<i class="bi bi-qr-code"></i>' : el.elementType === 'barcode' ? '<i class="bi bi-upc-scan"></i>' : el.elementType === 'partner_logo' ? '<i class="bi bi-building"></i>' : el.elementType === 'partner_signature' ? '<i class="bi bi-vector-pen"></i>' : el.elementType === 'instructor_signature' ? '<i class="bi bi-person-check"></i>' : '<i class="bi bi-type"></i>';
             row.innerHTML =
                 '<div class="ly-icon">' + icon + '</div>' +
                 '<div class="ly-name"></div>' +
@@ -809,11 +870,13 @@
             : '<i class="bi bi-sliders2"></i> إعدادات القالب';
         syncCanvasInputs();
         if (!el) return;
-        $('elTypeBadge').textContent = el.elementType === 'field' ? 'بيان ديناميكي' : el.elementType === 'divider' ? 'فاصل بصري' : el.elementType === 'qr' ? 'رمز QR' : el.elementType === 'barcode' ? 'باركود' : 'نص ثابت';
+        $('elTypeBadge').textContent = el.elementType === 'field' ? 'بيان ديناميكي' : el.elementType === 'divider' ? 'فاصل بصري' : el.elementType === 'qr' ? 'رمز QR' : el.elementType === 'barcode' ? 'باركود' : el.elementType === 'partner_logo' ? 'شعار الشريك' : el.elementType === 'partner_signature' ? 'توقيع الشريك' : el.elementType === 'instructor_signature' ? 'توقيع المدرب' : 'نص ثابت';
         $('elIndexLabel').textContent = 'العنصر #' + (selected + 1) + ' من ' + elements.length;
         $('contentWrap').classList.toggle('d-none', el.elementType !== 'text');
         $('fieldWrap').classList.toggle('d-none', el.elementType !== 'field');
         $('barcodeWrap').classList.toggle('d-none', el.elementType !== 'barcode');
+        $('partnerSlotWrap').classList.toggle('d-none', !isPartnerSlot(el.elementType));
+        if (isPartnerSlot(el.elementType)) buildPartnerSlotOptions(el);
         if (el.elementType === 'text') $('selectedContent').value = el.content || '';
         if (el.elementType === 'field') $('selectedFieldKey').value = el.fieldKey || 'trainee_name';
         if (el.elementType === 'barcode') $('selectedBarcodeSource').value = el.fieldKey || 'certificate_number';
@@ -831,6 +894,27 @@
         $('selectedVisible').checked = el.isVisible !== false;
     }
 
+    function buildPartnerSlotOptions(el) {
+        const select = $('selectedPartnerSlot');
+        const count = Math.max(1, elements.filter(e => isPartnerSlot(e.elementType)).length);
+        const current = slotOf(el);
+        select.replaceChildren();
+        for (let i = 0; i < count; i++) {
+            const opt = document.createElement('option');
+            opt.value = String(i);
+            opt.textContent = 'الجهة الداعمة #' + (i + 1);
+            select.appendChild(opt);
+        }
+        // Keep the element's own slot selectable even when it is beyond the current count.
+        if (current >= count) {
+            const opt = document.createElement('option');
+            opt.value = String(current);
+            opt.textContent = 'الجهة الداعمة #' + (current + 1);
+            select.appendChild(opt);
+        }
+        select.value = String(current);
+    }
+
     function syncCanvasInputs() {
         $('canvasWidthInput').value = canvasW;
         $('canvasHeightInput').value = canvasH;
@@ -842,6 +926,19 @@
         $('borderColorHex').textContent = cProps.borderColor.toLowerCase();
         $('borderWidth').value = cProps.borderWidth;
         $('borderRadius').value = cProps.borderRadius;
+        syncBackgroundPreview();
+    }
+
+    function syncBackgroundPreview() {
+        const wrap = $('backgroundPreviewWrap');
+        const img = $('backgroundPreview');
+        if (backgroundImageUrl) {
+            img.src = backgroundImageUrl;
+            wrap.style.display = 'block';
+        } else {
+            img.removeAttribute('src');
+            wrap.style.display = 'none';
+        }
     }
 
     function updateSelected(prop, value, commit) {
@@ -899,6 +996,25 @@
         form.submit();
     }
 
+    // ---------- Background image ----------
+    $('backgroundImageInput').addEventListener('change', e => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        backgroundImageUrl = URL.createObjectURL(file);
+        $('hfRemoveBackground').value = 'false';
+        syncBackgroundPreview();
+        render();
+        pushHistory();
+    });
+    $('removeBackgroundBtn').addEventListener('click', () => {
+        backgroundImageUrl = null;
+        $('backgroundImageInput').value = '';
+        $('hfRemoveBackground').value = 'true';
+        syncBackgroundPreview();
+        render();
+        pushHistory();
+    });
+
     // ---------- Bindings ----------
     $('designsToggle').addEventListener('click', e => {
         e.stopPropagation();
@@ -932,6 +1048,9 @@
     $('addDividerBtn').addEventListener('click', () => addElement('divider'));
     $('addQrBtn').addEventListener('click', () => addElement('qr'));
     $('addBarcodeBtn').addEventListener('click', () => addElement('barcode'));
+    $('addPartnerLogoBtn').addEventListener('click', () => addElement('partner_logo'));
+    $('addPartnerSignatureBtn').addEventListener('click', () => addElement('partner_signature'));
+    $('addSignatureBtn').addEventListener('click', () => addElement('instructor_signature'));
     document.querySelectorAll('.quick-field').forEach(b => b.addEventListener('click', () => addElement('field', b.dataset.field)));
 
     $('saveDraftBtn').addEventListener('click', () => submitForm(false));
@@ -941,6 +1060,7 @@
     $('selectedContent').addEventListener('change', e => updateSelected('content', e.target.value, true));
     $('selectedFieldKey').addEventListener('change', e => { updateSelected('fieldKey', e.target.value, true); refreshPropsPanel(); });
     $('selectedBarcodeSource').addEventListener('change', e => { updateSelected('fieldKey', e.target.value, true); refreshLayers(); });
+    $('selectedPartnerSlot').addEventListener('change', e => { updateSelected('fieldKey', e.target.value, true); refreshLayers(); refreshPropsPanel(); });
     $('selectedFontFamily').addEventListener('change', e => { updateSelected('fontFamily', e.target.value, true); refreshPropsPanel(); });
     $('selectedFontSize').addEventListener('change', e => updateSelected('fontSize', e.target.value, true));
     $('selectedWeight').addEventListener('change', e => updateSelected('fontWeight', e.target.value, true));

@@ -199,6 +199,7 @@ public class PublicCertificateVerificationViewModel
     public string DesignBorderColor { get; set; } = "#c9a227";
     public int DesignBorderWidth { get; set; } = 12;
     public int DesignBorderRadius { get; set; } = 8;
+    public string? DesignBackgroundImageUrl { get; set; }
     public List<PublicCertificateDesignElementViewModel> DesignElements { get; set; } = new();
 }
 
@@ -234,6 +235,8 @@ public class CertificateDesignEditorPostModel
     public string BorderColor { get; set; } = "#c9a227";
     public int BorderWidth { get; set; }
     public int BorderRadius { get; set; }
+    public string? BackgroundImageUrl { get; set; }
+    public bool RemoveBackgroundImage { get; set; }
     public bool Publish { get; set; }
     public string ElementsJson { get; set; } = "[]";
 }

@@ -28,7 +28,18 @@ public sealed class CertificateDesignService
         };
 
     public static readonly IReadOnlySet<string> AllowedElementTypes =
-        new HashSet<string>(new[] { "text", "field", "divider", "qr", "barcode" }, StringComparer.OrdinalIgnoreCase);
+        new HashSet<string>(new[] { "text", "field", "divider", "qr", "barcode", "partner_logo", "partner_signature", "instructor_signature" }, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Element types that render a course partner's artwork. Their <c>FieldKey</c> holds the
+    /// partner slot index (0-based), so one template can show several partners side by side.
+    /// </summary>
+    public static readonly IReadOnlySet<string> PartnerSlotElementTypes =
+        new HashSet<string>(new[] { "partner_logo", "partner_signature" }, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Reads the 0-based partner slot from an element's field key; anything else means slot 0.</summary>
+    public static int ParsePartnerSlot(string? fieldKey)
+        => int.TryParse((fieldKey ?? string.Empty).Trim(), out var slot) && slot >= 0 ? slot : 0;
 
     /// <summary>Field keys a barcode element may encode, with the labels shown in the editor.</summary>
     public static readonly IReadOnlyDictionary<string, string> BarcodeSources =

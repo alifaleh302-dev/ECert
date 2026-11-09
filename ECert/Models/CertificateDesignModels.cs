@@ -27,6 +27,9 @@ public class CertificateDesign
     public int BorderWidth { get; set; } = 12;
     [Range(0, 80)]
     public int BorderRadius { get; set; } = 8;
+    /// <summary>Optional uploaded background image (full-bleed artwork) drawn behind every element.</summary>
+    [StringLength(400)]
+    public string? BackgroundImageUrl { get; set; }
     [StringLength(100)]
     public string? UpdatedBy { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.Now;

@@ -15,6 +15,11 @@ public class Instructor
     [Display(Name = "الصورة")]
     public string? PhotoUrl { get; set; }
 
+    /// <summary>Hand-drawn signature captured on screen; merged into certificates this instructor signs.</summary>
+    [Display(Name = "التوقيع")]
+    [StringLength(400)]
+    public string? SignatureImageUrl { get; set; }
+
     [Display(Name = "السيرة الذاتية")]
     public string? Bio { get; set; }
 
