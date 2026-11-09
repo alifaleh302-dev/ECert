@@ -19,38 +19,47 @@
 
     string FontSize(int value)
         => $"{(value * 100d / Math.Max(Model.DesignCanvasWidth, 1)).ToString("0.###", CultureInfo.InvariantCulture)}cqw";
+
+    var siteName = (ViewBag.SiteSettings as List<ECert.Models.SiteSetting>)
+        ?.FirstOrDefault(s => s.Key == "SiteName")?.Value;
+    if (string.IsNullOrWhiteSpace(siteName)) siteName = "مركز التدريب";
 }
 
 @section Styles {
     <link href="~/css/certificate-verify.css" rel="stylesheet" asp-append-version="true" />
 }
 
-<div class="cv-page py-4 py-md-5">
-    <header class="cv-head">
-        <div>
-            <h1 class="cv-head__title">نتيجة التحقق من الشهادة</h1>
-            <p class="cv-head__sub">عرض عام للبيانات الأساسية اللازمة للتحقق من صحة الشهادة.</p>
+<div class="cv-report">
+    <header class="cv-report__head">
+        <div class="cv-report__brand">
+            <span class="cv-report__seal" aria-hidden="true"><i class="bi bi-patch-check-fill"></i></span>
+            <div>
+                <p class="cv-report__authority">@siteName</p>
+                <h1 class="cv-report__title">تقرير التحقق من الشهادة</h1>
+                <p class="cv-report__sub">Certificate Verification Report</p>
+            </div>
         </div>
-        <a asp-action="Verify" class="cv-back"><i class="bi bi-arrow-right"></i> تحقق من شهادة أخرى</a>
+        <a asp-action="Verify" class="cv-report__back"><i class="bi bi-arrow-right"></i> تحقق من شهادة أخرى</a>
     </header>
 
     @if (Model.CertificateFound && Model.HasPublishedDesign)
     {
-        <section class="cv-status cv-status--@state" aria-live="polite">
-            <span class="cv-status__mark"><i class="bi @iconClass" aria-hidden="true"></i></span>
-            <div class="cv-status__text">
-                <p class="cv-status__title">@statusTitle</p>
-                <p class="cv-status__desc">@statusDesc</p>
-                <div class="cv-status__meta">
-                    <span class="cv-chip"><i class="bi bi-hash"></i><span class="cv-code">@Model.CertificateNumber</span></span>
-                    <span class="cv-chip"><i class="bi bi-calendar3"></i> @Model.IssueDate?.ToString("yyyy-MM-dd")</span>
-                    <span class="cv-chip"><i class="bi bi-info-circle"></i> @Model.Status</span>
-                </div>
+        <section class="cv-verdict cv-verdict--@state" aria-live="polite">
+            <span class="cv-verdict__seal"><i class="bi @iconClass" aria-hidden="true"></i></span>
+            <div class="cv-verdict__body">
+                <p class="cv-verdict__label">حالة التحقق</p>
+                <p class="cv-verdict__title">@statusTitle</p>
+                <p class="cv-verdict__desc">@statusDesc</p>
+                <ul class="cv-verdict__facts">
+                    <li><i class="bi bi-hash" aria-hidden="true"></i><span>رقم الشهادة:</span><strong class="cv-code">@Model.CertificateNumber</strong></li>
+                    <li><i class="bi bi-calendar3" aria-hidden="true"></i><span>تاريخ الإصدار:</span><strong>@Model.IssueDate?.ToString("yyyy-MM-dd")</strong></li>
+                    <li><i class="bi bi-patch-check" aria-hidden="true"></i><span>الحالة:</span><strong>@Model.Status</strong></li>
+                </ul>
             </div>
         </section>
 
-        <section class="cv-stage" aria-label="الشهادة الرقمية للمتدرب">
-            <div class="cv-stage__frame">
+        <section class="cv-doc" aria-label="الشهادة الرقمية للمتدرب">
+            <div class="cv-doc__frame">
                 <div class="cv-paper"
                      style="--certificate-ratio: @Model.DesignCanvasWidth / @Model.DesignCanvasHeight; background-color: @Model.DesignBackgroundColor; border: @Model.DesignBorderWidth.ToString(CultureInfo.InvariantCulture)px solid @Model.DesignBorderColor; border-radius: @Model.DesignBorderRadius.ToString(CultureInfo.InvariantCulture)px;">
                     @if (!string.IsNullOrWhiteSpace(Model.DesignBackgroundImageUrl))
@@ -91,84 +100,93 @@
                 </div>
             </div>
 
-            <div class="cv-strip">
-                <span class="cv-strip__item"><span class="cv-dot cv-dot--@state"></span> حالة الشهادة: <strong>@Model.Status</strong></span>
-                <span class="cv-strip__item"><i class="bi bi-shield-check"></i> وثيقة صادرة عن الجهة المصدرة، وتُعرض هنا بغرض التحقق.</span>
+            <div class="cv-doc__caption">
+                <span><span class="cv-dot cv-dot--@state"></span> حالة الشهادة: <strong>@Model.Status</strong></span>
+                <span><i class="bi bi-shield-check"></i> وثيقة صادرة عن الجهة المصدرة، وتُعرض هنا بغرض التحقق.</span>
             </div>
         </section>
 
-        <section class="cv-details" aria-label="بيانات الشهادة">
-            <div class="cv-details__head"><i class="bi bi-card-text"></i> بيانات الشهادة</div>
-            <div class="cv-details__grid">
-                <div class="cv-field">
-                    <span class="cv-field__label">رقم الشهادة</span>
-                    <span class="cv-field__value cv-code">@Model.CertificateNumber</span>
+        <section class="cv-record" aria-label="بيانات الشهادة">
+            <h2 class="cv-record__title"><i class="bi bi-card-text"></i> بيانات الشهادة الرسمية</h2>
+            <dl class="cv-record__grid">
+                <div class="cv-record__row">
+                    <dt>رقم الشهادة</dt>
+                    <dd class="cv-code">@Model.CertificateNumber</dd>
                 </div>
-                <div class="cv-field">
-                    <span class="cv-field__label">اسم المتدرب</span>
-                    <span class="cv-field__value">@(Model.TraineeNameArabic ?? Model.TraineeName)</span>
+                <div class="cv-record__row">
+                    <dt>الحالة</dt>
+                    <dd>@Model.Status</dd>
                 </div>
-                <div class="cv-field">
-                    <span class="cv-field__label">الاسم بالإنجليزية</span>
-                    <span class="cv-field__value" dir="ltr">@(Model.TraineeNameEnglish ?? Model.TraineeName)</span>
+                <div class="cv-record__row">
+                    <dt>اسم المتدرب</dt>
+                    <dd>@(Model.TraineeNameArabic ?? Model.TraineeName)</dd>
                 </div>
-                <div class="cv-field">
-                    <span class="cv-field__label">الدورة</span>
-                    <span class="cv-field__value">@Model.CourseNameArabic<span class="cv-sub" dir="ltr">@Model.CourseNameEnglish</span></span>
+                <div class="cv-record__row">
+                    <dt>الاسم بالإنجليزية</dt>
+                    <dd dir="ltr">@(Model.TraineeNameEnglish ?? Model.TraineeName)</dd>
                 </div>
-                <div class="cv-field">
-                    <span class="cv-field__label">تاريخ الإصدار</span>
-                    <span class="cv-field__value">@Model.IssueDate?.ToString("yyyy-MM-dd")</span>
+                <div class="cv-record__row">
+                    <dt>الدورة التدريبية</dt>
+                    <dd>@Model.CourseNameArabic<span class="cv-sub" dir="ltr">@Model.CourseNameEnglish</span></dd>
                 </div>
-                <div class="cv-field">
-                    <span class="cv-field__label">الحالة</span>
-                    <span class="cv-field__value">@Model.Status</span>
+                <div class="cv-record__row">
+                    <dt>تاريخ الإصدار</dt>
+                    <dd>@Model.IssueDate?.ToString("yyyy-MM-dd")</dd>
                 </div>
-            </div>
+            </dl>
         </section>
 
-        <div class="cv-actions">
+        <div class="cv-report__actions">
             <button type="button" class="btn btn-outline-primary" onclick="window.print()"><i class="bi bi-printer"></i> طباعة الشهادة</button>
             <a asp-action="Verify" class="btn btn-primary"><i class="bi bi-search"></i> تحقق من شهادة أخرى</a>
         </div>
+
+        <p class="cv-report__note">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            <span>
+                هذه النتيجة صادرة آلياً عن السجل الرسمي لـ @siteName وتعكس حالة الشهادة لحظة الاستعلام
+                (@DateTime.Now.ToString("yyyy-MM-dd HH:mm")). للتحقق من صحة الوثيقة المطبوعة يُرجى
+                مطابقة رقم الشهادة وبيانات المتدرب والدورة الظاهرة أعلاه.
+            </span>
+        </p>
     }
     else
     {
-        <div class="cv-empty">
-            <div class="cv-empty__mark cv-empty__mark--@state" aria-hidden="true"><i class="bi @iconClass"></i></div>
-            <h2 class="cv-empty__title">@statusTitle</h2>
-            <p class="cv-empty__text">@statusDesc</p>
+        <div class="cv-notfound">
+            <div class="cv-notfound__mark cv-notfound__mark--@state" aria-hidden="true"><i class="bi @iconClass"></i></div>
+            <h2 class="cv-notfound__title">@statusTitle</h2>
+            <p class="cv-notfound__text">@statusDesc</p>
 
             @if (Model.CertificateFound)
             {
-                <div class="cv-details">
-                    <div class="cv-details__head"><i class="bi bi-card-text"></i> بيانات الشهادة</div>
-                    <div class="cv-details__grid">
-                        <div class="cv-field">
-                            <span class="cv-field__label">رقم الشهادة</span>
-                            <span class="cv-field__value cv-code">@Model.CertificateNumber</span>
+                <div class="cv-record">
+                    <h2 class="cv-record__title"><i class="bi bi-card-text"></i> بيانات الشهادة</h2>
+                    <dl class="cv-record__grid">
+                        <div class="cv-record__row">
+                            <dt>رقم الشهادة</dt>
+                            <dd class="cv-code">@Model.CertificateNumber</dd>
                         </div>
-                        <div class="cv-field">
-                            <span class="cv-field__label">اسم المتدرب</span>
-                            <span class="cv-field__value">@(Model.TraineeNameArabic ?? Model.TraineeName)</span>
+                        <div class="cv-record__row">
+                            <dt>الحالة</dt>
+                            <dd>@Model.Status</dd>
                         </div>
-                        <div class="cv-field">
-                            <span class="cv-field__label">الدورة</span>
-                            <span class="cv-field__value">@Model.CourseNameArabic<span class="cv-sub" dir="ltr">@Model.CourseNameEnglish</span></span>
+                        <div class="cv-record__row">
+                            <dt>اسم المتدرب</dt>
+                            <dd>@(Model.TraineeNameArabic ?? Model.TraineeName)</dd>
                         </div>
-                        <div class="cv-field">
-                            <span class="cv-field__label">الحالة</span>
-                            <span class="cv-field__value">@Model.Status</span>
+                        <div class="cv-record__row">
+                            <dt>الدورة التدريبية</dt>
+                            <dd>@Model.CourseNameArabic<span class="cv-sub" dir="ltr">@Model.CourseNameEnglish</span></dd>
                         </div>
-                    </div>
+                    </dl>
                 </div>
             }
             else if (!string.IsNullOrWhiteSpace(Model.SearchCode))
             {
-                <p class="cv-empty__entered">المدخل الذي تم التحقق منه: <span class="cv-code">@Model.SearchCode</span></p>
+                <p class="cv-notfound__entered">المدخل الذي تم التحقق منه: <span class="cv-code">@Model.SearchCode</span></p>
             }
 
-            <div class="cv-actions">
+            <div class="cv-report__actions">
                 <a asp-action="Verify" class="btn btn-primary"><i class="bi bi-search"></i> تحقق من شهادة أخرى</a>
             </div>
         </div>

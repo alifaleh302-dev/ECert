@@ -1,52 +1,88 @@
 @{
     ViewData["Title"] = "التحقق من شهادة";
     var turnstileSiteKey = ViewBag.TurnstileSiteKey as string;
+    var siteName = (ViewBag.SiteSettings as List<ECert.Models.SiteSetting>)
+        ?.FirstOrDefault(s => s.Key == "SiteName")?.Value;
+    if (string.IsNullOrWhiteSpace(siteName)) siteName = "مركز التدريب";
 }
 
-<div class="cv-page">
-    <div class="cv-verify">
-        <header class="cv-verify__head">
-            <span class="cv-verify__mark" aria-hidden="true"><i class="bi bi-shield-check"></i></span>
-            <h1 class="cv-verify__title">التحقق من صحة شهادة</h1>
-            <p class="cv-verify__lead">
-                أدخل رقم الشهادة أو رمز التحقق للتأكد من صدورها وسريانها. تظهر النتيجة بيانات عامة فقط، دون أي معلومات حساسة.
+<div class="cv-portal">
+    <div class="cv-portal__card">
+        <div class="cv-portal__band">
+            <span class="cv-portal__crest" aria-hidden="true"><i class="bi bi-patch-check-fill"></i></span>
+            <p class="cv-portal__authority">@siteName</p>
+            <h1 class="cv-portal__title">بوابة التحقق من الشهادات</h1>
+            <p class="cv-portal__subtitle">Official Certificate Verification</p>
+        </div>
+
+        <div class="cv-portal__body">
+            <p class="cv-portal__intro">
+                خدمة رسمية للتأكد من صحة الشهادات الصادرة عن @siteName وسريانها. أدخل رقم الشهادة
+                أو رمز التحقق المطبوع عليها، وستظهر لك النتيجة مباشرة دون كشف أي بيانات حساسة.
             </p>
-        </header>
 
-        <form asp-action="Verify" method="post" class="cv-verify__form">
-            @Html.AntiForgeryToken()
+            <form asp-action="Verify" method="post" novalidate>
+                @Html.AntiForgeryToken()
 
-            <div class="cv-verify__field">
-                <label for="verifyCode" class="cv-verify__label">رقم الشهادة أو رمز التحقق</label>
-                <div class="cv-verify__input">
-                    <i class="bi bi-upc-scan" aria-hidden="true"></i>
-                    <input type="text"
-                           id="verifyCode"
-                           name="code"
-                           class="form-control"
-                           placeholder="CERT-2026-XXXXXXXXXX"
-                           autocomplete="off"
-                           dir="ltr"
-                           required />
+                <div class="cv-field">
+                    <label for="verifyCode" class="cv-field__label">رقم الشهادة أو رمز التحقق</label>
+                    <div class="cv-input">
+                        <i class="bi bi-upc-scan" aria-hidden="true"></i>
+                        <input type="text"
+                               id="verifyCode"
+                               name="code"
+                               class="form-control"
+                               placeholder="CERT-2026-XXXXXXXXXX"
+                               autocomplete="off"
+                               inputmode="text"
+                               spellcheck="false"
+                               dir="ltr"
+                               required />
+                    </div>
+                    <p class="cv-hint">مثال: رقم الشهادة المطبوع، أو رمز التحقق المرفق بها.</p>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(turnstileSiteKey))
+                {
+                    <div class="cv-turnstile">
+                        <div class="cf-turnstile" data-sitekey="@turnstileSiteKey"></div>
+                    </div>
+                }
+
+                <button type="submit" class="cv-submit">
+                    <i class="bi bi-shield-check" aria-hidden="true"></i> تحقّق من الشهادة
+                </button>
+            </form>
+
+            <div class="cv-assurance">
+                <div class="cv-assurance__item">
+                    <i class="bi bi-hash" aria-hidden="true"></i>
+                    <div>
+                        <strong>مصدر موثوق</strong>
+                        <span>النتيجة صادرة مباشرةً من سجل الشهادات الرسمي.</span>
+                    </div>
+                </div>
+                <div class="cv-assurance__item">
+                    <i class="bi bi-lock" aria-hidden="true"></i>
+                    <div>
+                        <strong>خصوصية محفوظة</strong>
+                        <span>لا تُعرض سوى البيانات العامة اللازمة للتحقق.</span>
+                    </div>
+                </div>
+                <div class="cv-assurance__item">
+                    <i class="bi bi-clock-history" aria-hidden="true"></i>
+                    <div>
+                        <strong>نتيجة فورية</strong>
+                        <span>تظهر حالة الشهادة لحظة إدخال الرمز.</span>
+                    </div>
                 </div>
             </div>
+        </div>
 
-            @if (!string.IsNullOrWhiteSpace(turnstileSiteKey))
-            {
-                <div class="cv-verify__turnstile">
-                    <div class="cf-turnstile" data-sitekey="@turnstileSiteKey"></div>
-                </div>
-            }
-
-            <button type="submit" class="btn btn-primary cv-verify__submit">
-                <i class="bi bi-search"></i> تحقق الآن
-            </button>
-        </form>
-
-        <ul class="cv-verify__notes">
-            <li><i class="bi bi-hash"></i> يمكنك استخدام رقم الشهادة المطبوع أو رمز التحقق المرفق بها.</li>
-            <li><i class="bi bi-lock"></i> تُعرض البيانات العامة للتحقق فقط دون كشف معلومات المتدرب الحساسة.</li>
-        </ul>
+        <div class="cv-portal__foot">
+            <i class="bi bi-shield-lock-fill" aria-hidden="true"></i>
+            <span>اتصال آمن — تُعرض البيانات للتحقق فقط.</span>
+        </div>
     </div>
 </div>
 
