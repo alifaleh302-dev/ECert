@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using ECert.Data;
 using ECert.Services;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -28,7 +29,8 @@ var rawMySqlConn = ResolveMySqlConnectionString(builder.Configuration);
 var mysqlConn = NormalizeMySqlConnectionString(rawMySqlConn);
 
 builder.Services.AddDbContext<ECertDbContext>(options =>
-    options.UseMySql(mysqlConn, ServerVersion.AutoDetect(mysqlConn)));
+    options.UseMySql(mysqlConn, ServerVersion.AutoDetect(mysqlConn))
+        .AddInterceptors(new AuditChainSaveChangesInterceptor()));
 
 // Railway rebuilds containers during each deploy. Persisting Data Protection keys in MySQL
 // keeps authentication cookies and antiforgery tokens valid across future deployments.
@@ -49,7 +51,6 @@ builder.Services.AddSingleton<CertificateSecurityService>();
 builder.Services.AddSingleton<CertificateQrService>();
 builder.Services.AddSingleton<CertificateBarcodeService>();
 builder.Services.AddSingleton<VerifyRequestGuardService>();
-builder.Services.AddSingleton<LoginAttemptGuard>();
 builder.Services.AddScoped<CertificateSchemaMigrationService>();
 builder.Services.AddScoped<AcademicSchemaMigrationService>();
 builder.Services.AddScoped<CourseNameSchemaMigrationService>();
@@ -81,6 +82,17 @@ builder.Services.AddScoped<UserCourseSchemaMigrationService>();
 builder.Services.AddScoped<UserCategorySchemaMigrationService>();
 builder.Services.AddScoped<InvoiceNumberIndexSchemaMigrationService>();
 builder.Services.AddScoped<PerformanceIndexSchemaMigrationService>();
+builder.Services.AddScoped<SecuritySchemaMigrationService>();
+builder.Services.AddScoped<SecuritySettingsService>();
+builder.Services.AddSingleton<LoginThrottleService>();
+builder.Services.AddScoped<SecurityAlertService>();
+builder.Services.AddSingleton<BackupCryptoService>();
+builder.Services.AddScoped<DatabaseBackupService>();
+builder.Services.AddScoped<AuditIntegrityService>();
+builder.Services.AddScoped<TelegramLinkService>();
+builder.Services.AddSingleton<LoginOtpService>();
+builder.Services.AddHttpClient<TelegramBotService>();
+builder.Services.AddHostedService<EncryptedBackupService>();
 builder.Services.AddScoped<TurnstileService>();
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
 
@@ -99,6 +111,29 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
             : CookieSecurePolicy.Always;
         options.Events = new CookieAuthenticationEvents
         {
+            // Enforce the idle timeout configured in /SecuritySettings. The last-activity stamp
+            // travels inside the encrypted ticket, so it cannot be forged from the client.
+            OnValidatePrincipal = context =>
+            {
+                var props = context.Properties;
+                var now = DateTimeOffset.UtcNow;
+                var timeout = TimeSpan.FromMinutes(SecurityPolicySnapshot.IdleTimeoutMinutes);
+                var raw = props.Items.TryGetValue("lastActivity", out var value) ? value : null;
+
+                if (DateTimeOffset.TryParse(raw, out var last) && now - last > timeout)
+                {
+                    context.RejectPrincipal();
+                    return context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                }
+                // Refresh the stamp at most once a minute so the cookie is not rewritten on every hit.
+                if (!DateTimeOffset.TryParse(raw, out var previous) || now - previous > TimeSpan.FromMinutes(1))
+                {
+                    props.Items["lastActivity"] = now.ToString("O");
+                    context.ShouldRenew = true;
+                }
+
+                return Task.CompletedTask;
+            },
             OnRedirectToLogin = context =>
             {
                 if (context.Request.Path.StartsWithSegments("/api"))
@@ -239,6 +274,11 @@ using (var scope = app.Services.CreateScope())
         await userCourseMigration.EnsureAsync();
         var userCategoryMigration = scope.ServiceProvider.GetRequiredService<UserCategorySchemaMigrationService>();
         await userCategoryMigration.EnsureAsync();
+        // Security tables/columns (SecuritySettings, User Telegram fields, audit hash-chain columns
+        // and the immutability triggers). Must run before DbSeeder loads Users, which selects the
+        // new Telegram columns.
+        var securityMigration = scope.ServiceProvider.GetRequiredService<SecuritySchemaMigrationService>();
+        await securityMigration.EnsureAsync();
         DbSeeder.Seed(db, bootstrapLogger);
         DbSeeder.SeedHomepageCms(db);
         // Unique invoice numbers are a data guarantee, applied after the tables are seeded.

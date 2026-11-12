@@ -32,4 +32,16 @@ public class AuditLog
 
     [Display(Name = "عنوان IP")]
     public string? IpAddress { get; set; }
+
+    /// <summary>
+    /// Hash of the previous row in the chain (empty for the first row). Together with
+    /// <see cref="RowHash"/> this makes the log tamper-evident: altering or deleting any row
+    /// breaks every hash that follows it, which the integrity check detects.
+    /// </summary>
+    [StringLength(64)]
+    public string? PreviousHash { get; set; }
+
+    /// <summary>SHA-256 over this row's content plus <see cref="PreviousHash"/>.</summary>
+    [StringLength(64)]
+    public string? RowHash { get; set; }
 }

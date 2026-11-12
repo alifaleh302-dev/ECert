@@ -18,12 +18,14 @@ public class AuthApiController : ControllerBase
 {
     private readonly ECertDbContext _db;
     private readonly AuditLogService _audit;
-    private readonly LoginAttemptGuard _loginGuard;
-    public AuthApiController(ECertDbContext db, AuditLogService audit, LoginAttemptGuard loginGuard)
+    private readonly LoginThrottleService _throttle;
+    private readonly SecurityAlertService _alerts;
+    public AuthApiController(ECertDbContext db, AuditLogService audit, LoginThrottleService throttle, SecurityAlertService alerts)
     {
         _db = db;
         _audit = audit;
-        _loginGuard = loginGuard;
+        _throttle = throttle;
+        _alerts = alerts;
     }
 
     [HttpPost("login")]
@@ -36,10 +38,12 @@ public class AuthApiController : ControllerBase
 
         var username = model.Username.Trim();
         var clientAddress = GetClientAddress();
-        var accountDelayed = _loginGuard.IsAccountDelayed(username, out var accountDelay);
-        var addressDelayed = _loginGuard.IsDelayed(username, clientAddress, out var addressDelay);
-        if (accountDelayed || addressDelayed)
-            await Task.Delay(accountDelayed ? accountDelay : addressDelay, HttpContext.RequestAborted);
+
+        if (_throttle.IsBlocked(username, clientAddress, out var blockedFor))
+        {
+            await Task.Delay(TimeSpan.FromSeconds(Math.Min(3, blockedFor.TotalSeconds)), HttpContext.RequestAborted);
+            return Ok(ApiResponse.Fail($"تم حظر المحاولات مؤقتاً. أعد المحاولة بعد {Math.Ceiling(blockedFor.TotalMinutes)} دقيقة."));
+        }
 
         var user = await _db.Users
             .Include(u => u.UserRoles).ThenInclude(ur => ur.Role).ThenInclude(r => r!.RolePermissions).ThenInclude(rp => rp.Permission)
@@ -47,12 +51,12 @@ public class AuthApiController : ControllerBase
 
         if (user == null || !BCrypt.Net.BCrypt.Verify(model.Password, user.PasswordHash))
         {
-            _loginGuard.RegisterFailure(username, clientAddress);
-            _loginGuard.RegisterAccountFailure(username);
+            _throttle.RegisterFailure(username, clientAddress);
+            await _alerts.AlertRepeatedFailedLoginsAsync(username, clientAddress, SecurityPolicySnapshot.MaxFailedLoginAttempts);
             return Ok(ApiResponse.Fail("اسم المستخدم أو كلمة المرور غير صحيحة"));
         }
 
-        _loginGuard.RegisterSuccess(username, clientAddress);
+        _throttle.RegisterSuccess(username, clientAddress);
 
         var claims = new List<Claim>
         {

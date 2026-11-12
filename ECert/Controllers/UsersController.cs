@@ -13,7 +13,13 @@ public class UsersController : Controller
 {
     private readonly ECertDbContext _db;
     private readonly AuditLogService _audit;
-    public UsersController(ECertDbContext db, AuditLogService audit) { _db = db; _audit = audit; }
+    private readonly TelegramLinkService _telegramLink;
+    public UsersController(ECertDbContext db, AuditLogService audit, TelegramLinkService telegramLink)
+    {
+        _db = db;
+        _audit = audit;
+        _telegramLink = telegramLink;
+    }
 
     private bool HasPermission(string perm) => User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
     private bool IsSuperAdmin => User.IsSuperAdmin();
@@ -175,6 +181,10 @@ public class UsersController : Controller
         var categoryIds = user.CategoryAssignments.Select(uc => uc.CategoryId).ToList();
         await PopulateFormDataAsync(null, courseIds, categoryIds, isSuperAdminAccount);
 
+        ViewBag.TelegramChatId = user.TelegramChatId;
+        ViewBag.TelegramLinkCode = user.TelegramLinkCode;
+        ViewBag.TelegramLinkedAt = user.TelegramLinkedAt;
+
         return View(new EditUserViewModel
         {
             UserId = user.UserId,
@@ -282,6 +292,31 @@ public class UsersController : Controller
         await _audit.LogAsync(User.Identity?.Name ?? "", "Update", "User", id, null, "Password reset");
         TempData["Success"] = "تم إعادة تعيين كلمة المرور.";
         return RedirectToAction("Index");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GenerateTelegramLink(int id)
+    {
+        if (!HasPermission("manage-users")) return Forbid();
+        var user = await _db.Users.FindAsync(id);
+        if (user == null) return NotFound();
+
+        var code = await _telegramLink.GenerateCodeAsync(id);
+        await _audit.LogAsync(User.Identity?.Name ?? "", "Update", "User", id, null, "Telegram link code issued");
+        TempData["Success"] = $"رمز الربط للمستخدم {user.Username}: {code} — يرسله الموظف إلى البوت لربط حسابه.";
+        return RedirectToAction("Edit", new { id });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UnlinkTelegram(int id)
+    {
+        if (!HasPermission("manage-users")) return Forbid();
+        await _telegramLink.UnlinkAsync(id);
+        await _audit.LogAsync(User.Identity?.Name ?? "", "Update", "User", id, null, "Telegram unlinked");
+        TempData["Success"] = "تم إلغاء ربط تليجرام.";
+        return RedirectToAction("Edit", new { id });
     }
 
     private async Task PopulateFormDataAsync(

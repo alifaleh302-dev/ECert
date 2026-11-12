@@ -72,6 +72,49 @@
 
             <partial name="_CourseScopePicker" model="scope" />
 
+            @{
+                var tgChatId = ViewBag.TelegramChatId as string;
+                var tgCode = ViewBag.TelegramLinkCode as string;
+                var tgLinkedAt = ViewBag.TelegramLinkedAt as DateTime?;
+            }
+            <div class="a-card mt-4">
+                <div class="a-card__header">
+                    <h2 class="a-card__title"><i class="bi bi-telegram" aria-hidden="true"></i> ربط تليجرام (التحقق بخطوتين)</h2>
+                    @if (!string.IsNullOrWhiteSpace(tgChatId))
+                    {
+                        <span class="a-badge a-badge--success">مرتبط</span>
+                    }
+                    else
+                    {
+                        <span class="a-badge a-badge--neutral">غير مرتبط</span>
+                    }
+                </div>
+                <div class="a-card__body">
+                    @if (!string.IsNullOrWhiteSpace(tgChatId))
+                    {
+                        <p class="a-hint mb-3">مرتبط منذ @(tgLinkedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—"). عند تفعيل المصادقة الثنائية يحتاج هذا المستخدم إلى رمز يُرسل إلى تليجرام عند كل دخول.</p>
+                        <button type="submit" formaction="@Url.Action("UnlinkTelegram", new { id = Model.UserId })" class="btn btn-outline-danger"
+                                onclick="return confirm('إلغاء ربط تليجرام لهذا المستخدم؟');">
+                            <i class="bi bi-x-circle"></i> إلغاء الربط
+                        </button>
+                    }
+                    else
+                    {
+                        @if (!string.IsNullOrWhiteSpace(tgCode))
+                        {
+                            <div class="a-note a-note--info mb-3" role="status">
+                                <i class="bi bi-key" aria-hidden="true"></i>
+                                <div>رمز الربط: <strong dir="ltr">@tgCode</strong> — يرسله الموظف إلى البوت لربط حسابه.</div>
+                            </div>
+                        }
+                        <p class="a-hint mb-3">أنشئ رمزاً وأرسله للموظف ليرسله إلى بوت تليجرام، ثم استخدم «مزامنة ربط تليجرام» في صفحة إعدادات الأمان.</p>
+                        <button type="submit" formaction="@Url.Action("GenerateTelegramLink", new { id = Model.UserId })" class="btn btn-outline-primary">
+                            <i class="bi bi-link-45deg"></i> إنشاء رمز ربط
+                        </button>
+                    }
+                </div>
+            </div>
+
             <div class="a-form__actions">
                 <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ التعديلات</button>
                 <a asp-action="Index" class="btn btn-outline-secondary">إلغاء</a>

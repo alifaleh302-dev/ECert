@@ -1,0 +1,150 @@
+@model ECert.Models.SecuritySettings
+@{
+    ViewData["Title"] = "إعدادات الأمان والنسخ الاحتياطي";
+    ViewData["PageIcon"] = "bi-shield-lock";
+    ViewData["PageDesc"] = "توكن البوت، قنوات التنبيه والأرشيف، مفتاح التشفير، المصادقة الثنائية وسياسة الحظر — لمدير النظام فقط";
+    Layout = "_AdminLayout";
+    var hasKey = !string.IsNullOrWhiteSpace(Model.BackupEncryptionKey);
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="VerifyIntegrity" class="btn btn-outline-secondary"><i class="bi bi-patch-check"></i> فحص سلامة السجلات</a>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="a-note a-note--success mb-4" role="status"><i class="bi bi-check-circle" aria-hidden="true"></i> <div>@TempData["Success"]</div></div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="a-note a-note--danger mb-4" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> <div>@TempData["Error"]</div></div>
+}
+
+<div class="a-note a-note--info mb-4">
+    <i class="bi bi-info-circle" aria-hidden="true"></i>
+    <div>تُقرأ هذه القيم ديناميكياً من قاعدة البيانات. أي تغيير هنا يسري على الخدمات الأمنية خلال لحظات دون إعادة نشر.</div>
+</div>
+
+<form asp-action="Save" method="post">
+    @Html.AntiForgeryToken()
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="a-card h-100">
+                <div class="a-card__header">
+                    <h2 class="a-card__title"><i class="bi bi-telegram" aria-hidden="true"></i> تكامل تليجرام</h2>
+                </div>
+                <div class="a-card__body a-form__grid">
+                    <div class="a-field a-field--full">
+                        <label asp-for="TelegramBotToken" class="a-field__label"></label>
+                        <input asp-for="TelegramBotToken" class="form-control" autocomplete="off" placeholder="123456789:AA..." />
+                        <p class="a-hint">توكن البوت المستخدم لإرسال رموز الدخول والتنبيهات والأرشيف. يُخزَّن في قاعدة البيانات.</p>
+                    </div>
+                    <div class="a-field">
+                        <label asp-for="SecurityAlertChannelId" class="a-field__label"></label>
+                        <input asp-for="SecurityAlertChannelId" class="form-control" placeholder="-1001234567890" />
+                        <p class="a-hint">قناة التنبيهات الفورية (دخول فاشل متكرر، تعديل صلاحيات، إعادة فتح فترة، استرداد كبير).</p>
+                    </div>
+                    <div class="a-field">
+                        <label asp-for="BackupChannelId" class="a-field__label"></label>
+                        <input asp-for="BackupChannelId" class="form-control" placeholder="-1009876543210" />
+                        <p class="a-hint">قناة الأرشيف المعزولة التي تُرسل إليها النسخ الاحتياطية المشفّرة.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="a-card h-100">
+                <div class="a-card__header">
+                    <h2 class="a-card__title"><i class="bi bi-key" aria-hidden="true"></i> تشفير النسخ الاحتياطي</h2>
+                    @if (hasKey)
+                    {
+                        <span class="a-badge a-badge--success">مفتاح مضبوط</span>
+                    }
+                    else
+                    {
+                        <span class="a-badge a-badge--warning">لا يوجد مفتاح</span>
+                    }
+                </div>
+                <div class="a-card__body a-form__grid">
+                    <div class="a-field a-field--full">
+                        <label asp-for="BackupEncryptionKey" class="a-field__label"></label>
+                        <input asp-for="BackupEncryptionKey" type="password" class="form-control" autocomplete="new-password"
+                               placeholder="@(hasKey ? "•••••••• (اتركه فارغاً للإبقاء على المفتاح الحالي)" : "أدخل مفتاحاً قوياً")" />
+                        <p class="a-hint">يُشتق منه مفتاح AES-256 (PBKDF2) لتشفير كل نسخة احتياطية. لا يُعرض المفتاح الحالي حفاظاً على سريّته.</p>
+                    </div>
+                    <div class="a-field">
+                        <label asp-for="BackupHourUtc" class="a-field__label"></label>
+                        <input asp-for="BackupHourUtc" type="number" min="0" max="23" class="form-control" />
+                        <p class="a-hint">توقيت عالمي (UTC).</p>
+                    </div>
+                    <div class="a-field">
+                        <label class="a-field__label d-block">النسخ الاحتياطي اليومي</label>
+                        <div class="form-check form-switch">
+                            <input asp-for="BackupEnabled" class="form-check-input" type="checkbox" role="switch" />
+                            <label asp-for="BackupEnabled" class="form-check-label">تفعيل النسخ الآلي اليومي</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="a-card h-100">
+                <div class="a-card__header">
+                    <h2 class="a-card__title"><i class="bi bi-person-lock" aria-hidden="true"></i> المصادقة وسياسة الحظر</h2>
+                </div>
+                <div class="a-card__body a-form__grid">
+                    <div class="a-field a-field--full">
+                        <div class="form-check form-switch">
+                            <input asp-for="TwoFactorEnabled" class="form-check-input" type="checkbox" role="switch" />
+                            <label asp-for="TwoFactorEnabled" class="form-check-label"></label>
+                        </div>
+                        <p class="a-hint">عند التفعيل، يحتاج الموظف المرتبط بتليجرام إلى رمز OTP بعد كلمة المرور.</p>
+                    </div>
+                    <div class="a-field">
+                        <label asp-for="MaxFailedLoginAttempts" class="a-field__label"></label>
+                        <input asp-for="MaxFailedLoginAttempts" type="number" min="1" max="100" class="form-control" />
+                    </div>
+                    <div class="a-field">
+                        <label asp-for="LockoutMinutes" class="a-field__label"></label>
+                        <input asp-for="LockoutMinutes" type="number" min="1" max="1440" class="form-control" />
+                    </div>
+                    <div class="a-field a-field--full">
+                        <label asp-for="IdleTimeoutMinutes" class="a-field__label"></label>
+                        <input asp-for="IdleTimeoutMinutes" type="number" min="1" max="1440" class="form-control" />
+                        <p class="a-hint">تُنهى الجلسة تلقائياً بعد هذه المدة من عدم النشاط.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="a-card h-100">
+                <div class="a-card__header">
+                    <h2 class="a-card__title"><i class="bi bi-cloud-arrow-up" aria-hidden="true"></i> عمليات النسخ الاحتياطي</h2>
+                </div>
+                <div class="a-card__body">
+                    <p class="a-hint mb-3">تُنشئ النسخة كاملة من قاعدة البيانات، تُضغط وتُشفّر AES-256، وتُرسل إلى قناة الأرشيف ثم تُحذف من ذاكرة السيرفر فوراً.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="submit" asp-action="RunBackupNow" class="btn btn-outline-primary"
+                                onclick="return confirm('إنشاء نسخة احتياطية مشفّرة الآن؟');">
+                            <i class="bi bi-play-circle"></i> تشغيل نسخة الآن
+                        </button>
+                        <button type="submit" asp-action="PollTelegramLinks" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-repeat"></i> مزامنة ربط تليجرام
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ الإعدادات الأمنية</button>
+    </div>
+</form>

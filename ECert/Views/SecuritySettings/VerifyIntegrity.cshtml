@@ -1,0 +1,48 @@
+@model (ECert.Services.AuditIntegrityResult Operations, ECert.Services.AuditIntegrityResult Financial)
+@{
+    ViewData["Title"] = "سلامة سجلات التدقيق";
+    ViewData["PageIcon"] = "bi-patch-check";
+    ViewData["PageDesc"] = "التحقق من سلسلة التوقيعات (SHA-256) في سجلات العمليات والتدقيق المالي";
+    Layout = "_AdminLayout";
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للإعدادات</a>
+    </div>
+</div>
+
+@foreach (var (label, result) in new[] { ("سجل العمليات", Model.Operations), ("سجل التدقيق المالي", Model.Financial) })
+{
+    <div class="a-card mb-4">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-journal-check" aria-hidden="true"></i> @label</h2>
+            @if (result.Intact)
+            {
+                <span class="a-badge a-badge--success">سليم</span>
+            }
+            else
+            {
+                <span class="a-badge a-badge--danger">مخترق</span>
+            }
+        </div>
+        <div class="a-card__body">
+            @if (result.Intact)
+            {
+                <p class="mb-0">تم التحقق من @result.Checked سجلاً؛ سلسلة التوقيعات سليمة بالكامل.</p>
+            }
+            else
+            {
+                <div class="a-note a-note--danger mb-0" role="alert">
+                    <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+                    <div>
+                        <strong>تم اكتشاف تلاعب.</strong>
+                        <p class="mb-1">أول سجل غير سليم: #@result.FirstBrokenId (بعد فحص @result.Checked سجلاً).</p>
+                        <p class="mb-0">@result.Detail</p>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}

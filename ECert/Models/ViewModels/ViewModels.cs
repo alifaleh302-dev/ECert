@@ -14,6 +14,14 @@ public class LoginViewModel
     public string Password { get; set; } = string.Empty;
 }
 
+public class TwoFactorViewModel
+{
+    [Required(ErrorMessage = "رمز التحقق مطلوب")]
+    [StringLength(6, MinimumLength = 6, ErrorMessage = "الرمز من ستة أرقام")]
+    [Display(Name = "رمز التحقق")]
+    public string Code { get; set; } = string.Empty;
+}
+
 public class PublicRegistrationViewModel
 {
     [Required(ErrorMessage = "الاسم بالعربية مطلوب")]

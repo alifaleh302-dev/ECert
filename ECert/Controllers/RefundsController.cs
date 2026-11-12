@@ -23,10 +23,11 @@ public class RefundsController : Controller
     private readonly ReceiptVerificationService _receipts;
     private readonly IConfiguration _configuration;
     private readonly SystemSettingsService _settings;
+    private readonly SecurityAlertService _alerts;
 
     public RefundsController(ECertDbContext db, AuditLogService audit, FinancialService financial,
         FinancialLedgerService ledger, ReceiptVerificationService receipts, IConfiguration configuration,
-        SystemSettingsService settings)
+        SystemSettingsService settings, SecurityAlertService alerts)
     {
         _db = db;
         _audit = audit;
@@ -35,6 +36,7 @@ public class RefundsController : Controller
         _receipts = receipts;
         _configuration = configuration;
         _settings = settings;
+        _alerts = alerts;
     }
 
     private bool HasPermission(string perm) => User.HasPermission(perm);
@@ -178,6 +180,7 @@ public class RefundsController : Controller
         await transaction.CommitAsync();
         await _audit.LogAsync(Actor, "Approve", "Refund", refund.RefundId, null,
             $"Approve refund: {refund.Amount:N2}; Invoice: {refund.Invoice.InvoiceNumber}");
+        await _alerts.AlertLargeRefundApprovedAsync(Actor, refund.Invoice.InvoiceNumber ?? "", refund.Amount);
         TempData["Success"] = result.Message;
         return RedirectToAction(nameof(Index));
     }
