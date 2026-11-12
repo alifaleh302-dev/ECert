@@ -14,7 +14,13 @@ namespace ECert.Services;
 public class SecuritySchemaMigrationService
 {
     private readonly ECertDbContext _db;
-    public SecuritySchemaMigrationService(ECertDbContext db) => _db = db;
+    private readonly ILogger<SecuritySchemaMigrationService> _logger;
+
+    public SecuritySchemaMigrationService(ECertDbContext db, ILogger<SecuritySchemaMigrationService> logger)
+    {
+        _db = db;
+        _logger = logger;
+    }
 
     public async Task EnsureAsync()
     {
@@ -114,25 +120,54 @@ public class SecuritySchemaMigrationService
     /// has no <c>CREATE TRIGGER IF NOT EXISTS</c>, so each is dropped before being recreated;
     /// re-running is therefore safe and always converges on the current definition.
     /// </summary>
+    /// <remarks>
+    /// Managed MySQL enables binary logging and does not grant the application user <c>SUPER</c>,
+    /// and creating a trigger under those conditions requires
+    /// <c>log_bin_trust_function_creators=1</c>. Rather than abort startup (which would crash-loop
+    /// the host on an upgraded database), the failure is logged and skipped — the hash chain in
+    /// <see cref="AuditIntegrityService"/> still makes tampering detectable, the trigger is only the
+    /// second line of defence.
+    /// </remarks>
     private async Task EnsureImmutableTriggersAsync(string table)
     {
         foreach (var (trigger, eventName) in Triggers(table))
         {
-            await _db.Database.ExecuteSqlRawAsync($"DROP TRIGGER IF EXISTS `{trigger}`;");
-            await _db.Database.ExecuteSqlRawAsync($@"
-                CREATE TRIGGER `{trigger}` BEFORE {eventName} ON `{table}`
-                FOR EACH ROW
-                BEGIN
-                    SIGNAL SQLSTATE '45000'
-                        SET MESSAGE_TEXT = 'سجلات التدقيق محصّنة: لا يُسمح بالتعديل أو الحذف';
-                END;");
+            // Both DROP and CREATE of a trigger require the SUPER privilege when binary logging is
+            // enabled, so they are guarded together: whichever one the server rejects, startup
+            // continues and the hash chain remains the detection mechanism.
+            try
+            {
+                await _db.Database.ExecuteSqlRawAsync($"DROP TRIGGER IF EXISTS `{trigger}`;");
+                await _db.Database.ExecuteSqlRawAsync($@"
+                    CREATE TRIGGER `{trigger}` BEFORE {eventName} ON `{table}`
+                    FOR EACH ROW
+                    BEGIN
+                        SIGNAL SQLSTATE '45000'
+                            SET MESSAGE_TEXT = 'سجلات التدقيق محصّنة: لا يُسمح بالتعديل أو الحذف';
+                    END;");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Could not install immutability trigger {Trigger} on {Table}; the audit hash chain still detects tampering.",
+                    trigger, table);
+            }
         }
     }
 
     private async Task DropImmutableTriggersAsync(string table)
     {
         foreach (var (trigger, _) in Triggers(table))
-            await _db.Database.ExecuteSqlRawAsync($"DROP TRIGGER IF EXISTS `{trigger}`;");
+        {
+            try
+            {
+                await _db.Database.ExecuteSqlRawAsync($"DROP TRIGGER IF EXISTS `{trigger}`;");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not drop trigger {Trigger}.", trigger);
+            }
+        }
     }
 
     private static (string Trigger, string Event)[] Triggers(string table) => new[]
