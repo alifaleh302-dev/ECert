@@ -1,0 +1,69 @@
+@{
+    ViewData["Title"] = "مصروف جديد";
+    ViewData["PageIcon"] = "bi-cart-plus";
+    ViewData["PageDesc"] = "تسجيل مصروف جديد؛ يبقى بانتظار اعتماد مدير النظام قبل أن يُحتسب";
+    Layout = "_AdminLayout";
+    var categories = ViewBag.Categories as List<ExpenseCategory> ?? new();
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> عودة</a>
+    </div>
+</div>
+
+@if (TempData["Error"] != null)
+{
+    <div class="a-note a-note--danger mb-4" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> <div>@TempData["Error"]</div></div>
+}
+
+@if (!categories.Any())
+{
+    <div class="a-note a-note--warning mb-4" role="alert">
+        <i class="bi bi-exclamation-circle" aria-hidden="true"></i>
+        <div>لا توجد بنود مصروفات. أضف بنداً من <a asp-action="Categories">بنود المصروفات</a> أولاً.</div>
+    </div>
+}
+
+<div class="a-card">
+    <div class="a-card__body">
+        <form asp-action="Create" method="post" enctype="multipart/form-data" class="a-form__grid">
+            @Html.AntiForgeryToken()
+            <div class="a-field">
+                <label class="a-field__label a-label--required" for="expCategoryId">بند المصروف</label>
+                <select id="expCategoryId" name="expenseCategoryId" class="form-select" required>
+                    <option value="">— اختر البند —</option>
+                    @foreach (var c in categories)
+                    {
+                        <option value="@c.ExpenseCategoryId">@c.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="a-field">
+                <label class="a-field__label a-label--required" for="expAmount">المبلغ (@Currency.Symbol)</label>
+                <input id="expAmount" type="number" name="amount" min="0.01" step="0.01" class="form-control" required placeholder="0.00" />
+            </div>
+            <div class="a-field a-field--full">
+                <label class="a-field__label a-label--required" for="expDesc">البيان</label>
+                <input id="expDesc" type="text" name="description" maxlength="300" class="form-control" required placeholder="وصف المصروف" />
+            </div>
+            <div class="a-field">
+                <label class="a-field__label" for="expDate">تاريخ المصروف</label>
+                <input id="expDate" type="date" name="expenseDate" value="@DateTime.Today.ToString("yyyy-MM-dd")" class="form-control" />
+            </div>
+            <div class="a-field">
+                <label class="a-field__label" for="expDoc">رقم المستند</label>
+                <input id="expDoc" type="text" name="documentNumber" maxlength="80" class="form-control" placeholder="اختياري" />
+            </div>
+            <div class="a-field a-field--full">
+                <label class="a-field__label" for="expFile">المرفق (صورة الفاتورة)</label>
+                <input id="expFile" type="file" name="attachment" accept=".jpg,.jpeg,.png,.gif,.webp" class="form-control" />
+                <p class="a-hint">صيغ مسموحة: JPG, PNG, GIF, WEBP بحجم أقصى 5 ميغابايت.</p>
+            </div>
+            <div class="a-field a-field--full">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ المصروف</button>
+            </div>
+        </form>
+    </div>
+</div>

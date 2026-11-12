@@ -231,12 +231,12 @@
                                             {
                                                 <div>
                                                     <span class="text-muted text-decoration-line-through small">@course.Price.ToString("N0")</span>
-                                                    <span class="fw-bold text-danger fs-5 me-1">@course.FinalPrice.ToString("N0") ريال</span>
+                                                    <span class="fw-bold text-danger fs-5 me-1">@course.FinalPrice.ToString("N0") @Currency.Symbol</span>
                                                 </div>
                                             }
                                             else
                                             {
-                                                <span class="fw-bold text-primary fs-5">@course.Price.ToString("N0") ريال</span>
+                                                <span class="fw-bold text-primary fs-5">@course.Price.ToString("N0") @Currency.Symbol</span>
                                             }
                                         </div>
                                     </div>

@@ -98,10 +98,28 @@ CREATE TABLE IF NOT EXISTS `FinancialAuditEntries` (
     KEY `IX_FinancialAuditEntries_ActionType` (`ActionType`)
 ) CHARACTER SET utf8mb4;");
 
+        await _db.Database.ExecuteSqlRawAsync(@"
+CREATE TABLE IF NOT EXISTS `AccountingPeriodLocks` (
+    `AccountingPeriodLockId` INT NOT NULL AUTO_INCREMENT,
+    `LockedThrough` DATETIME(6) NOT NULL,
+    `Note` VARCHAR(500) NULL,
+    `IsActive` TINYINT(1) NOT NULL DEFAULT 1,
+    `LockedBy` VARCHAR(150) NOT NULL,
+    `LockedAt` DATETIME(6) NOT NULL,
+    PRIMARY KEY (`AccountingPeriodLockId`),
+    KEY `IX_AccountingPeriodLocks_IsActive` (`IsActive`, `LockedThrough`)
+) CHARACTER SET utf8mb4;");
+
         await EnsureColumnAsync("Payments", "PublicId", "VARCHAR(64) NULL");
         await EnsureIndexAsync("Payments", "IX_Payments_PublicId", "`PublicId`", unique: true);
         await EnsureColumnAsync("Refunds", "PublicId", "VARCHAR(64) NULL");
         await EnsureIndexAsync("Refunds", "IX_Refunds_PublicId", "`PublicId`", unique: true);
+        // Refund approval status: existing rows are approved (they were applied before the ceiling).
+        await EnsureColumnAsync("Refunds", "Status", "VARCHAR(40) NOT NULL DEFAULT 'Approved'");
+        await EnsureColumnAsync("Refunds", "ApprovedBy", "VARCHAR(150) NULL");
+        await EnsureColumnAsync("Refunds", "ApprovedAt", "DATETIME(6) NULL");
+        // Refund funding source: existing rows came out of an employee's custody, not the fund.
+        await EnsureColumnAsync("Refunds", "PaidFromFund", "TINYINT(1) NOT NULL DEFAULT 0");
     }
 
     private async Task EnsureColumnAsync(string tableName, string columnName, string definitionSql)

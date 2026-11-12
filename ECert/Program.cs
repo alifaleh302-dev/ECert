@@ -65,8 +65,17 @@ builder.Services.AddScoped<LegacyCertificateImportService>();
 builder.Services.AddScoped<CertificateDesignSchemaMigrationService>();
 builder.Services.AddScoped<CashboxSchemaMigrationService>();
 builder.Services.AddScoped<FinancialSchemaMigrationService>();
+builder.Services.AddScoped<ExpenseInstallmentSchemaMigrationService>();
 builder.Services.AddScoped<FinancialLedgerService>();
 builder.Services.AddScoped<FinancialService>();
+builder.Services.AddScoped<SystemSettingsService>();
+builder.Services.AddScoped<PeriodLockService>();
+builder.Services.AddScoped<CashReconciliationService>();
+builder.Services.AddScoped<ExpenseService>();
+builder.Services.AddScoped<InstallmentService>();
+builder.Services.AddScoped<FinanceReportService>();
+builder.Services.AddScoped<CourseRevenueService>();
+builder.Services.AddScoped<CurrencyProvider>();
 builder.Services.AddScoped<ReceiptVerificationService>();
 builder.Services.AddScoped<UserCourseSchemaMigrationService>();
 builder.Services.AddScoped<UserCategorySchemaMigrationService>();
@@ -221,6 +230,10 @@ using (var scope = app.Services.CreateScope())
         // before any migration or the seeder that loads those entities (EF selects every column).
         var financialMigration = scope.ServiceProvider.GetRequiredService<FinancialSchemaMigrationService>();
         await financialMigration.EnsureAsync();
+        // Expense and installment tables: created here so the seeder and every later query can load
+        // those entities (EF selects every mapped column).
+        var expenseInstallmentMigration = scope.ServiceProvider.GetRequiredService<ExpenseInstallmentSchemaMigrationService>();
+        await expenseInstallmentMigration.EnsureAsync();
         // Must exist before DbSeeder loads Users with their course assignments.
         var userCourseMigration = scope.ServiceProvider.GetRequiredService<UserCourseSchemaMigrationService>();
         await userCourseMigration.EnsureAsync();

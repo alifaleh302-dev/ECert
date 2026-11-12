@@ -73,7 +73,7 @@
                                     <strong>@(p.Invoice?.TraineeNameArabic ?? p.Invoice?.TraineeName)</strong>
                                     <span class="d-block text-muted small" dir="ltr">@(p.Invoice?.TraineeNameEnglish ?? p.Invoice?.TraineeName)</span>
                                 </td>
-                                <td class="fw-bold">@p.Amount.ToString("N0") ريال</td>
+                                <td class="fw-bold">@p.Amount.ToString("N0") @Currency.Symbol</td>
                                 <td>
                                     @switch (p.PaymentMethod)
                                     {

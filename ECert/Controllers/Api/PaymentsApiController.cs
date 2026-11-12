@@ -17,8 +17,11 @@ public class PaymentsApiController : ControllerBase
     private readonly ECertDbContext _db;
     private readonly AuditLogService _audit;
     private readonly FinancialLedgerService _ledger;
-    public PaymentsApiController(ECertDbContext db, AuditLogService audit, FinancialLedgerService ledger)
-    { _db = db; _audit = audit; _ledger = ledger; }
+    private readonly SystemSettingsService _settings;
+    private readonly PeriodLockService _periods;
+    public PaymentsApiController(ECertDbContext db, AuditLogService audit, FinancialLedgerService ledger,
+        SystemSettingsService settings, PeriodLockService periods)
+    { _db = db; _audit = audit; _ledger = ledger; _settings = settings; _periods = periods; }
 
     private bool HasPermission(string perm) => User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
 
@@ -59,6 +62,9 @@ public class PaymentsApiController : ControllerBase
         if (!CanAccess(invoice)) return Ok(ApiResponse.Fail("ليس لديك صلاحية الوصول"));
         if (invoice.Status == "Cancelled") return Ok(ApiResponse.Fail("لا يمكن تسجيل دفعة على فاتورة ملغية."));
 
+        if (await _periods.IsLockedAsync(DateTime.Now))
+            return Ok(ApiResponse.Fail((await _periods.BlockedMessageAsync(DateTime.Now))!));
+
         var remaining = invoice.TotalAmount - invoice.PaidAmount;
         if (req.Amount > remaining)
             return Ok(ApiResponse.Fail("المبلغ أكبر من المتبقي!"));
@@ -92,7 +98,7 @@ public class PaymentsApiController : ControllerBase
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Create", "Payment", payment.PaymentId, null, $"Amount: {req.Amount}");
 
-        return Ok(ApiResponse<object>.Ok(new { id = payment.PaymentId }, $"تم تسجيل دفعة بقيمة {req.Amount} ريال بنجاح"));
+        return Ok(ApiResponse<object>.Ok(new { id = payment.PaymentId }, $"تم تسجيل دفعة بقيمة {req.Amount:N2} {await _settings.GetCurrencySymbolAsync()} بنجاح"));
     }
 
     public record CancelPaymentRequest(string? Reason);
@@ -106,6 +112,13 @@ public class PaymentsApiController : ControllerBase
         var payment = await _db.Payments.Include(p => p.Invoice).ThenInclude(i => i!.Registration).FirstOrDefaultAsync(p => p.PaymentId == id);
         if (payment == null) return NotFound(ApiResponse.Fail("الدفعة غير موجودة"));
         if (payment.Invoice == null || !CanAccess(payment.Invoice)) return Ok(ApiResponse.Fail("ليس لديك صلاحية الوصول"));
+
+        if (await _periods.IsLockedAsync(payment.PaymentDate))
+            return Ok(ApiResponse.Fail((await _periods.BlockedMessageAsync(payment.PaymentDate))!));
+
+        // A repeated cancel must not reverse the collector's custody twice.
+        if (payment.IsCancelled)
+            return Ok(ApiResponse.Ok("تم إلغاء الدفعة بنجاح"));
 
         payment.IsCancelled = true;
         payment.CancellationReason = req?.Reason;
@@ -125,7 +138,7 @@ public class PaymentsApiController : ControllerBase
             .Where(p => p.InvoiceId == invoice.InvoiceId && !p.IsCancelled)
             .SumAsync(p => (decimal?)p.Amount) ?? 0m;
         var refunded = await _db.Refunds
-            .Where(r => r.InvoiceId == invoice.InvoiceId)
+            .Where(r => r.InvoiceId == invoice.InvoiceId && r.Status == RefundStatus.Approved)
             .SumAsync(r => (decimal?)r.Amount) ?? 0m;
         var net = paid - refunded;
 

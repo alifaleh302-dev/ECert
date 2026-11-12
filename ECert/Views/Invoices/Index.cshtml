@@ -47,9 +47,9 @@
                                 <td><code>@inv.InvoiceNumber</code></td>
                                 <td><strong>@(inv.TraineeNameArabic ?? inv.TraineeName)</strong><span class="d-block text-muted small" dir="ltr">@(inv.TraineeNameEnglish ?? inv.TraineeName)</span></td>
                                 <td><span dir="ltr">@(inv.CourseNameEnglish ?? inv.CourseName)</span><span class="d-block text-muted small">@(inv.CourseNameArabic ?? inv.CourseName)</span></td>
-                                <td>@inv.TotalAmount.ToString("N0") ريال</td>
-                                <td>@inv.PaidAmount.ToString("N0") ريال</td>
-                                <td>@inv.RemainingAmount.ToString("N0") ريال</td>
+                                <td>@inv.TotalAmount.ToString("N0") @Currency.Symbol</td>
+                                <td>@inv.PaidAmount.ToString("N0") @Currency.Symbol</td>
+                                <td>@inv.RemainingAmount.ToString("N0") @Currency.Symbol</td>
                                 <td>
                                     @switch (inv.Status)
                                     {

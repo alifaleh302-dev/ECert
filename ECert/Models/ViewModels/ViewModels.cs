@@ -315,17 +315,80 @@ public class CourseRevenueRowViewModel
 {
     public int CourseId { get; set; }
     public string CourseName { get; set; } = string.Empty;
+    public string CategoryName { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
     public int Registrations { get; set; }
     public decimal Original { get; set; }
     public decimal Exemptions { get; set; }
     public decimal Expected { get; set; }
+    /// <summary>Gross collections before refunds.</summary>
     public decimal Paid { get; set; }
-    public decimal Remaining { get; set; }
+    public decimal Refunds { get; set; }
+    /// <summary>Collections minus approved refunds — the revenue actually kept.</summary>
+    public decimal NetPaid => Paid - Refunds;
+    public decimal Remaining => Expected - NetPaid;
     public int FullPaid { get; set; }
     public int Partial { get; set; }
     public int Unpaid { get; set; }
     public decimal Cash { get; set; }
-    public decimal Bank { get; set; }
-    public decimal Transferred { get; set; }
-    public decimal AvailableToTransfer { get; set; }
+    /// <summary>Electronic wallets and bank transfers (everything that is not cash).</summary>
+    public decimal Wallet { get; set; }
+    /// <summary>Collection ratio (0–100) of net paid against the expected amount.</summary>
+    public decimal CollectionPercent => Expected > 0 ? Math.Round(NetPaid / Expected * 100m, 1) : 0m;
+}
+
+/// <summary>Totals shown as KPI cards above the course-revenue table; they honour the active filters.</summary>
+public class CourseRevenueSummaryViewModel
+{
+    public decimal Expected { get; set; }
+    public decimal NetPaid { get; set; }
+    public decimal Cash { get; set; }
+    public decimal Wallet { get; set; }
+    public decimal Remaining { get; set; }
+    public decimal CollectionPercent => Expected > 0 ? Math.Round(NetPaid / Expected * 100m, 1) : 0m;
+}
+
+/// <summary>One trainee's collection position inside the per-course drill-down.</summary>
+public class CourseRevenueTraineeRow
+{
+    public int InvoiceId { get; set; }
+    public string InvoiceNumber { get; set; } = string.Empty;
+    public string TraineeName { get; set; } = string.Empty;
+    public string Phone { get; set; } = string.Empty;
+    public decimal Expected { get; set; }
+    public decimal Paid { get; set; }
+    public decimal Refunds { get; set; }
+    public decimal NetPaid => Paid - Refunds;
+    public decimal Remaining => Expected - NetPaid;
+    public string Status { get; set; } = string.Empty;
+    public DateTime? DueDate { get; set; }
+}
+
+/// <summary>A grouped money total (by collecting employee, or by payment method).</summary>
+public class CourseRevenueBreakdownRow
+{
+    public string Label { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public int Count { get; set; }
+    public decimal Share => 0m; // set by the view from the section total
+}
+
+/// <summary>The whole drill-down payload for one course (تقرير تحصيلات الدورة).</summary>
+public class CourseRevenueDetailViewModel
+{
+    public int CourseId { get; set; }
+    public string CourseName { get; set; } = string.Empty;
+    public string CategoryName { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public DateTime? From { get; set; }
+    public DateTime? To { get; set; }
+    public decimal Expected { get; set; }
+    public decimal Paid { get; set; }
+    public decimal Refunds { get; set; }
+    public decimal NetPaid => Paid - Refunds;
+    public decimal Remaining => Expected - NetPaid;
+    public decimal CollectionPercent => Expected > 0 ? Math.Round(NetPaid / Expected * 100m, 1) : 0m;
+    public List<CourseRevenueTraineeRow> Trainees { get; set; } = new();
+    public List<CourseRevenueBreakdownRow> ByEmployee { get; set; } = new();
+    public List<CourseRevenueBreakdownRow> ByMethod { get; set; } = new();
 }

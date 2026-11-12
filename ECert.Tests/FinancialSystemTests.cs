@@ -164,6 +164,94 @@ public class FinancialSystemTests
         Assert.Equal(0m, (await _fixture.Factory.GetInvoiceAsync(invoiceId)).PaidAmount);
     }
 
+    /// <summary>
+    /// Re-posting the cancel form (double-click, back button, retry) must not reverse the collector's
+    /// custody a second time — the reversal is idempotent and the custody returns to its starting
+    /// balance exactly once.
+    /// </summary>
+    [Fact]
+    public async Task Cancelling_a_payment_twice_reverses_the_custody_only_once()
+    {
+        var invoiceId = await _fixture.Factory.CreateInvoiceAsync();
+        var admin = await SignInAdminAsync();
+        var adminId = await _fixture.Factory.AdminUserIdAsync();
+        var custodyBefore = await _fixture.Factory.CustodyBalanceAsync(adminId);
+
+        var add = await admin.PostFormAsync($"/Payments/Add?invoiceId={invoiceId}", "/Payments/Add", new[]
+        {
+            new KeyValuePair<string, string>("InvoiceId", invoiceId.ToString()),
+            new KeyValuePair<string, string>("Amount", "300"),
+            new KeyValuePair<string, string>("PaymentMethod", "Cash")
+        });
+        add.EnsureSuccessStatusCode();
+        Assert.Equal(300m, await _fixture.Factory.CustodyBalanceAsync(adminId) - custodyBefore);
+
+        var paymentId = await _fixture.Factory.WithDbAsync(async db =>
+            (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstAsync(
+                db.Payments.Where(p => p.InvoiceId == invoiceId))).PaymentId);
+
+        var token = await admin.FetchTokenAsync($"/Invoices/Details/{invoiceId}");
+        var form = new[] { new KeyValuePair<string, string>("id", paymentId.ToString()) };
+
+        var first = await admin.PostFormWithTokenAsync(token, "/Payments/Cancel", form);
+        first.EnsureSuccessStatusCode();
+        var second = await admin.PostFormWithTokenAsync(token, "/Payments/Cancel", form);
+        second.EnsureSuccessStatusCode();
+
+        Assert.Equal(0m, await _fixture.Factory.CustodyBalanceAsync(adminId) - custodyBefore);
+        var reversalEntries = await _fixture.Factory.WithDbAsync(db =>
+            Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(
+                db.CustodyEntries.Where(e => e.ReferenceType == "Payment" && e.ReferenceId == paymentId
+                    && e.EntryType == ECert.Models.CustodyEntryTypes.Adjustment)));
+        Assert.Equal(1, reversalEntries);
+    }
+
+    /// <summary>
+    /// A refund still awaiting approval must not affect the invoice: cancelling the payment that it
+    /// was created against cannot drive the balance negative.
+    /// </summary>
+    [Fact]
+    public async Task A_pending_refund_does_not_drive_the_invoice_balance_negative()
+    {
+        var invoiceId = await _fixture.Factory.CreateInvoiceAsync();
+        var admin = await SignInAdminAsync();
+        await _fixture.Factory.AddPaymentAsync(invoiceId, 200m);
+
+        await _fixture.Factory.WithDbAsync(async db =>
+        {
+            var invoice = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstAsync(
+                db.Invoices.Where(i => i.InvoiceId == invoiceId));
+            db.Refunds.Add(new ECert.Models.Refund
+            {
+                InvoiceId = invoiceId,
+                RegistrationId = invoice.RegistrationId,
+                Amount = 150m,
+                Reason = "اختبار استرداد معلّق",
+                RefundMethod = "Cash",
+                RefundDate = DateTime.Now,
+                RefundedBy = "admin",
+                Status = ECert.Models.RefundStatus.PendingApproval,
+                CreatedAt = DateTime.Now
+            });
+            await db.SaveChangesAsync();
+            return true;
+        });
+
+        var paymentId = await _fixture.Factory.WithDbAsync(async db =>
+            (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstAsync(
+                db.Payments.Where(p => p.InvoiceId == invoiceId))).PaymentId);
+
+        var token = await admin.FetchTokenAsync($"/Invoices/Details/{invoiceId}");
+        var cancel = await admin.PostFormWithTokenAsync(token, "/Payments/Cancel", new[]
+        {
+            new KeyValuePair<string, string>("id", paymentId.ToString())
+        });
+        cancel.EnsureSuccessStatusCode();
+
+        var (paid, _) = await _fixture.Factory.GetInvoiceAsync(invoiceId);
+        Assert.Equal(0m, paid);
+    }
+
     [Fact]
     public async Task An_employee_requests_a_handover_and_a_super_admin_approves_it()
     {

@@ -19,7 +19,7 @@
 </div>
 
 <section class="a-kpis mb-4" aria-label="ملخص المتأخرات">
-    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المتأخرات", Value = total.ToString("N2"), Icon = "bi-exclamation-diamond", Tone = "danger", Hint = "ريال" })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المتأخرات", Value = total.ToString("N2"), Icon = "bi-exclamation-diamond", Tone = "danger", Hint = Currency.Symbol })" />
     <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "عدد الفواتير غير المسددة", Value = rows.Count.ToString(), Icon = "bi-receipt", Tone = "warning", Hint = "فاتورة" })" />
 </section>
 

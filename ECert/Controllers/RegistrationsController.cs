@@ -18,15 +18,17 @@ public class RegistrationsController : Controller
     private readonly NotificationService _notify;
     private readonly RegistrationInvoiceService _invoiceService;
     private readonly FinancialLedgerService _ledger;
+    private readonly SystemSettingsService _settings;
 
     public RegistrationsController(ECertDbContext db, AuditLogService audit, NotificationService notify,
-        RegistrationInvoiceService invoiceService, FinancialLedgerService ledger)
+        RegistrationInvoiceService invoiceService, FinancialLedgerService ledger, SystemSettingsService settings)
     {
         _db = db;
         _audit = audit;
         _notify = notify;
         _invoiceService = invoiceService;
         _ledger = ledger;
+        _settings = settings;
     }
 
     private bool HasPermission(string perm) => User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
@@ -235,7 +237,7 @@ public class RegistrationsController : Controller
             await _audit.LogAsync(User.Identity?.Name ?? "", "ApplyExemption", "Registration", reg.RegistrationId, null,
                 $"Exemption: {reg.ExemptionAmount}; Reason: {reg.ExemptionReason ?? "-"}");
             TempData["Success"] = reg.ExemptionAmount > 0
-                ? $"تم تطبيق إعفاء بقيمة {reg.ExemptionAmount:N2} ريال بنجاح."
+                ? $"تم تطبيق إعفاء بقيمة {reg.ExemptionAmount:N2} {await _settings.GetCurrencySymbolAsync()} بنجاح."
                 : "تم إلغاء الإعفاء وإعادة الرسوم إلى قيمتها الأصلية.";
         }
         catch (InvalidOperationException ex)

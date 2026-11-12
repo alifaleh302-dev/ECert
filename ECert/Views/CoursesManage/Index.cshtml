@@ -55,7 +55,7 @@
                                 </td>
                                 <td>@course.Category?.CategoryName</td>
                                 <td>@course.InstructorNamesDisplay</td>
-                                <td>@course.Price.ToString("N0") ريال</td>
+                                <td>@course.Price.ToString("N0") @Currency.Symbol</td>
                                 <td>
                                     @switch (course.Status)
                                     {

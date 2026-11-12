@@ -67,8 +67,10 @@ public class CashboxWithdrawal
 
 public static class CashboxRoles
 {
-    public const string SystemManager = "SuperAdmin";      // مدير النظام — فقط من يسحب من الصندوق
+    public const string SystemManager = "SuperAdmin";      // مدير النظام — الجهة الوحيدة التي تتعامل مع الصندوق الرئيسي
 
-    public const string PermTransfer = "manage-cashbox";   // صلاحية ترحيل الرصيد
-    public const string PermWithdraw = "withdraw-cashbox"; // صلاحية سحب من الصندوق — SuperAdmin فقط
+    // The main fund is reachable only by the SuperAdmin. Collections flow into an employee's
+    // custody first, and reach the fund solely through an approved handover (توريد) from
+    // /Custody — the single, auditable path. There is deliberately no per-course "transfer"
+    // permission: that legacy path is retired.
 }

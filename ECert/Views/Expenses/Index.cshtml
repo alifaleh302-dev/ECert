@@ -1,0 +1,135 @@
+@{
+    ViewData["Title"] = "المصروفات";
+    ViewData["PageIcon"] = "bi-cart-dash";
+    ViewData["PageDesc"] = "تسجيل مصروفات المؤسسة واعتمادها؛ لا تُحتسب في التقارير إلا بعد الاعتماد";
+    Layout = "_AdminLayout";
+    var expenses = ViewBag.Expenses as List<Expense> ?? new();
+    var categories = ViewBag.Categories as List<ExpenseCategory> ?? new();
+    decimal approvedTotal = ViewBag.ApprovedTotal is decimal a ? a : 0m;
+    int pendingCount = ViewBag.PendingCount is int p ? p : 0;
+    bool isSuperAdmin = ViewBag.IsSuperAdmin is bool sa && sa;
+    string statusLabel(string s) => ECert.Controllers.ExpensesController.StatusLabel(s);
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Categories" class="btn btn-outline-secondary"><i class="bi bi-tags"></i> بنود المصروفات</a>
+        <a asp-action="ExportXlsx" asp-route-categoryId="@ViewBag.CategoryId" asp-route-status="@ViewBag.Status"
+           asp-route-from="@ViewBag.From" asp-route-to="@ViewBag.To" class="btn btn-success">
+            <i class="bi bi-file-earmark-excel"></i> تصدير XLSX
+        </a>
+        <a asp-action="Create" class="btn btn-primary"><i class="bi bi-plus-lg"></i> مصروف جديد</a>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="a-note a-note--success mb-4" role="status"><i class="bi bi-check-circle" aria-hidden="true"></i> <div>@TempData["Success"]</div></div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="a-note a-note--danger mb-4" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> <div>@TempData["Error"]</div></div>
+}
+
+<section class="a-kpis mb-4" aria-label="ملخص المصروفات">
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المصروفات المعتمدة", Value = approvedTotal.ToString("N2"), Icon = "bi-cart-dash", Tone = "danger", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "بانتظار الاعتماد", Value = pendingCount.ToString(), Icon = "bi-hourglass-split", Tone = "warning", Hint = "مصروف" })" />
+</section>
+
+<form method="get" class="a-toolbar" role="search" aria-label="تصفية المصروفات">
+    <div class="a-toolbar__field a-toolbar__field--grow">
+        <label class="a-field__label" for="expCat">البند</label>
+        <select id="expCat" name="categoryId" class="form-select">
+            <option value="">كل البنود</option>
+            @foreach (var c in categories)
+            {
+                <option value="@c.ExpenseCategoryId" selected="@(ViewBag.CategoryId == c.ExpenseCategoryId)">@c.Name</option>
+            }
+        </select>
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="expStatus">الحالة</label>
+        <select id="expStatus" name="status" class="form-select">
+            <option value="">الكل</option>
+            <option value="Approved" selected="@(ViewBag.Status == "Approved")">معتمد</option>
+            <option value="PendingApproval" selected="@(ViewBag.Status == "PendingApproval")">بانتظار الاعتماد</option>
+            <option value="Rejected" selected="@(ViewBag.Status == "Rejected")">مرفوض</option>
+        </select>
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="expFrom">من</label>
+        <input id="expFrom" type="date" name="from" value="@ViewBag.From" class="form-control" />
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="expTo">إلى</label>
+        <input id="expTo" type="date" name="to" value="@ViewBag.To" class="form-control" />
+    </div>
+    <div class="a-toolbar__actions">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> تصفية</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">مسح</a>
+    </div>
+</form>
+
+<div class="a-card">
+    <div class="a-card__body @(expenses.Any() ? "a-card__body--flush" : "")">
+        @if (expenses.Any())
+        {
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>التاريخ</th><th>البند</th><th>البيان</th><th>المبلغ</th>
+                            <th>المستند</th><th>قدّمه</th><th>الحالة</th><th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var e in expenses)
+                        {
+                            <tr>
+                                <td class="small">@e.ExpenseDate.ToString("yyyy-MM-dd")</td>
+                                <td class="small">@e.Category?.Name</td>
+                                <td class="a-table__primary">@e.Description</td>
+                                <td class="a-amount a-amount--out">@e.Amount.ToString("N2") @Currency.Symbol</td>
+                                <td class="small">
+                                    @if (!string.IsNullOrWhiteSpace(e.AttachmentUrl))
+                                    {
+                                        <a href="@e.AttachmentUrl" target="_blank" rel="noopener"><i class="bi bi-paperclip"></i> مرفق</a>
+                                    }
+                                    else { <span class="text-muted">—</span> }
+                                </td>
+                                <td class="small">@e.SubmittedBy</td>
+                                <td>
+                                    <span class="a-badge @(e.Status == "Approved" ? "a-badge--success" : e.Status == "Rejected" ? "a-badge--danger" : "a-badge--warning")">@statusLabel(e.Status)</span>
+                                </td>
+                                <td>
+                                    @if (isSuperAdmin && e.Status == "PendingApproval")
+                                    {
+                                        <div class="d-flex gap-1">
+                                            <form asp-action="Approve" asp-route-id="@e.ExpenseId" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('اعتماد هذا المصروف؟');"><i class="bi bi-check-lg"></i> اعتماد</button>
+                                            </form>
+                                            <form asp-action="Reject" asp-route-id="@e.ExpenseId" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('رفض هذا المصروف؟');"><i class="bi bi-x-lg"></i> رفض</button>
+                                            </form>
+                                        </div>
+                                    }
+                                    else if (!string.IsNullOrWhiteSpace(e.ReviewedBy))
+                                    {
+                                        <span class="small text-muted">@e.ReviewedBy</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-cart-dash", Title = "لا توجد مصروفات", Text = "لم تُسجَّل مصروفات مطابقة للتصفية." })" />
+        }
+    </div>
+</div>

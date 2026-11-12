@@ -68,7 +68,7 @@ public class RolePermissionFlowTests
         yield return new object[] { new[] { AdminPermissions.ViewInvoices } };
         yield return new object[] { new[] { AdminPermissions.ManageFinance } };
         yield return new object[] { new[] { AdminPermissions.ManageRegistrations, AdminPermissions.ViewReports, AdminPermissions.ManagePosts } };
-        yield return new object[] { new[] { AdminPermissions.ManageCashbox, AdminPermissions.ManagePhoneCountries } };
+        yield return new object[] { new[] { AdminPermissions.ViewCustody, AdminPermissions.ManagePhoneCountries } };
         yield return new object[] { new[] { AdminPermissions.ManageUsers, AdminPermissions.ViewAuditLog } };
     }
 

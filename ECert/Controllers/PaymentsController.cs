@@ -19,9 +19,12 @@ public class PaymentsController : Controller
     private readonly FinancialLedgerService _ledger;
     private readonly ReceiptVerificationService _receipts;
     private readonly IConfiguration _configuration;
+    private readonly SystemSettingsService _settings;
+    private readonly PeriodLockService _periods;
     public PaymentsController(ECertDbContext db, AuditLogService audit, FinancialLedgerService ledger,
-        ReceiptVerificationService receipts, IConfiguration configuration)
-    { _db = db; _audit = audit; _ledger = ledger; _receipts = receipts; _configuration = configuration; }
+        ReceiptVerificationService receipts, IConfiguration configuration, SystemSettingsService settings,
+        PeriodLockService periods)
+    { _db = db; _audit = audit; _ledger = ledger; _receipts = receipts; _configuration = configuration; _settings = settings; _periods = periods; }
 
     private string InstitutionName =>
         _configuration["Institution:Name"] is { Length: > 0 } name ? name : "مركز التدريب";
@@ -105,6 +108,12 @@ public class PaymentsController : Controller
             return RedirectToAction("Details", "Invoices", new { id = model.InvoiceId });
         }
 
+        if (await _periods.IsLockedAsync(DateTime.Now))
+        {
+            TempData["Error"] = await _periods.BlockedMessageAsync(DateTime.Now);
+            return RedirectToAction("Add", new { invoiceId = model.InvoiceId });
+        }
+
         if (model.Amount <= 0)
         {
             TempData["Error"] = "المبلغ يجب أن يكون أكبر من صفر!";
@@ -168,7 +177,7 @@ public class PaymentsController : Controller
         await transaction.CommitAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Create", "Payment", payment.PaymentId, null, $"Amount: {model.Amount}, Method: {model.PaymentMethod}");
 
-        TempData["Success"] = $"تم تسجيل دفعة بقيمة {model.Amount} ريال بنجاح.";
+        TempData["Success"] = $"تم تسجيل دفعة بقيمة {model.Amount:N2} {await _settings.GetCurrencySymbolAsync()} بنجاح.";
         return RedirectToAction("Receipt", new { id = payment.PaymentId });
     }
 
@@ -198,7 +207,8 @@ public class PaymentsController : Controller
             WhatsAppLinkBuilder.BuildReceiptMessage(
                 InstitutionName, "سند قبض", payment.ReferenceNumber ?? $"P-{payment.PaymentId}",
                 payment.Invoice.TraineeName, payment.Invoice.CourseName, payment.Amount,
-                payment.Invoice.RemainingAmount, (string)ViewBag.VerificationUrl));
+                payment.Invoice.RemainingAmount, (string)ViewBag.VerificationUrl,
+                await _settings.GetCurrencySymbolAsync()));
         return View(payment);
     }
 
@@ -222,9 +232,28 @@ public class PaymentsController : Controller
     public async Task<IActionResult> Cancel(int id, string? reason)
     {
         if (!HasPermission("manage-payments")) return Forbid();
+
+        // A double-submit (or a re-post of the same form) must not reverse the custody twice: the
+        // row lock plus the already-cancelled guard makes the reversal idempotent.
+        await using var transaction = await _db.Database.BeginTransactionAsync();
+        await LockPaymentRowAsync(id);
         var payment = await _db.Payments.Include(p => p.Invoice).ThenInclude(i => i!.Registration).FirstOrDefaultAsync(p => p.PaymentId == id);
         if (payment == null) return NotFound();
         if (payment.Invoice == null || !CanAccess(User, payment.Invoice)) return Forbid();
+
+        if (payment.IsCancelled)
+        {
+            await transaction.RollbackAsync();
+            TempData["Success"] = "تم إلغاء الدفعة بنجاح.";
+            return RedirectToAction("Details", "Invoices", new { id = payment.InvoiceId });
+        }
+
+        if (await _periods.IsLockedAsync(payment.PaymentDate))
+        {
+            await transaction.RollbackAsync();
+            TempData["Error"] = await _periods.BlockedMessageAsync(payment.PaymentDate);
+            return RedirectToAction("Details", "Invoices", new { id = payment.InvoiceId });
+        }
 
         payment.IsCancelled = true;
         payment.CancellationReason = reason;
@@ -245,9 +274,25 @@ public class PaymentsController : Controller
         await RecomputeInvoiceAsync(payment.Invoice);
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Cancel", "Payment", id, null, $"Reason: {reason}");
+        await transaction.CommitAsync();
 
         TempData["Success"] = "تم إلغاء الدفعة بنجاح.";
         return RedirectToAction("Details", "Invoices", new { id = payment.InvoiceId });
+    }
+
+    /// <summary>Takes an exclusive row lock so concurrent cancels of one payment serialise.</summary>
+    private async Task LockPaymentRowAsync(int paymentId)
+    {
+        var connection = _db.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open) await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.Transaction = _db.Database.CurrentTransaction?.GetDbTransaction();
+        command.CommandText = "SELECT `PaymentId` FROM `Payments` WHERE `PaymentId` = @id FOR UPDATE";
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "@id";
+        parameter.Value = paymentId;
+        command.Parameters.Add(parameter);
+        await command.ExecuteScalarAsync();
     }
 
     /// <summary>Finds the user who recorded a payment, so its reversal debits the right custody.</summary>
@@ -266,6 +311,12 @@ public class PaymentsController : Controller
         var payment = await _db.Payments.Include(p => p.Invoice).ThenInclude(i => i!.Registration).FirstOrDefaultAsync(p => p.PaymentId == id);
         if (payment == null) return NotFound();
         if (payment.Invoice == null || !CanAccess(User, payment.Invoice)) return Forbid();
+
+        if (await _periods.IsLockedAsync(payment.PaymentDate))
+        {
+            TempData["Error"] = await _periods.BlockedMessageAsync(payment.PaymentDate);
+            return RedirectToAction("Details", "Invoices", new { id = payment.InvoiceId });
+        }
 
         var invoiceId = payment.InvoiceId;
         var invoice = payment.Invoice;
@@ -334,7 +385,7 @@ public class PaymentsController : Controller
             .Where(p => p.InvoiceId == invoice.InvoiceId && !p.IsCancelled)
             .SumAsync(p => (decimal?)p.Amount) ?? 0m;
         var refunded = await _db.Refunds
-            .Where(r => r.InvoiceId == invoice.InvoiceId)
+            .Where(r => r.InvoiceId == invoice.InvoiceId && r.Status == RefundStatus.Approved)
             .SumAsync(r => (decimal?)r.Amount) ?? 0m;
         var net = paid - refunded;
 

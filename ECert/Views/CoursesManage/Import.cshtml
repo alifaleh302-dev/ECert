@@ -68,7 +68,7 @@ else
                     @foreach (var row in Model.Preview.Rows)
                     {
                         <tr class="@(row.IsValid ? "" : "table-danger")">
-                            <td>@row.RowNumber</td><td><strong>@row.CourseName</strong></td><td>@row.Category</td><td>@row.Instructors</td><td>@row.Price.ToString("N0") ريال</td><td>@row.Status</td>
+                            <td>@row.RowNumber</td><td><strong>@row.CourseName</strong></td><td>@row.Category</td><td>@row.Instructors</td><td>@row.Price.ToString("N0") @Currency.Symbol</td><td>@row.Status</td>
                             <td>@if (row.IsValid) { <span class="a-badge a-badge--success">سليم</span> } else { <span class="a-error">@string.Join("، ", row.Errors)</span> }</td>
                         </tr>
                     }

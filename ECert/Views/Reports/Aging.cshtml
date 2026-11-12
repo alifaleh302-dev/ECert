@@ -1,0 +1,49 @@
+@{
+    ViewData["Title"] = "أعمار المتأخرات";
+    ViewData["PageIcon"] = "bi-hourglass-split";
+    ViewData["PageDesc"] = "توزيع الأرصدة المستحقة حسب مدة التأخر، ضمن نطاق دوراتك";
+    Layout = "_AdminLayout";
+    var rows = ViewBag.Rows as List<ECert.Services.FinanceReportService.AgingRow> ?? new();
+    decimal total = ViewBag.Total is decimal t ? t : 0m;
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+</div>
+
+<section class="a-kpis mb-4" aria-label="ملخص الأعمار">
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المتأخرات", Value = total.ToString("N2"), Icon = "bi-exclamation-diamond", Tone = "danger", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "عدد الفواتير", Value = rows.Sum(r => r.Count).ToString(), Icon = "bi-receipt", Tone = "neutral", Hint = "فاتورة" })" />
+</section>
+
+<div class="a-card">
+    <div class="a-card__body @(rows.Any() ? "a-card__body--flush" : "")">
+        @if (rows.Any())
+        {
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover align-middle">
+                    <thead><tr><th>الفئة العمرية</th><th>عدد الفواتير</th><th>المبلغ</th><th>النسبة</th></tr></thead>
+                    <tbody>
+                        @foreach (var r in rows)
+                        {
+                            var pct = total > 0 ? (r.Amount / total * 100) : 0m;
+                            <tr>
+                                <td>@r.Label</td>
+                                <td>@r.Count</td>
+                                <td class="a-amount a-amount--out fw-bold">@r.Amount.ToString("N2") @Currency.Symbol</td>
+                                <td class="small">@pct.ToString("N1")%</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr class="fw-bold"><td>الإجمالي</td><td>@rows.Sum(r => r.Count)</td><td class="a-amount a-amount--out">@total.ToString("N2") @Currency.Symbol</td><td>100%</td></tr>
+                    </tfoot>
+                </table>
+            </div>
+        }
+        else
+        {
+            <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-check2-circle", Title = "لا توجد متأخرات", Text = "لا توجد أرصدة مستحقة." })" />
+        }
+    </div>
+</div>

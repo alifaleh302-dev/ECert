@@ -1,0 +1,110 @@
+@{
+    ViewData["Title"] = "المطابقة النقدية";
+    ViewData["PageIcon"] = "bi-clipboard-check";
+    ViewData["PageDesc"] = "مطابقة النقد الفعلي مع الحركات المسجلة (تقرير Z) وأرصدة العهد";
+    Layout = "_AdminLayout";
+    var result = ViewBag.Result as ECert.Services.CashReconciliationService.ReconciliationResult;
+    var custody = ViewBag.Custody as List<ECert.Services.FinanceReportService.CustodyBalanceRow> ?? new();
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+</div>
+
+<form method="get" class="a-toolbar" role="search" aria-label="نطاق التاريخ">
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="recFrom">من</label>
+        <input id="recFrom" type="date" name="from" value="@ViewBag.From" class="form-control" />
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="recTo">إلى</label>
+        <input id="recTo" type="date" name="to" value="@ViewBag.To" class="form-control" />
+    </div>
+    <div class="a-toolbar__actions">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> مطابقة</button>
+        <a asp-action="Reconciliation" class="btn btn-outline-secondary">اليوم</a>
+    </div>
+</form>
+
+@if (result != null)
+{
+    <div class="a-note @(result.IsBalanced ? "a-note--success" : "a-note--warning") mb-4" role="status">
+        <i class="bi @(result.IsBalanced ? "bi-check-circle" : "bi-exclamation-triangle")" aria-hidden="true"></i>
+        <div>
+            @if (result.IsBalanced)
+            {
+                <span>النقد مطابق: رصيد النظام يساوي رصيد الحركات.</span>
+            }
+            else
+            {
+                <span>يوجد فرق بين رصيد النظام ورصيد الحركات بقيمة <strong>@result.Difference.ToString("N2") @Currency.Symbol</strong> — راجع الحركات.</span>
+            }
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="a-card h-100">
+                <div class="a-card__header"><h2 class="a-card__title"><i class="bi bi-calculator" aria-hidden="true"></i> حركات الفترة</h2></div>
+                <div class="a-card__body">
+                    <table class="table a-table align-middle">
+                        <tbody>
+                            <tr><td>إجمالي التحصيل</td><td class="a-amount a-amount--in fw-bold">@result.TotalCollected.ToString("N2") @Currency.Symbol</td></tr>
+                            <tr><td>الاستردادات المعتمدة</td><td class="a-amount a-amount--out">@result.TotalRefunded.ToString("N2") @Currency.Symbol</td></tr>
+                            <tr><td class="text-muted small">منها استرداد من الصندوق الرئيسي</td><td class="a-amount a-amount--out small">@result.TotalRefundedFromFund.ToString("N2") @Currency.Symbol</td></tr>
+                            <tr><td>التوريدات للصندوق (من العهد)</td><td class="a-amount">@result.TotalTransferred.ToString("N2") @Currency.Symbol</td></tr>
+                            <tr><td>المسحوب من الصندوق</td><td class="a-amount a-amount--out">@result.TotalWithdrawn.ToString("N2") @Currency.Symbol</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="a-card h-100">
+                <div class="a-card__header"><h2 class="a-card__title"><i class="bi bi-safe" aria-hidden="true"></i> الأرصدة</h2></div>
+                <div class="a-card__body">
+                    <table class="table a-table align-middle">
+                        <tbody>
+                            <tr><td>رصيد الصندوق (التوريد − السحب − استرداد من الصندوق)</td><td class="a-amount fw-bold">@result.FundBalance.ToString("N2") @Currency.Symbol</td></tr>
+                            <tr><td>إجمالي العهد لدى الموظفين</td><td class="a-amount fw-bold">@result.CustodyBalance.ToString("N2") @Currency.Symbol</td></tr>
+                            <tr class="border-top"><td class="fw-bold">رصيد النظام</td><td class="a-amount fw-bold">@result.SystemBalance.ToString("N2") @Currency.Symbol</td></tr>
+                            <tr><td class="fw-bold">رصيد الحركات</td><td class="a-amount fw-bold">@result.MovementBalance.ToString("N2") @Currency.Symbol</td></tr>
+                            <tr><td class="fw-bold">الفرق</td><td class="a-amount fw-bold @(result.IsBalanced ? "a-amount--in" : "a-amount--out")">@result.Difference.ToString("N2") @Currency.Symbol</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="a-card mt-4">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-wallet2" aria-hidden="true"></i> أرصدة العهد حسب الموظف</h2>
+        </div>
+        <div class="a-card__body @(custody.Any() ? "a-card__body--flush" : "")">
+            @if (custody.Any())
+            {
+                <div class="a-table-wrap">
+                    <table class="table a-table align-middle">
+                        <thead><tr><th>الموظف</th><th>المستخدم</th><th>الرصيد</th></tr></thead>
+                        <tbody>
+                            @foreach (var c in custody)
+                            {
+                                <tr>
+                                    <td class="a-table__primary">@c.FullName</td>
+                                    <td class="small" dir="ltr">@c.Username</td>
+                                    <td class="a-amount fw-bold @(c.Balance >= 0 ? "" : "a-amount--out")">@c.Balance.ToString("N2") @Currency.Symbol</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-wallet2", Title = "لا توجد عهد", Text = "لا توجد أرصدة عهد حالياً." })" />
+            }
+        </div>
+    </div>
+}

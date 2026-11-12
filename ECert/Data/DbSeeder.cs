@@ -267,6 +267,23 @@ public static class DbSeeder
         EnsureSiteSetting(db, "FooterShowAboutLinks", "true", "Layout");
         EnsureSiteSetting(db, "FooterShowSocial", "true", "Layout");
 
+        // Financial system settings (currency + refund approval ceiling). The symbol is display-only;
+        // the system never performs currency conversion.
+        EnsureSiteSetting(db, "CurrencyName", "ريال يمني", "Finance");
+        EnsureSiteSetting(db, "CurrencySymbol", "ر.ي", "Finance");
+        // Refunds at or below this ceiling apply immediately; a larger one waits for a SuperAdmin.
+        EnsureSiteSetting(db, "RefundApprovalThreshold", "500", "Finance");
+        BackfillBlankRefundThreshold(db);
+
+        if (!db.ExpenseCategories.Any())
+        {
+            var defaults = new[] { "رواتب وأجور", "إيجار", "مستلزمات وقرطاسية", "خدمات ومرافق", "تسويق وإعلان", "صيانة", "مصروفات أخرى" };
+            var order = 0;
+            foreach (var name in defaults)
+                db.ExpenseCategories.Add(new ExpenseCategory { Name = name, SortOrder = order++, IsActive = true });
+            db.SaveChanges();
+        }
+
         if (!db.HeroSlides.Any())
         {
             db.HeroSlides.Add(new HeroSlide { Title = "طور مهاراتك مع أفضل المدربين", Description = "نقدم دورات تدريبية معتمدة في مختلف المجالات مع شهادات معتمدة", ImageUrl = "", Button1Text = "استكشف الدورات", Button1Url = "/Courses", Button2Text = "تحقق من شهادة", Button2Url = "/Certificates/Verify", SortOrder = 1, IsActive = true });
@@ -354,5 +371,17 @@ public static class DbSeeder
     {
         if (db.SiteSettings.Any(s => s.Key == key)) return;
         db.SiteSettings.Add(new SiteSetting { Key = key, Value = value, Category = category });
+    }
+
+    /// <summary>
+    /// Seeds the 500 default onto an already-provisioned database whose refund ceiling was left
+    /// blank (an empty ceiling meant "no approval needed"). Only a blank value is filled, so an
+    /// administrator who deliberately chose a different ceiling is never overridden.
+    /// </summary>
+    private static void BackfillBlankRefundThreshold(ECertDbContext db)
+    {
+        var setting = db.SiteSettings.FirstOrDefault(s => s.Key == "RefundApprovalThreshold");
+        if (setting != null && string.IsNullOrWhiteSpace(setting.Value))
+            setting.Value = "500";
     }
 }

@@ -20,7 +20,7 @@
                 <dl class="row mb-0">
                     <dt class="col-sm-4">نوع السند</dt><dd class="col-sm-8">@Model.Kind</dd>
                     <dt class="col-sm-4">رقم السند</dt><dd class="col-sm-8"><code>@Model.ReceiptNumber</code></dd>
-                    <dt class="col-sm-4">المبلغ</dt><dd class="col-sm-8 fw-bold">@Model.Amount.ToString("N2") ريال</dd>
+                    <dt class="col-sm-4">المبلغ</dt><dd class="col-sm-8 fw-bold">@Model.Amount.ToString("N2") @Currency.Symbol</dd>
                     <dt class="col-sm-4">المتدرب</dt><dd class="col-sm-8">@Model.TraineeName</dd>
                     <dt class="col-sm-4">الدورة</dt><dd class="col-sm-8">@Model.CourseName</dd>
                     <dt class="col-sm-4">التاريخ</dt><dd class="col-sm-8">@Model.Date.ToString("yyyy-MM-dd HH:mm")</dd>

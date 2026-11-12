@@ -1596,6 +1596,28 @@ a.a-kpi:focus-visible {
 .a-amount--in { color: var(--a-success); }
 .a-amount--out { color: var(--a-danger); }
 
+/* Inline collection-ratio bar (course-revenue report, breakdown tables). */
+.a-progress {
+    height: 8px;
+    min-width: 70px;
+    border-radius: var(--a-r-full);
+    background: var(--a-surface-3);
+    overflow: hidden;
+}
+
+.a-progress__bar {
+    height: 100%;
+    border-radius: var(--a-r-full);
+    background: var(--a-brand);
+    transition: width .3s ease;
+}
+
+.a-progress__bar--brand { background: var(--a-brand); }
+.a-progress__bar--success { background: var(--a-success); }
+.a-progress__bar--warning { background: var(--a-warning); }
+.a-progress__bar--danger { background: var(--a-danger); }
+.a-progress__bar--info { background: var(--a-info); }
+
 /* Typeahead search-select used by the course instructor picker. */
 .search-select { position: relative; }
 .search-results {

@@ -1,7 +1,7 @@
 @{
-    ViewData["Title"] = "الصندوق";
+    ViewData["Title"] = "الصندوق الرئيسي";
     ViewData["PageIcon"] = "bi-safe";
-    ViewData["PageDesc"] = "ترحيل أرصدة الدورات إلى الصندوق وعرض إجمالي الصندوق والسحوبات";
+    ViewData["PageDesc"] = "الصندوق الرئيسي — التوريدات المعتمدة من العهد والسحوبات. الوصول لمدير النظام فقط";
     Layout = "_AdminLayout";
 
     var transfers = ViewBag.Transfers as List<CashboxTransfer> ?? new();
@@ -10,24 +10,19 @@
     decimal totalTransferred = ViewBag.TotalTransferred is decimal tt ? tt : 0m;
     decimal totalWithdrawn = ViewBag.TotalWithdrawn is decimal tw ? tw : 0m;
     decimal fundRemaining = ViewBag.FundRemaining is decimal fr ? fr : 0m;
-    decimal untransferredTotal = ViewBag.UntransferredTotal is decimal ut ? ut : 0m;
-    var byCourse = ViewBag.TransfersByCourse as Dictionary<int, decimal> ?? new();
+    decimal custodyTotal = ViewBag.CustodyTotal is decimal ct ? ct : 0m;
     var coursesMap = new Dictionary<int, string>();
     if (ViewBag.Courses is List<Course> cList)
         foreach (var cc in cList) coursesMap[cc.CourseId] = cc.CourseName;
-    bool canTransfer = ViewBag.CanTransfer is bool ct && ct;
-    bool canWithdraw = ViewBag.CanWithdraw is bool cw && cw;
 }
+
 <div class="page-header">
     <partial name="_PageHeader" />
-    @if (canTransfer)
-    {
-        <div class="page-actions">
-            <a asp-controller="Reports" asp-action="CourseRevenue" class="btn btn-outline-success">
-                <i class="bi bi-graph-up-arrow"></i> تقرير الإيرادات (للترحيل)
-            </a>
-        </div>
-    }
+    <div class="page-actions">
+        <a asp-controller="Custody" asp-action="Index" class="btn btn-outline-primary">
+            <i class="bi bi-wallet2"></i> عهدة الموظف والتوريد
+        </a>
+    </div>
 </div>
 
 @if (TempData["Success"] != null)
@@ -43,45 +38,50 @@
     </div>
 }
 
-<section class="a-kpis mb-4" aria-label="ملخص الصندوق">
-    <partial name="_KpiCard" model="@(new KpiCard { Label = "إجمالي المحصَّل من الدورات", Value = totalCollected.ToString("N0"), Icon = "bi-cash-stack", Tone = "brand", Hint = "ريال" })" />
-    <partial name="_KpiCard" model="@(new KpiCard { Label = "إجمالي المرحَّل للصندوق", Value = totalTransferred.ToString("N0"), Icon = "bi-safe", Tone = "success", Hint = "ريال" })" />
-    <partial name="_KpiCard" model="@(new KpiCard { Label = "رصيد دون ترحيل", Value = untransferredTotal.ToString("N0"), Icon = "bi-exclamation-circle", Tone = "warning", Hint = "ريال" })" />
-    <partial name="_KpiCard" model="@(new KpiCard { Label = "الصندوق المتاح", Value = fundRemaining.ToString("N0"), Icon = "bi-bank", Tone = "neutral", Hint = "المرحَّل − المسحوب" })" />
-</section>
-
-@if (canWithdraw)
-{
-    <div class="a-card mb-4">
-        <div class="a-card__header">
-            <h2 class="a-card__title"><i class="bi bi-cash-withdraw" aria-hidden="true"></i> سحب من الصندوق — لمدير النظام فقط</h2>
-        </div>
-        <div class="a-card__body">
-            <form asp-action="Withdraw" method="post" class="a-form__grid">
-                @Html.AntiForgeryToken()
-                <div class="a-field">
-                    <label class="a-field__label a-label--required">المبلغ (ريال)</label>
-                    <input type="number" name="amount" min="0.01" step="0.01" max="@fundRemaining.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required />
-                </div>
-                <div class="a-field">
-                    <label class="a-field__label a-label--required">السبب / البيان</label>
-                    <input type="text" name="reason" maxlength="500" class="form-control" placeholder="مثلاً: مصروفات تشغيلية شهرية" required />
-                </div>
-                <div class="a-field a-field--full">
-                    <button type="submit" class="btn btn-danger"
-                            onclick="return confirm('تأكيد سحب المبلغ من الصندوق العام؟');">
-                        <i class="bi bi-dash-circle"></i> سحب
-                    </button>
-                    <p class="a-hint mt-2 mb-0">الصندوق المتاح للسحب الآن: <strong>@fundRemaining.ToString("N0")</strong> ريال</p>
-                </div>
-            </form>
-        </div>
+<div class="a-note a-note--info mb-4">
+    <i class="bi bi-signpost-split" aria-hidden="true"></i>
+    <div>
+        المسار الوحيد لدخول الأموال إلى الصندوق الرئيسي هو <strong>توريد العهدة</strong> المعتمد من صفحة
+        <a asp-controller="Custody" asp-action="Index">عهدة الموظف</a>.
     </div>
-}
+</div>
+
+<section class="a-kpis mb-4" aria-label="ملخص الصندوق">
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "إجمالي المحصَّل من الدورات", Value = totalCollected.ToString("N0"), Icon = "bi-cash-stack", Tone = "brand", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "إجمالي المورَّد للصندوق", Value = totalTransferred.ToString("N0"), Icon = "bi-safe", Tone = "success", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "إجمالي العهد لدى الموظفين", Value = custodyTotal.ToString("N0"), Icon = "bi-wallet2", Tone = "warning", Hint = "لم تُورَّد بعد" })" />
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "الصندوق المتاح", Value = fundRemaining.ToString("N0"), Icon = "bi-bank", Tone = "neutral", Hint = "المورَّد − المسحوب" })" />
+</section>
 
 <div class="a-card mb-4">
     <div class="a-card__header">
-        <h2 class="a-card__title"><i class="bi bi-arrow-left-circle" aria-hidden="true"></i> عمليات ترحيل الأرصدة من الدورات</h2>
+        <h2 class="a-card__title"><i class="bi bi-cash-withdraw" aria-hidden="true"></i> سحب من الصندوق — لمدير النظام فقط</h2>
+    </div>
+    <div class="a-card__body">
+        <form asp-action="Withdraw" method="post" class="a-form__grid">
+            @Html.AntiForgeryToken()
+            <div class="a-field">
+                <label class="a-field__label a-label--required">المبلغ (@Currency.Symbol)</label>
+                <input type="number" name="amount" min="0.01" step="0.01" max="@fundRemaining.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required />
+            </div>
+            <div class="a-field">
+                <label class="a-field__label a-label--required">السبب / البيان</label>
+                <input type="text" name="reason" maxlength="500" class="form-control" placeholder="مثلاً: مصروفات تشغيلية شهرية" required />
+            </div>
+            <div class="a-field a-field--full">
+                <button type="submit" class="btn btn-danger"
+                        onclick="return confirm('تأكيد سحب المبلغ من الصندوق العام؟');">
+                    <i class="bi bi-dash-circle"></i> سحب
+                </button>
+                <p class="a-hint mt-2 mb-0">الصندوق المتاح للسحب الآن: <strong>@fundRemaining.ToString("N0")</strong> @Currency.Symbol</p>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="a-card mb-4">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-arrow-left-circle" aria-hidden="true"></i> التوريدات المعتمدة من العهد</h2>
     </div>
     <div class="a-card__body @(transfers.Any() ? "a-card__body--flush" : "")">
         @if (transfers.Any())
@@ -110,10 +110,10 @@
                                     }
                                     else
                                     {
-                                        <span class="text-muted">— تحويل عام —</span>
+                                        <span class="text-muted">— توريد عهدة —</span>
                                     }
                                 </td>
-                                <td class="a-amount a-amount--in">@t.Amount.ToString("N0") ريال</td>
+                                <td class="a-amount a-amount--in">@t.Amount.ToString("N0") @Currency.Symbol</td>
                                 <td class="text-muted small">@t.Note</td>
                                 <td class="small">@t.CreatedBy</td>
                                 <td class="small">@t.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
@@ -125,7 +125,7 @@
         }
         else
         {
-            <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-arrow-left-circle", Title = "لا توجد عمليات ترحيل", Text = "لا توجد عمليات ترحيل حتى الآن." })" />
+            <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-arrow-left-circle", Title = "لا توجد توريدات", Text = "لم تُورَّد أي عهدة إلى الصندوق بعد." })" />
         }
     </div>
 </div>
@@ -153,7 +153,7 @@
                         {
                             <tr>
                                 <td>@w.Id</td>
-                                <td class="a-amount a-amount--out">@w.Amount.ToString("N0") ريال</td>
+                                <td class="a-amount a-amount--out">@w.Amount.ToString("N0") @Currency.Symbol</td>
                                 <td>@w.Reason</td>
                                 <td class="small">@w.CreatedBy</td>
                                 <td class="small">@w.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>

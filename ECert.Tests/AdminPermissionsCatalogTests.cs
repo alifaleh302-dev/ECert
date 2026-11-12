@@ -49,8 +49,6 @@ public class AdminPermissionsCatalogTests
     [Theory]
     [InlineData("manage-finance", "Invoices")]
     [InlineData("view-invoices", "Invoices")]
-    [InlineData("manage-cashbox", "Cashbox")]
-    [InlineData("withdraw-cashbox", "Cashbox")]
     [InlineData("view-custody", "Custody")]
     [InlineData("manage-refunds", "Refunds")]
     [InlineData("view-receivables", "Receivables")]

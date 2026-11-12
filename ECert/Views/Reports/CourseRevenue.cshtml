@@ -1,19 +1,33 @@
 @{
     ViewData["Title"] = "تقرير إيرادات الدورات";
     ViewData["PageIcon"] = "bi-graph-up-arrow";
-    ViewData["PageDesc"] = "تحليل الإيرادات والمدفوعات لكل دورة تدريبية";
+    ViewData["PageDesc"] = "تحليل تفصيلي للإيرادات: المتوقع، المحصّل، المسترد، وصافي الإيراد الفعلي لكل دورة";
     Layout = "_AdminLayout";
     var data = ViewBag.Data as List<CourseRevenueRowViewModel> ?? new();
+    var summary = ViewBag.Summary as CourseRevenueSummaryViewModel ?? new();
+    var categories = ViewBag.Categories as List<Category> ?? new();
     var courses = ViewBag.Courses as List<Course> ?? new();
-    bool canTransfer = ViewBag.CanTransfer is bool b && b;
+    int? categoryId = ViewBag.CategoryId as int?;
+    int? courseId = ViewBag.CourseId as int?;
+    string? status = ViewBag.Status as string;
+
+    var courseStatuses = new (string Value, string Label)[]
+    {
+        ("Draft", "مسودة"),
+        ("OpenForRegistration", "مفتوحة للتسجيل"),
+        ("InProgress", "جارية"),
+        ("Completed", "مكتملة"),
+        ("Archived", "مؤرشفة")
+    };
+
+    string BarTone(decimal pct) => pct >= 80 ? "success" : pct >= 40 ? "warning" : "danger";
 }
+
 <div class="page-header">
     <partial name="_PageHeader" />
     <div class="page-actions">
-        <a asp-controller="Cashbox" asp-action="Index" class="btn btn-outline-primary">
-            <i class="bi bi-safe"></i> الصندوق
-        </a>
-        <a asp-action="ExportCourseRevenueXlsx" class="btn btn-success">
+        <a asp-action="ExportCourseRevenueXlsx" asp-route-categoryId="@categoryId" asp-route-courseId="@courseId"
+           asp-route-status="@status" asp-route-from="@ViewBag.From" asp-route-to="@ViewBag.To" class="btn btn-success">
             <i class="bi bi-file-earmark-excel"></i> تصدير XLSX
         </a>
     </div>
@@ -32,19 +46,51 @@
     </div>
 }
 
-<form method="get" class="a-toolbar" role="search" aria-label="تصفية تقارير الإيرادات">
-    <div class="a-toolbar__field a-toolbar__field--grow">
-        <label class="a-field__label" for="revenueCourse">اسم الدورة</label>
-        <select id="revenueCourse" name="courseId" class="form-select">
-            <option value="">كل الدورات</option>
-            @if (courses != null)
+<section class="a-kpis mb-4" aria-label="ملخص الإيرادات">
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "إجمالي الإيراد المتوقع", Value = summary.Expected.ToString("N0"), Icon = "bi-cash-stack", Tone = "brand", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "صافي المحصّل الفعلي", Value = summary.NetPaid.ToString("N0"), Icon = "bi-graph-up-arrow", Tone = "success", Hint = $"نقدي {summary.Cash.ToString("N0")} · محافظ {summary.Wallet.ToString("N0")} {Currency.Symbol}" })" />
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "إجمالي المتبقي", Value = summary.Remaining.ToString("N0"), Icon = "bi-hourglass-split", Tone = "warning", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "نسبة التحصيل الإجمالية", Value = $"{summary.CollectionPercent}%", Icon = "bi-percent", Tone = "info", Hint = "صافي المحصّل ÷ المتوقع" })" />
+</section>
+
+<form method="get" class="a-toolbar" role="search" aria-label="تصفية تقرير الإيرادات">
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="revCategory">الفئة</label>
+        <select id="revCategory" name="categoryId" class="form-select">
+            <option value="">كل الفئات</option>
+            @foreach (var c in categories)
             {
-                @foreach (var c in courses)
-                {
-                    <option value="@c.CourseId" selected="@(ViewBag.CourseId == c.CourseId)">@c.CourseName</option>
-                }
+                <option value="@c.CategoryId" selected="@(categoryId == c.CategoryId)">@c.CategoryName</option>
             }
         </select>
+    </div>
+    <div class="a-toolbar__field a-toolbar__field--grow">
+        <label class="a-field__label" for="revCourse">الدورة</label>
+        <select id="revCourse" name="courseId" class="form-select">
+            <option value="">كل الدورات</option>
+            @foreach (var c in courses)
+            {
+                <option value="@c.CourseId" selected="@(courseId == c.CourseId)">@c.CourseName</option>
+            }
+        </select>
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="revStatus">حالة الدورة</label>
+        <select id="revStatus" name="status" class="form-select">
+            <option value="">كل الحالات</option>
+            @foreach (var s in courseStatuses)
+            {
+                <option value="@s.Value" selected="@(status == s.Value)">@s.Label</option>
+            }
+        </select>
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="revFrom">من</label>
+        <input id="revFrom" type="date" name="from" value="@ViewBag.From" class="form-control" />
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="revTo">إلى</label>
+        <input id="revTo" type="date" name="to" value="@ViewBag.To" class="form-control" />
     </div>
     <div class="a-toolbar__actions">
         <button type="submit" class="btn btn-primary"><i class="bi bi-funnel" aria-hidden="true"></i> تصفية</button>
@@ -54,88 +100,76 @@
 
 <div class="a-card">
     <div class="a-card__body">
-        @if (data != null && data.Count > 0)
+        @if (data.Count > 0)
         {
             <div class="a-table-wrap">
                 <table class="table a-table table-hover align-middle">
                     <thead>
                         <tr>
                             <th>الدورة</th>
+                            <th>الفئة</th>
                             <th>المسجلين</th>
                             <th>المتوقع</th>
                             <th>المدفوع</th>
+                            <th>المسترد (Refunds)</th>
+                            <th>صافي الإيراد الفعلي</th>
                             <th>المتبقي</th>
-                            <th>نقدي</th>
-                            <th>محافظ</th>
-                            <th class="text-center">رصيد مرحَّل</th>
-                            <th class="text-center">رصيد دون ترحيل</th>
-                            @if (canTransfer)
-                            {
-                                <th class="text-center" style="min-width:160px">ترحيل إلى الصندوق</th>
-                            }
+                            <th style="min-width:160px">نسبة التحصيل %</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var item in data)
                         {
+                            var pct = item.CollectionPercent;
                             <tr>
-                                <td class="fw-bold">@item.CourseName</td>
+                                <td class="fw-bold">
+                                    <a asp-action="CourseRevenueDetail" asp-route-courseId="@item.CourseId"
+                                       asp-route-from="@ViewBag.From" asp-route-to="@ViewBag.To"
+                                       class="text-decoration-none">@item.CourseName</a>
+                                </td>
+                                <td class="small text-muted">@item.CategoryName</td>
                                 <td>@item.Registrations</td>
-                                <td>@(((decimal)item.Expected).ToString("N0")) ريال</td>
-                                <td class="text-success fw-bold">@(((decimal)item.Paid).ToString("N0")) ريال</td>
-                                <td class="text-danger">@(((decimal)item.Remaining).ToString("N0")) ريال</td>
-                                <td>@(((decimal)item.Cash).ToString("N0")) ريال</td>
-                                <td>@(((decimal)item.Bank).ToString("N0")) ريال</td>
-                                <td class="text-center">
-                                    <span class="a-badge a-badge--success">@(((decimal)item.Transferred).ToString("N0")) ريال</span>
+                                <td>@item.Expected.ToString("N0") @Currency.Symbol</td>
+                                <td class="text-success fw-bold">@item.Paid.ToString("N0") @Currency.Symbol</td>
+                                <td class="text-danger">@(item.Refunds > 0 ? item.Refunds.ToString("N0") : "—")</td>
+                                <td class="fw-bold">@item.NetPaid.ToString("N0") @Currency.Symbol</td>
+                                <td class="text-danger">@item.Remaining.ToString("N0") @Currency.Symbol</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="a-progress flex-grow-1" role="progressbar" aria-valuenow="@pct" aria-valuemin="0" aria-valuemax="100">
+                                            <div class="a-progress__bar a-progress__bar--@BarTone(pct)" style="width:@(pct.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></div>
+                                        </div>
+                                        <span class="small fw-bold">@pct%</span>
+                                    </div>
                                 </td>
-                                <td class="text-center">
-                                    @{
-                                        var avail = (decimal)item.AvailableToTransfer;
-                                        var badgeClass = avail > 0 ? "bg-warning text-dark" : "bg-light text-muted";
-                                    }
-                                    <span class="badge @badgeClass">@avail.ToString("N0") ريال</span>
-                                </td>
-                                @if (canTransfer)
-                                {
-                                    <td class="text-center">
-                                        @if (((decimal)item.AvailableToTransfer) > 0)
-                                        {
-                                            <form asp-controller="Cashbox" asp-action="Transfer" method="post" class="d-inline-flex gap-1 align-items-center">
-                                                @Html.AntiForgeryToken()
-                                                <input type="hidden" name="courseId" value="@item.CourseId" />
-                                                <input type="number" name="amount" min="0.01" step="0.01"
-                                                       max="@(((decimal)item.AvailableToTransfer).ToString(System.Globalization.CultureInfo.InvariantCulture))"
-                                                       value="@(((decimal)item.AvailableToTransfer).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture))"
-                                                       class="form-control form-control-sm" style="width:130px" required />
-                                                <button type="submit" class="btn btn-sm btn-primary"
-                                                        onclick="return confirm('ترحيل @(((decimal)item.AvailableToTransfer).ToString("N0")) ريال من هذه الدورة إلى الصندوق؟');">
-                                                    <i class="bi bi-arrow-left-circle"></i> ترحيل
-                                                </button>
-                                            </form>
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted small">—</span>
-                                        }
-                                    </td>
-                                }
                             </tr>
                         }
                     </tbody>
+                    <tfoot>
+                        <tr class="fw-bold">
+                            <td>الإجمالي</td>
+                            <td></td>
+                            <td>@data.Sum(r => r.Registrations)</td>
+                            <td>@summary.Expected.ToString("N0") @Currency.Symbol</td>
+                            <td class="text-success">@data.Sum(r => r.Paid).ToString("N0") @Currency.Symbol</td>
+                            <td class="text-danger">@data.Sum(r => r.Refunds).ToString("N0") @Currency.Symbol</td>
+                            <td>@summary.NetPaid.ToString("N0") @Currency.Symbol</td>
+                            <td class="text-danger">@summary.Remaining.ToString("N0") @Currency.Symbol</td>
+                            <td>@summary.CollectionPercent%</td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
-            @if (canTransfer)
-            {
-                <p class="text-muted small mb-0 mt-2">
-                    <i class="bi bi-info-circle"></i>
-                    زر "ترحيل" يظهر فقط عندما يكون هناك رصيد "بدون ترحيل" أكبر من صفر. المبلغ المُدخل لا يجتاز الرصيد المتاح.
-                </p>
-            }
+            <p class="text-muted small mb-0 mt-2">
+                <i class="bi bi-info-circle"></i>
+                اضغط على اسم الدورة لعرض تفاصيل تحصيلات المتدربين وتوزيعها حسب الموظف وطريقة الدفع.
+                الأموال تصل إلى الصندوق الرئيسي فقط عبر توريد العهدة من صفحة
+                <a asp-controller="Custody" asp-action="Index">عهدة الموظف</a>.
+            </p>
         }
         else
         {
-            <p class="text-center text-muted py-4">لا توجد بيانات</p>
+            <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-graph-up-arrow", Title = "لا توجد بيانات", Text = "لا توجد دورات مطابقة للفلاتر المحددة." })" />
         }
     </div>
 </div>

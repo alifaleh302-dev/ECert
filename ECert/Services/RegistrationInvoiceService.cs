@@ -7,8 +7,13 @@ namespace ECert.Services;
 public class RegistrationInvoiceService
 {
     private readonly ECertDbContext _db;
+    private readonly SystemSettingsService _settings;
 
-    public RegistrationInvoiceService(ECertDbContext db) => _db = db;
+    public RegistrationInvoiceService(ECertDbContext db, SystemSettingsService settings)
+    {
+        _db = db;
+        _settings = settings;
+    }
 
     public async Task<Invoice> EnsureForAcceptedAsync(Registration registration, string createdBy)
     {
@@ -72,7 +77,7 @@ public class RegistrationInvoiceService
             : registration.Course.FinalPrice;
         exemptionAmount = Math.Round(exemptionAmount, 2, MidpointRounding.AwayFromZero);
         if (exemptionAmount < 0 || exemptionAmount > originalAmount)
-            throw new InvalidOperationException($"مبلغ الإعفاء يجب أن يكون بين 0 و {originalAmount:N2} ريال.");
+            throw new InvalidOperationException($"مبلغ الإعفاء يجب أن يكون بين 0 و {originalAmount:N2} {await _settings.GetCurrencySymbolAsync()}.");
 
         var totalAmount = originalAmount - exemptionAmount;
         if (registration.Invoice != null && registration.Invoice.PaidAmount > totalAmount)

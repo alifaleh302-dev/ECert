@@ -22,9 +22,11 @@ public class RefundsController : Controller
     private readonly FinancialLedgerService _ledger;
     private readonly ReceiptVerificationService _receipts;
     private readonly IConfiguration _configuration;
+    private readonly SystemSettingsService _settings;
 
     public RefundsController(ECertDbContext db, AuditLogService audit, FinancialService financial,
-        FinancialLedgerService ledger, ReceiptVerificationService receipts, IConfiguration configuration)
+        FinancialLedgerService ledger, ReceiptVerificationService receipts, IConfiguration configuration,
+        SystemSettingsService settings)
     {
         _db = db;
         _audit = audit;
@@ -32,6 +34,7 @@ public class RefundsController : Controller
         _ledger = ledger;
         _receipts = receipts;
         _configuration = configuration;
+        _settings = settings;
     }
 
     private bool HasPermission(string perm) => User.HasPermission(perm);
@@ -84,6 +87,11 @@ public class RefundsController : Controller
 
         ViewBag.Invoice = invoice;
         ViewBag.RefundedAmount = await _financial.GetRefundedAmountAsync(invoiceId);
+        ViewBag.IsSuperAdmin = User.IsSuperAdmin();
+        ViewBag.CustodyBalance = CurrentUserId.HasValue
+            ? await _ledger.GetCustodyBalanceAsync(CurrentUserId.Value)
+            : 0m;
+        ViewBag.FundBalance = await _ledger.GetMainFundBalanceAsync();
         return View();
     }
 
@@ -104,7 +112,7 @@ public class RefundsController : Controller
 
         await using var transaction = await _db.Database.BeginTransactionAsync();
         var result = await _financial.CreateRefundAsync(invoice, amount, reason, refundMethod, receiptNumber,
-            CurrentUserId.Value, Actor);
+            CurrentUserId.Value, Actor, isSuperAdmin: User.IsSuperAdmin());
 
         if (!result.Success)
         {
@@ -119,6 +127,59 @@ public class RefundsController : Controller
 
         TempData["Success"] = result.Message;
         return RedirectToAction(nameof(Receipt), new { id = result.Refund!.RefundId });
+    }
+
+    /// <summary>
+    /// Approves a refund that was waiting for approval, after re-checking the refundable ceiling so a
+    /// crafted request cannot push an invoice past fully refunded. SuperAdmin only; the caller must
+    /// already be inside a transaction.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Approve(int id)
+    {
+        if (!HasPermission(AdminPermissions.ManageRefunds)) return Forbid();
+        if (!User.IsSuperAdmin())
+        {
+            TempData["Error"] = "اعتماد الاستردادات يتطلب صلاحية مدير النظام.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var refund = await _db.Refunds.Include(r => r.Invoice).ThenInclude(i => i!.Registration)
+            .FirstOrDefaultAsync(r => r.RefundId == id);
+        if (refund?.Invoice?.Registration == null) return NotFound();
+        if (!User.CanAccessCourse(refund.Invoice.Registration.CourseId)) return Forbid();
+
+        if (!CurrentUserId.HasValue)
+        {
+            TempData["Error"] = "تعذّر تحديد المستخدم الحالي.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        await using var transaction = await _db.Database.BeginTransactionAsync();
+        // Re-check the ceiling: the invoice may have changed since the request was created.
+        await _financial.RecomputeInvoiceAsync(refund.Invoice);
+        var available = refund.Invoice.PaidAmount;
+        if (refund.Amount > available)
+        {
+            await transaction.RollbackAsync();
+            TempData["Error"] = $"لا يمكن الاعتماد: المبلغ المتاح للاسترداد ({available:N2}) أقل من قيمة الطلب ({refund.Amount:N2}).";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var result = await _financial.ApproveRefundAsync(refund, CurrentUserId.Value, Actor);
+        if (!result.Success)
+        {
+            await transaction.RollbackAsync();
+            TempData["Error"] = result.Message;
+            return RedirectToAction(nameof(Index));
+        }
+
+        await transaction.CommitAsync();
+        await _audit.LogAsync(Actor, "Approve", "Refund", refund.RefundId, null,
+            $"Approve refund: {refund.Amount:N2}; Invoice: {refund.Invoice.InvoiceNumber}");
+        TempData["Success"] = result.Message;
+        return RedirectToAction(nameof(Index));
     }
 
     /// <summary>Printable refund voucher (سند صرف) with a public verification QR and WhatsApp share link.</summary>
@@ -144,7 +205,8 @@ public class RefundsController : Controller
             WhatsAppLinkBuilder.BuildReceiptMessage(
                 InstitutionName, "سند استرداد", refund.ReceiptNumber ?? $"R-{refund.RefundId}",
                 refund.Invoice.TraineeName, refund.Invoice.CourseName, refund.Amount,
-                refund.Invoice.RemainingAmount, (string)ViewBag.VerificationUrl));
+                refund.Invoice.RemainingAmount, (string)ViewBag.VerificationUrl,
+                await _settings.GetCurrencySymbolAsync()));
         return View(refund);
     }
 }

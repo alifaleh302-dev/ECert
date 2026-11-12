@@ -28,10 +28,10 @@
 </div>
 
 <section class="a-kpis mb-4" aria-label="ملخص الحساب">
-    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "المبلغ المستحق", Value = (invoice?.TotalAmount ?? 0m).ToString("N2"), Icon = "bi-receipt", Tone = "brand", Hint = "ريال" })" />
-    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المدفوع", Value = (invoice?.PaidAmount ?? 0m).ToString("N2"), Icon = "bi-cash-stack", Tone = "success", Hint = "ريال" })" />
-    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المسترد", Value = refunded.ToString("N2"), Icon = "bi-arrow-counterclockwise", Tone = "warning", Hint = "ريال" })" />
-    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "المتبقي", Value = (invoice?.RemainingAmount ?? 0m).ToString("N2"), Icon = "bi-exclamation-diamond", Tone = "danger", Hint = "ريال" })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "المبلغ المستحق", Value = (invoice?.TotalAmount ?? 0m).ToString("N2"), Icon = "bi-receipt", Tone = "brand", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المدفوع", Value = (invoice?.PaidAmount ?? 0m).ToString("N2"), Icon = "bi-cash-stack", Tone = "success", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المسترد", Value = refunded.ToString("N2"), Icon = "bi-arrow-counterclockwise", Tone = "warning", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "المتبقي", Value = (invoice?.RemainingAmount ?? 0m).ToString("N2"), Icon = "bi-exclamation-diamond", Tone = "danger", Hint = Currency.Symbol })" />
 </section>
 
 <div class="a-grid-2">

@@ -57,6 +57,7 @@ public static class CustodyEntryTypes
     public const string Collection = "Collection";   // مبلغ محصَّل من المتدرب
     public const string Refund = "Refund";           // استرداد رسوم دُفع نقداً من العهدة
     public const string Handover = "Handover";       // توريد/ترحيل إلى الصندوق الرئيسي
+    public const string FundPayout = "FundPayout";   // صرف من الصندوق الرئيسي (استرداد لم يغطّه أي عهدة)
     public const string Adjustment = "Adjustment";   // تسوية يدوية (SuperAdmin فقط)
 }
 
@@ -159,6 +160,33 @@ public class Refund
     [Display(Name = "نفّذه")]
     public string RefundedBy { get; set; } = string.Empty;
 
+    /// <summary>
+    /// <see cref="RefundStatus.PendingApproval"/> while a refund above the direct ceiling waits for a
+    /// SuperAdmin; <see cref="RefundStatus.Approved"/> once it counts against the invoice and custody.
+    /// A pending refund affects neither until it is approved.
+    /// </summary>
+    [Required]
+    [StringLength(40)]
+    [Display(Name = "الحالة")]
+    public string Status { get; set; } = RefundStatus.Approved;
+
+    [StringLength(150)]
+    [Display(Name = "اعتمده")]
+    public string? ApprovedBy { get; set; }
+
+    [Display(Name = "تاريخ الاعتماد")]
+    public DateTime? ApprovedAt { get; set; }
+
+    /// <summary>
+    /// True when the money left the main fund instead of an employee's custody. A refund is normally
+    /// paid out of the performing employee's own custody; when that custody cannot cover it, a
+    /// SuperAdmin may draw the amount from the main fund instead. This flag keeps the fund balance
+    /// correct (see <see cref="FinancialLedgerService.GetMainFundBalanceAsync"/>) and guarantees no
+    /// custody is ever pushed below zero by a refund.
+    /// </summary>
+    [Display(Name = "من الصندوق الرئيسي")]
+    public bool PaidFromFund { get; set; }
+
     /// <summary>Opaque id used by the public verification link/QR; never exposes the sequential key.</summary>
     [StringLength(64)]
     public string? PublicId { get; set; }
@@ -209,13 +237,23 @@ public class FinancialAuditEntry
     public DateTime Timestamp { get; set; } = DateTime.Now;
 }
 
+public static class RefundStatus
+{
+    public const string Approved = "Approved";             // معتمد — يخصم فوراً
+    public const string PendingApproval = "PendingApproval"; // بانتظار اعتماد مدير النظام
+}
+
 public static class FinancialActionTypes
 {
     public const string Collection = "Collection";   // قبض
     public const string Refund = "Refund";           // استرداد
+    public const string RefundApproved = "RefundApproved"; // اعتماد استرداد كبير
     public const string Cancel = "Cancel";           // إلغاء
     public const string Exemption = "Exemption";     // إعفاء / خصم
     public const string Handover = "Handover";       // ترحيل عهدة
     public const string Transfer = "Transfer";       // ترحيل رصيد دورة للصندوق
     public const string Withdraw = "Withdraw";       // سحب من الصندوق
+    public const string Expense = "Expense";         // مصروف معتمد
+    public const string PeriodLock = "PeriodLock";   // إقفال فترة مالية
+    public const string PeriodReopen = "PeriodReopen"; // إعادة فتح فترة مالية
 }
