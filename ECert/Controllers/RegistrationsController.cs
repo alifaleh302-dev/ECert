@@ -28,6 +28,9 @@ public class RegistrationsController : Controller
 
     private bool HasPermission(string perm) => User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
 
+    /// <summary>Denies access to a registration whose course is outside the user's scope.</summary>
+    private bool CanAccess(Registration registration) => User.CanAccessCourseOf(registration);
+
     private string? SafeReturnUrl(string? returnUrl) =>
         !string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : null;
 
@@ -41,6 +44,7 @@ public class RegistrationsController : Controller
         var query = _db.Registrations
             .Include(r => r.Course)
             .Include(r => r.Invoice)
+            .InScope(User)
             .AsQueryable();
 
         if (!string.IsNullOrEmpty(status)) query = query.Where(r => r.Status == status);
@@ -64,6 +68,7 @@ public class RegistrationsController : Controller
         // Razor iterates ViewBag values as dynamic; anonymous-type properties are
         // inaccessible to the generated view and cause RuntimeBinderException.
         ViewBag.Courses = await _db.Courses
+            .InScope(User)
             .OrderBy(c => c.CourseName)
             .ToListAsync();
         ViewBag.TotalCount = registrations.Count;
@@ -80,6 +85,7 @@ public class RegistrationsController : Controller
             .Include(r => r.Invoice).ThenInclude(i => i!.Payments)
             .FirstOrDefaultAsync(r => r.RegistrationId == id);
         if (reg == null) return NotFound();
+        if (!CanAccess(reg)) return Forbid();
         return View(reg);
     }
 
@@ -90,6 +96,7 @@ public class RegistrationsController : Controller
         if (!HasPermission("manage-registrations")) return Forbid();
         var reg = await _db.Registrations.Include(r => r.Course).FirstOrDefaultAsync(r => r.RegistrationId == id);
         if (reg == null) return NotFound();
+        if (!CanAccess(reg)) return Forbid();
 
         if (reg.Status != "Pending")
         {
@@ -117,6 +124,7 @@ public class RegistrationsController : Controller
         if (!HasPermission("manage-registrations")) return Forbid();
         var reg = await _db.Registrations.FirstOrDefaultAsync(r => r.RegistrationId == id);
         if (reg == null) return NotFound();
+        if (!CanAccess(reg)) return Forbid();
 
         if (reg.Status != "Pending")
         {
@@ -138,6 +146,7 @@ public class RegistrationsController : Controller
         if (!HasPermission("manage-registrations")) return Forbid();
         var reg = await _db.Registrations.Include(r => r.Course).FirstOrDefaultAsync(r => r.RegistrationId == model.RegistrationId);
         if (reg == null) return NotFound();
+        if (!CanAccess(reg)) return Forbid();
 
         if (reg.Status != "Pending")
         {
@@ -167,6 +176,7 @@ public class RegistrationsController : Controller
         if (!HasPermission("manage-registrations")) return Forbid();
         var reg = await _db.Registrations.Include(r => r.Course).FirstOrDefaultAsync(r => r.RegistrationId == id);
         if (reg == null) return NotFound();
+        if (!CanAccess(reg)) return Forbid();
 
         if (reg.Status != "Rejected")
         {
@@ -196,6 +206,7 @@ public class RegistrationsController : Controller
             .Include(r => r.Invoice)
             .FirstOrDefaultAsync(r => r.RegistrationId == model.RegistrationId);
         if (reg == null) return NotFound();
+        if (!CanAccess(reg)) return Forbid();
 
         if (reg.Status is not ("Pending" or "Accepted"))
         {
@@ -234,6 +245,7 @@ public class RegistrationsController : Controller
         if (!HasPermission("manage-registrations")) return Forbid();
         var reg = await _db.Registrations.FindAsync(id);
         if (reg == null) return NotFound();
+        if (!CanAccess(reg)) return Forbid();
 
         if (reg.Status is not ("Accepted" or "Rejected"))
         {
@@ -259,6 +271,7 @@ public class RegistrationsController : Controller
             .Include(r => r.Invoice)
             .FirstOrDefaultAsync(r => r.RegistrationId == id);
         if (reg == null) return NotFound();
+        if (!CanAccess(reg)) return Forbid();
 
         if (reg.Status != "Archived")
         {
@@ -288,6 +301,7 @@ public class RegistrationsController : Controller
 
         var reg = await _db.Registrations.FindAsync(id);
         if (reg == null) return NotFound();
+        if (!CanAccess(reg)) return Forbid();
 
         _db.Registrations.Remove(reg);
         await _db.SaveChangesAsync();
@@ -320,6 +334,7 @@ public class RegistrationsController : Controller
         var selectedRegistrations = await _db.Registrations
             .Include(r => r.Course)
             .Include(r => r.Invoice)
+            .InScope(User)
             .Where(r => selectedIdList.Contains(r.RegistrationId))
             .ToListAsync();
 
@@ -392,6 +407,7 @@ public class RegistrationsController : Controller
         var course = courseId.HasValue
             ? await _db.Courses.AsNoTracking().FirstOrDefaultAsync(c => c.CourseId == courseId.Value)
             : null;
+        if (course != null && !User.CanAccessCourse(course.CourseId)) return Forbid();
         var requiresAcademic = course?.RequiresAcademicDetails == true;
 
         var headers = new List<string>
@@ -425,6 +441,12 @@ public class RegistrationsController : Controller
         if (!model.CourseId.HasValue)
         {
             ModelState.AddModelError(nameof(model.CourseId), "اختر الدورة أولاً.");
+            return View(model);
+        }
+
+        if (!User.CanAccessCourse(model.CourseId.Value))
+        {
+            ModelState.AddModelError(nameof(model.CourseId), "لا تملك صلاحية إدارة هذه الدورة.");
             return View(model);
         }
 
@@ -486,6 +508,11 @@ public class RegistrationsController : Controller
         if (course == null)
         {
             TempData["Error"] = "الدورة المحددة لم تعد موجودة.";
+            return RedirectToAction(nameof(Import));
+        }
+        if (!User.CanAccessCourse(course.CourseId))
+        {
+            TempData["Error"] = "لا تملك صلاحية إدارة هذه الدورة.";
             return RedirectToAction(nameof(Import));
         }
 
@@ -580,6 +607,7 @@ public class RegistrationsController : Controller
     {
         model.Courses = await _db.Courses
             .Where(c => c.Status != "Archived")
+            .InScope(User)
             .OrderBy(c => c.CourseNameArabic ?? c.CourseName)
             .Select(c => new RegistrationImportCourseOption
             {
@@ -795,7 +823,7 @@ public class RegistrationsController : Controller
     public async Task<IActionResult> ExportXlsx(string? status, string? search, int? courseId, DateTime? dateFrom, DateTime? dateTo)
     {
         if (!HasPermission("manage-registrations")) return Forbid();
-        var query = _db.Registrations.Include(r => r.Course).Include(r => r.Invoice).AsQueryable();
+        var query = _db.Registrations.Include(r => r.Course).Include(r => r.Invoice).InScope(User).AsQueryable();
         if (!string.IsNullOrEmpty(status)) query = query.Where(r => r.Status == status);
         if (!string.IsNullOrEmpty(search))
             query = query.Where(r => (r.FullNameArabic != null && r.FullNameArabic.Contains(search)) || (r.FullNameEnglish != null && r.FullNameEnglish.Contains(search)) || r.FullName.Contains(search) || r.Phone.Contains(search) || r.RequestNumber.Contains(search));

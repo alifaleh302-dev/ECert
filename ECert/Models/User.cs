@@ -42,4 +42,17 @@ public class User
     public bool MustChangePassword { get; set; }
 
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
+
+    /// <summary>
+    /// Courses this user may administer. Empty means unrestricted (every course), which is the
+    /// case for SuperAdmin and for roles that are not course-scoped.
+    /// </summary>
+    public ICollection<UserCourse> CourseAssignments { get; set; } = new List<UserCourse>();
+
+    /// <summary>
+    /// Categories whose courses this user may administer, including courses added later. Combined
+    /// with <see cref="CourseAssignments"/> to form the effective scope; empty on both means
+    /// unrestricted.
+    /// </summary>
+    public ICollection<UserCategory> CategoryAssignments { get; set; } = new List<UserCategory>();
 }

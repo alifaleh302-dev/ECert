@@ -1,0 +1,131 @@
+@model ECert.Models.ViewModels.CourseScopePickerViewModel
+@{
+    // A course counts as granted when it is named directly, or when its category is granted —
+    // the checkbox reflects the effective grant so the form matches what the user will get.
+    bool CourseGranted(int courseId) => Model.SelectedCourseIds.Contains(courseId);
+    bool CategoryGranted(int categoryId) => Model.SelectedCategoryIds.Contains(categoryId);
+
+    var courseByCategory = Model.Courses
+        .GroupBy(c => c.CategoryId)
+        .ToDictionary(g => g.Key, g => g.ToList());
+    var uncategorised = Model.Courses.Where(c => !Model.Categories.Any(cat => cat.CategoryId == c.CategoryId)).ToList();
+}
+
+<div class="a-scope" data-scope-picker>
+    <div class="a-scope__head">
+        <div>
+            <h3 class="a-form__section-title"><i class="bi bi-diagram-3" aria-hidden="true"></i> نطاق الدورات المسموح بها</h3>
+            <p class="a-form__section-desc mb-0">
+                حدّد الفئات أو الدورات التي يستطيع هذا المستخدم إدارتها وتحصيل رسومها.
+                إن لم تحدّد أي شيء فسيرى <strong>كل الدورات</strong>.
+            </p>
+        </div>
+        <div class="a-scope__summary">
+            <span class="a-badge a-badge--brand" data-scope-count>0 دورة محددة</span>
+            <span class="a-badge a-badge--neutral" data-scope-mode>كل الدورات</span>
+        </div>
+    </div>
+
+    @if (Model.IsUnscopableAccount)
+    {
+        <div class="a-note a-note--info">
+            <i class="bi bi-shield-lock" aria-hidden="true"></i>
+            <div>هذا حساب مدير النظام، وله صلاحية كاملة على جميع الدورات ولا يخضع لأي تحديد.</div>
+        </div>
+    }
+    else if (!Model.CanAssign)
+    {
+        <div class="a-note a-note--info">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            <div>سيُرث هذا المستخدم نفس نطاق الدورات الخاص بحسابك. لتحديد دورات أو فئات معيّنة له، يجب أن يقوم مدير النظام بذلك.</div>
+        </div>
+    }
+    else if (!Model.Courses.Any() && !Model.Categories.Any())
+    {
+        <div class="a-note a-note--neutral">
+            <i class="bi bi-inbox" aria-hidden="true"></i>
+            <div>لا توجد فئات أو دورات بعد. أنشئ دورة أولاً ثم عُد لتحديد النطاق.</div>
+        </div>
+    }
+    else
+    {
+        <div class="a-scope__grid">
+            <section class="a-scope__panel a-scope__panel--categories">
+                <div class="a-scope__panel-head">
+                    <h4 class="a-scope__panel-title"><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> الفئات</h4>
+                    <label class="a-scope__selectall">
+                        <input class="form-check-input" type="checkbox" data-scope-cat-toggle aria-label="تحديد كل الفئات" />
+                        <span>تحديد الكل</span>
+                    </label>
+                </div>
+                <div class="a-scope__list" role="group" aria-label="الفئات المسموح بها">
+                    @foreach (var category in Model.Categories)
+                    {
+                        var count = courseByCategory.TryGetValue(category.CategoryId, out var list) ? list.Count : 0;
+                        <label class="a-scope__item" data-scope-cat-item data-cat-id="@category.CategoryId">
+                            <input class="form-check-input" type="checkbox" name="CategoryIds" value="@category.CategoryId" checked="@(CategoryGranted(category.CategoryId) ? "checked" : null)" data-scope-cat-checkbox />
+                            <span class="a-scope__item-body">
+                                <span class="a-scope__item-title">@category.CategoryName</span>
+                                <span class="a-scope__item-meta">@count دورة</span>
+                            </span>
+                        </label>
+                    }
+                    @if (!Model.Categories.Any())
+                    {
+                        <span class="text-muted small">لا توجد فئات.</span>
+                    }
+                </div>
+            </section>
+
+            <section class="a-scope__panel a-scope__panel--courses">
+                <div class="a-scope__panel-head">
+                    <h4 class="a-scope__panel-title"><i class="bi bi-book" aria-hidden="true"></i> الدورات</h4>
+                    <label class="a-scope__selectall">
+                        <input class="form-check-input" type="checkbox" data-scope-course-toggle aria-label="تحديد كل الدورات المعروضة" />
+                        <span>تحديد المعروض</span>
+                    </label>
+                </div>
+                <div class="a-scope__controls">
+                    <div class="a-search">
+                        <i class="bi bi-search" aria-hidden="true"></i>
+                        <input type="search" class="form-control form-control-sm" placeholder="ابحث باسم الدورة..." data-scope-search aria-label="بحث في الدورات" />
+                    </div>
+                    <select class="form-select form-select-sm" data-scope-filter aria-label="تصفية حسب الفئة">
+                        <option value="">كل الفئات</option>
+                        @foreach (var category in Model.Categories)
+                        {
+                            <option value="@category.CategoryId">@category.CategoryName</option>
+                        }
+                        @if (uncategorised.Any())
+                        {
+                            <option value="none">بدون فئة</option>
+                        }
+                    </select>
+                </div>
+                <div class="a-scope__list" role="group" aria-label="الدورات المسموح بها">
+                    @foreach (var course in Model.Courses)
+                    {
+                        <label class="a-scope__item" data-scope-course-item
+                               data-cat-id="@course.CategoryId"
+                               data-search="@($"{course.CourseNameArabic} {course.CourseNameEnglish} {course.CourseName}".ToLowerInvariant())">
+                            <input class="form-check-input" type="checkbox" name="CourseIds" value="@course.CourseId" checked="@(CourseGranted(course.CourseId) ? "checked" : null)" data-scope-course-checkbox />
+                            <span class="a-scope__item-body">
+                                <span class="a-scope__item-title">@(course.CourseNameArabic ?? course.CourseName)</span>
+                                <span class="a-scope__item-meta">@course.Category?.CategoryName</span>
+                            </span>
+                        </label>
+                    }
+                    @if (!Model.Courses.Any())
+                    {
+                        <span class="text-muted small">لا توجد دورات.</span>
+                    }
+                    <p class="a-scope__empty" data-scope-empty hidden>لا توجد دورة مطابقة للبحث أو الفلتر.</p>
+                </div>
+            </section>
+        </div>
+        <p class="a-hint mt-3">
+            <i class="bi bi-lightbulb" aria-hidden="true"></i>
+            تحديد الفئة يمنح دوراتها الحالية والمستقبلية. لتقييد المستخدم بالدورات الحالية فقط، حدّد الفئات ثم اضغط «إلغاء تحديد الفئة» — تبقى الدورات محددة يدوياً ولا تُمنح أي دورة تُضاف لاحقاً.
+        </p>
+    }
+</div>

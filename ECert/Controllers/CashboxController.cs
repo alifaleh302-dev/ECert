@@ -36,6 +36,10 @@ public class CashboxController : Controller
     {
         if (!IsSuperAdmin && !CanTransfer) return Forbid();
 
+        // A course-scoped administrator only ever sees their own courses' movements; the global
+        // fund and its withdrawals stay hidden from them.
+        var allowedCourseIds = User.AllowedCourseIds();
+
         // جلب كل الترحيلات والسحوبات عبر ADO.NET لتجاوز sqlite/pomelo edge case في EF.
         var transfers = new List<CashboxTransfer>();
         var withdrawals = new List<CashboxWithdrawal>();
@@ -76,13 +80,17 @@ public class CashboxController : Controller
         }
         finally { if (shouldClose) await conn.CloseAsync(); }
 
+        if (allowedCourseIds is not null)
+        {
+            transfers = transfers.Where(t => t.CourseId.HasValue && allowedCourseIds.Contains(t.CourseId.Value)).ToList();
+            withdrawals = new List<CashboxWithdrawal>();
+        }
+
         // إجماليات
         decimal totalTransferred = transfers.Sum(t => t.Amount);
         decimal totalWithdrawn = withdrawals.Sum(w => w.Amount);
-        decimal totalCollected = 0m; // مجموع المُحصل من كل الدورات
-        var collected = await _db.Payments.IgnoreQueryFilters().Where(p => !p.IsCancelled)
-            .Select(p => (double?)p.Amount).ToListAsync();
-        if (collected.Any()) totalCollected = (decimal)collected.Sum();
+        decimal totalCollected = await _db.Payments.InScope(User).Where(p => !p.IsCancelled)
+            .SumAsync(p => (decimal?)p.Amount) ?? 0m;
 
         // رصيد كل دورة خارج الصندوق
         var byCourse = transfers
@@ -100,7 +108,7 @@ public class CashboxController : Controller
         ViewBag.TransfersByCourse = byCourse;
         // Razor iterates ViewBag values as dynamic; anonymous-type properties are
         // inaccessible to the generated view and cause RuntimeBinderException.
-        ViewBag.Courses = await _db.Courses.OrderBy(c => c.CourseName).ToListAsync();
+        ViewBag.Courses = await _db.Courses.InScope(User).OrderBy(c => c.CourseName).ToListAsync();
         ViewBag.CanTransfer = CanTransfer;
         ViewBag.CanWithdraw = CanWithdraw;
         ViewBag.IsSuperAdmin = IsSuperAdmin;
@@ -129,6 +137,11 @@ public class CashboxController : Controller
         if (course == null)
         {
             TempData["Error"] = "الدورة غير موجودة.";
+            return RedirectToAction("CourseRevenue", "Reports");
+        }
+        if (!User.CanAccessCourse(course.CourseId))
+        {
+            TempData["Error"] = "لا تملك صلاحية إدارة هذه الدورة.";
             return RedirectToAction("CourseRevenue", "Reports");
         }
 
@@ -182,7 +195,8 @@ public class CashboxController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Withdraw(decimal amount, string reason)
     {
-        if (!CanWithdraw) return Forbid();
+        // The fund is global, so a course-scoped user must never draw from it.
+        if (!CanWithdraw || User.IsCourseRestricted()) return Forbid();
 
         if (amount <= 0)
         {

@@ -19,13 +19,16 @@ public class PaymentsApiController : ControllerBase
 
     private bool HasPermission(string perm) => User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
 
+    private bool CanAccess(Invoice invoice) =>
+        invoice.Registration != null && User.CanAccessCourse(invoice.Registration.CourseId);
+
     [HttpGet]
     public async Task<IActionResult> Get()
     {
         if (!HasPermission("manage-payments"))
             return Ok(ApiResponse.Fail("ليس لديك صلاحية الوصول"));
 
-        var payments = await _db.Payments.Include(p => p.Invoice)
+        var payments = await _db.Payments.InScope(User).Include(p => p.Invoice)
             .OrderByDescending(p => p.PaymentDate)
             .Select(p => new
             {
@@ -45,8 +48,10 @@ public class PaymentsApiController : ControllerBase
         if (!HasPermission("manage-payments"))
             return Ok(ApiResponse.Fail("ليس لديك صلاحية الوصول"));
 
-        var invoice = await _db.Invoices.FindAsync(req.InvoiceId);
+        var invoice = await _db.Invoices.Include(i => i.Registration).FirstOrDefaultAsync(i => i.InvoiceId == req.InvoiceId);
         if (invoice == null) return NotFound(ApiResponse.Fail("الفاتورة غير موجودة"));
+        if (!CanAccess(invoice)) return Ok(ApiResponse.Fail("ليس لديك صلاحية الوصول"));
+        if (invoice.Status == "Cancelled") return Ok(ApiResponse.Fail("لا يمكن تسجيل دفعة على فاتورة ملغية."));
 
         var remaining = invoice.TotalAmount - invoice.PaidAmount;
         if (req.Amount > remaining)
@@ -67,13 +72,8 @@ public class PaymentsApiController : ControllerBase
         };
 
         _db.Payments.Add(payment);
-        invoice.PaidAmount += req.Amount;
-
-        if (invoice.PaidAmount >= invoice.TotalAmount)
-            invoice.Status = "Paid";
-        else if (invoice.PaidAmount > 0)
-            invoice.Status = "PartiallyPaid";
-
+        await _db.SaveChangesAsync();
+        await RecomputeInvoiceAsync(invoice);
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Create", "Payment", payment.PaymentId, null, $"Amount: {req.Amount}");
 
@@ -88,27 +88,33 @@ public class PaymentsApiController : ControllerBase
         if (!HasPermission("manage-payments"))
             return Ok(ApiResponse.Fail("ليس لديك صلاحية الوصول"));
 
-        var payment = await _db.Payments.Include(p => p.Invoice).FirstOrDefaultAsync(p => p.PaymentId == id);
+        var payment = await _db.Payments.Include(p => p.Invoice).ThenInclude(i => i!.Registration).FirstOrDefaultAsync(p => p.PaymentId == id);
         if (payment == null) return NotFound(ApiResponse.Fail("الدفعة غير موجودة"));
+        if (payment.Invoice == null || !CanAccess(payment.Invoice)) return Ok(ApiResponse.Fail("ليس لديك صلاحية الوصول"));
 
         payment.IsCancelled = true;
         payment.CancellationReason = req?.Reason;
 
-        if (payment.Invoice != null)
-        {
-            payment.Invoice.PaidAmount -= payment.Amount;
-            if (payment.Invoice.PaidAmount <= 0)
-            {
-                payment.Invoice.PaidAmount = 0;
-                payment.Invoice.Status = "Unpaid";
-            }
-            else
-                payment.Invoice.Status = "PartiallyPaid";
-        }
-
+        await _db.SaveChangesAsync();
+        await RecomputeInvoiceAsync(payment.Invoice);
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Cancel", "Payment", id, null, $"Reason: {req?.Reason}");
 
         return Ok(ApiResponse.Ok("تم إلغاء الدفعة بنجاح"));
+    }
+
+    /// <summary>Derives the invoice balance from its active payments so it can never drift.</summary>
+    private async Task RecomputeInvoiceAsync(Invoice invoice)
+    {
+        var paid = await _db.Payments
+            .Where(p => p.InvoiceId == invoice.InvoiceId && !p.IsCancelled)
+            .SumAsync(p => (decimal?)p.Amount) ?? 0m;
+
+        invoice.PaidAmount = paid;
+        invoice.Status = invoice.Status == "Cancelled"
+            ? "Cancelled"
+            : paid >= invoice.TotalAmount && invoice.TotalAmount > 0 ? "Paid"
+            : paid > 0 ? "PartiallyPaid"
+            : "Unpaid";
     }
 }

@@ -28,11 +28,12 @@ public class ReportsController : Controller
 
         // Razor iterates ViewBag values as dynamic; anonymous-type properties are
         // inaccessible to the generated view and cause RuntimeBinderException.
-        ViewBag.Courses = await _db.Courses.OrderBy(c => c.CourseName).ToListAsync();
+        ViewBag.Courses = await _db.Courses.InScope(User).OrderBy(c => c.CourseName).ToListAsync();
         ViewBag.CourseId = courseId;
         ViewBag.CanTransfer = CanTransfer;
 
         var query = _db.Courses
+            .InScope(User)
             .Include(c => c.Registrations).ThenInclude(r => r.Invoice).ThenInclude(i => i!.Payments)
             .AsQueryable();
         if (courseId.HasValue)
@@ -98,7 +99,7 @@ public class ReportsController : Controller
     {
         if (!User.HasPermission(AdminPermissions.ViewReports)) return Forbid();
 
-        var courses = await _db.Courses.Include(c => c.Registrations)
+        var courses = await _db.Courses.InScope(User).Include(c => c.Registrations)
             .ThenInclude(r => r.Invoice).ThenInclude(i => i!.Payments).ToListAsync();
 
         var transferredByCourse = new Dictionary<int, decimal>();

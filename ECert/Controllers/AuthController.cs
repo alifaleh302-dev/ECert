@@ -71,6 +71,13 @@ public class AuthController : Controller
                 claims.Add(new Claim("Permission", rp.Permission!.PermissionName));
         }
 
+        // Course confinement. No assignment at all means unrestricted (every course). Otherwise
+        // the user is confined to the courses named directly plus every course inside the granted
+        // categories; a stale id for a course that was deleted is harmless because the id simply
+        // matches nothing.
+        var isSuperAdmin = user.UserRoles.Any(ur => ur.Role!.RoleName == AdminPrincipalExtensions.SuperAdminRole);
+        await CourseScope.AddScopeClaimsAsync(claims, _db, user, isSuperAdmin);
+
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
 

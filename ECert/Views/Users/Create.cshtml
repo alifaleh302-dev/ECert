@@ -5,6 +5,11 @@
     ViewData["PageDesc"] = "أنشئ حساب مستخدم وامنحه الدور المناسب";
     Layout = "_AdminLayout";
     var roles = ViewBag.Roles as List<Role> ?? new();
+    var scope = ViewBag.Scope as ECert.Models.ViewModels.CourseScopePickerViewModel ?? new();
+}
+
+@section Styles {
+    <link href="~/css/course-scope-picker.css" rel="stylesheet" asp-append-version="true" />
 }
 
 <div class="page-header">
@@ -14,7 +19,7 @@
     </div>
 </div>
 
-<div class="a-card a-card--narrow">
+<div class="a-card a-card--form">
     <div class="a-card__header">
         <h2 class="a-card__title"><i class="bi bi-person-plus" aria-hidden="true"></i> بيانات المستخدم</h2>
     </div>
@@ -23,17 +28,17 @@
             @Html.AntiForgeryToken()
             <div asp-validation-summary="ModelOnly" class="a-error mb-3"></div>
 
-            <div class="a-field">
-                <label asp-for="Username" class="a-label a-label--required"></label>
-                <input asp-for="Username" class="form-control" />
-                <span asp-validation-for="Username" class="a-error"></span>
-            </div>
-            <div class="a-field">
-                <label asp-for="FullName" class="a-label a-label--required"></label>
-                <input asp-for="FullName" class="form-control" />
-                <span asp-validation-for="FullName" class="a-error"></span>
-            </div>
-            <div class="a-form__grid a-form__grid--2">
+            <div class="a-form__grid a-form__grid--3">
+                <div class="a-field">
+                    <label asp-for="Username" class="a-label a-label--required"></label>
+                    <input asp-for="Username" class="form-control" />
+                    <span asp-validation-for="Username" class="a-error"></span>
+                </div>
+                <div class="a-field">
+                    <label asp-for="FullName" class="a-label a-label--required"></label>
+                    <input asp-for="FullName" class="form-control" />
+                    <span asp-validation-for="FullName" class="a-error"></span>
+                </div>
                 <div class="a-field">
                     <label asp-for="Email" class="a-label"></label>
                     <input asp-for="Email" type="email" class="form-control" />
@@ -44,23 +49,25 @@
                     <input asp-for="Phone" class="form-control" />
                     <span asp-validation-for="Phone" class="a-error"></span>
                 </div>
+                <div class="a-field">
+                    <label asp-for="Password" class="a-label a-label--required"></label>
+                    <input asp-for="Password" type="password" class="form-control" />
+                    <span asp-validation-for="Password" class="a-error"></span>
+                </div>
+                <div class="a-field">
+                    <label asp-for="RoleId" class="a-label a-label--required"></label>
+                    <select asp-for="RoleId" class="form-select">
+                        <option value="">-- اختر الدور --</option>
+                        @foreach (var role in roles)
+                        {
+                            <option value="@role.RoleId">@role.RoleName</option>
+                        }
+                    </select>
+                    <span asp-validation-for="RoleId" class="a-error"></span>
+                </div>
             </div>
-            <div class="a-field">
-                <label asp-for="Password" class="a-label a-label--required"></label>
-                <input asp-for="Password" type="password" class="form-control" />
-                <span asp-validation-for="Password" class="a-error"></span>
-            </div>
-            <div class="a-field">
-                <label asp-for="RoleId" class="a-label a-label--required"></label>
-                <select asp-for="RoleId" class="form-select">
-                    <option value="">-- اختر الدور --</option>
-                    @foreach (var role in roles)
-                    {
-                        <option value="@role.RoleId">@role.RoleName</option>
-                    }
-                </select>
-                <span asp-validation-for="RoleId" class="a-error"></span>
-            </div>
+
+            <partial name="_CourseScopePicker" model="scope" />
 
             <div class="a-form__actions">
                 <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> إنشاء المستخدم</button>
@@ -69,3 +76,7 @@
         </form>
     </div>
 </div>
+
+@section Scripts {
+    <script src="~/js/course-scope-picker.js" asp-append-version="true"></script>
+}

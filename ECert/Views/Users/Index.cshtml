@@ -43,6 +43,14 @@
             <option value="inactive" selected="@(ViewBag.Status == "inactive")">معطل</option>
         </select>
     </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="userScope">النطاق</label>
+        <select id="userScope" name="scope" class="form-select">
+            <option value="">الكل</option>
+            <option value="scoped" selected="@(ViewBag.Scope == "scoped")">محدد بدورات/فئات</option>
+            <option value="all-courses" selected="@(ViewBag.Scope == "all-courses")">كل الدورات</option>
+        </select>
+    </div>
     <div class="a-toolbar__actions">
         <button type="submit" class="btn btn-primary"><i class="bi bi-funnel" aria-hidden="true"></i> تصفية</button>
         <a asp-action="Index" class="btn btn-outline-secondary">مسح</a>
@@ -59,6 +67,7 @@
                         <th>الاسم الكامل</th>
                         <th>البريد الإلكتروني</th>
                         <th>الأدوار</th>
+                        <th>الدورات المسموح بها</th>
                         <th>الحالة</th>
                         <th>آخر دخول</th>
                         <th>إجراءات</th>
@@ -80,12 +89,30 @@
                                     }
                                 </td>
                                 <td>
+                                    @if (user.CategoryAssignments.Any() || user.CourseAssignments.Any())
+                                    {
+                                        @foreach (var category in user.CategoryAssignments)
+                                        {
+                                            <span class="a-badge a-badge--brand"><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> @(category.Category?.CategoryName)</span>
+                                        }
+                                        @foreach (var assignment in user.CourseAssignments)
+                                        {
+                                            <span class="a-badge a-badge--neutral">@(assignment.Course?.CourseNameArabic ?? assignment.Course?.CourseName)</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="a-badge a-badge--success">كل الدورات</span>
+                                    }
+                                </td>
+                                <td>
                                     @if (user.IsActive) { <span class="a-badge a-badge--success">نشط</span> }
                                     else { <span class="a-badge a-badge--danger">معطل</span> }
                                 </td>
                                 <td>@(user.LastLoginAt?.ToString("yyyy-MM-dd HH:mm") ?? "لم يسجل دخول")</td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
+                                        <a asp-action="Edit" asp-route-id="@user.UserId" class="btn btn-outline-primary" title="تعديل"><i class="bi bi-pencil"></i></a>
                                         <form asp-action="ToggleActive" method="post" style="display:inline">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="id" value="@user.UserId" />
@@ -135,7 +162,7 @@
                     else
                     {
                         <tr>
-                            <td colspan="7" class="p-0">
+                            <td colspan="8" class="p-0">
                                 <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-people", Title = "لا يوجد مستخدمون", Text = "لم يُعثر على أي حساب مطابق. جرّب تعديل الفلاتر أو أضف مستخدمًا جديدًا." })" />
                             </td>
                         </tr>

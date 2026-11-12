@@ -29,9 +29,11 @@ ALTER TABLE `Courses` DROP COLUMN `PartnerName`;
 ALTER TABLE `Courses` DROP COLUMN `PartnerLogoUrl`;
 ALTER TABLE `Instructors` DROP COLUMN `SignatureImageUrl`;
 ALTER TABLE `CertificateDesigns` DROP COLUMN `BackgroundImageUrl`;
-DROP TABLE `CoursePartners`;");
+DROP TABLE `CoursePartners`;
+DROP TABLE `UserCategories`;");
 
             Assert.False(await bootstrap.ColumnExistsAsync("Courses", "PartnerName"));
+            Assert.False(await bootstrap.TableExistsAsync("UserCategories"));
         }
         finally
         {
@@ -50,6 +52,7 @@ DROP TABLE `CoursePartners`;");
             Assert.True(await upgraded.ColumnExistsAsync("Courses", "PartnerLogoUrl"));
             Assert.True(await upgraded.ColumnExistsAsync("Instructors", "SignatureImageUrl"));
             Assert.True(await upgraded.ColumnExistsAsync("CertificateDesigns", "BackgroundImageUrl"));
+            Assert.True(await upgraded.TableExistsAsync("UserCategories"));
         }
         finally
         {

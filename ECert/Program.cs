@@ -64,6 +64,9 @@ builder.Services.AddScoped<CertificateDesignService>();
 builder.Services.AddScoped<LegacyCertificateImportService>();
 builder.Services.AddScoped<CertificateDesignSchemaMigrationService>();
 builder.Services.AddScoped<CashboxSchemaMigrationService>();
+builder.Services.AddScoped<UserCourseSchemaMigrationService>();
+builder.Services.AddScoped<UserCategorySchemaMigrationService>();
+builder.Services.AddScoped<InvoiceNumberIndexSchemaMigrationService>();
 builder.Services.AddScoped<PerformanceIndexSchemaMigrationService>();
 builder.Services.AddScoped<TurnstileService>();
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
@@ -210,8 +213,16 @@ using (var scope = app.Services.CreateScope())
         await academicMigration.EnsureAsync();
         var cashboxMigration = scope.ServiceProvider.GetRequiredService<CashboxSchemaMigrationService>();
         await cashboxMigration.EnsureAsync();
+        // Must exist before DbSeeder loads Users with their course assignments.
+        var userCourseMigration = scope.ServiceProvider.GetRequiredService<UserCourseSchemaMigrationService>();
+        await userCourseMigration.EnsureAsync();
+        var userCategoryMigration = scope.ServiceProvider.GetRequiredService<UserCategorySchemaMigrationService>();
+        await userCategoryMigration.EnsureAsync();
         DbSeeder.Seed(db, bootstrapLogger);
         DbSeeder.SeedHomepageCms(db);
+        // Unique invoice numbers are a data guarantee, applied after the tables are seeded.
+        var invoiceNumberIndexMigration = scope.ServiceProvider.GetRequiredService<InvoiceNumberIndexSchemaMigrationService>();
+        await invoiceNumberIndexMigration.EnsureAsync();
         var performanceIndexMigration = scope.ServiceProvider.GetRequiredService<PerformanceIndexSchemaMigrationService>();
         await performanceIndexMigration.EnsureAsync();
     }

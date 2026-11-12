@@ -13,6 +13,8 @@ public class ECertDbContext : DbContext, IDataProtectionKeyContext
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<UserCourse> UserCourses => Set<UserCourse>();
+    public DbSet<UserCategory> UserCategories => Set<UserCategory>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Course> Courses => Set<Course>();
     public DbSet<Instructor> Instructors => Set<Instructor>();
@@ -62,6 +64,40 @@ public class ECertDbContext : DbContext, IDataProtectionKeyContext
             .HasOne(ur => ur.Role)
             .WithMany(r => r.UserRoles)
             .HasForeignKey(ur => ur.RoleId);
+
+        // Course assignments that confine a user to a set of courses.
+        modelBuilder.Entity<UserCourse>()
+            .HasOne(uc => uc.User)
+            .WithMany(u => u.CourseAssignments)
+            .HasForeignKey(uc => uc.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UserCourse>()
+            .HasOne(uc => uc.Course)
+            .WithMany()
+            .HasForeignKey(uc => uc.CourseId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UserCourse>()
+            .HasIndex(uc => new { uc.UserId, uc.CourseId })
+            .IsUnique();
+
+        // Category assignments that confine a user to every course in a category.
+        modelBuilder.Entity<UserCategory>()
+            .HasOne(uc => uc.User)
+            .WithMany(u => u.CategoryAssignments)
+            .HasForeignKey(uc => uc.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UserCategory>()
+            .HasOne(uc => uc.Category)
+            .WithMany()
+            .HasForeignKey(uc => uc.CategoryId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UserCategory>()
+            .HasIndex(uc => new { uc.UserId, uc.CategoryId })
+            .IsUnique();
 
         // Role Permissions
         modelBuilder.Entity<RolePermission>()

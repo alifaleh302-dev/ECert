@@ -108,6 +108,41 @@ public static class AdminPermissions
     /// </summary>
     public static readonly IReadOnlySet<string> SuperAdminOnly =
         new HashSet<string>(StringComparer.Ordinal) { ManageRoles };
+
+    /// <summary>
+    /// Ready-made permission bundles for the common staff roles. A preset is only a starting
+    /// point: the administrator still ticks or clears individual permissions afterwards, which
+    /// is what makes the "simplified custom permissions" workflow quick without being rigid.
+    /// </summary>
+    public sealed record RolePreset(string Key, string Name, string Description, IReadOnlyList<string> Permissions);
+
+    public static readonly IReadOnlyList<RolePreset> Presets = new List<RolePreset>
+    {
+        new("finance", "محاسب", "تسجيل الدفعات ومتابعة الفواتير والصندوق دون إدارة النظام.", new[]
+        {
+            ManageFinance, ViewInvoices, ManagePayments, ViewReports, ManageCashbox, WithdrawCashbox
+        }),
+        new("collections", "محصّل رسوم", "تسجيل الدفعات ومتابعة الفواتير فقط.", new[]
+        {
+            ViewInvoices, ManagePayments
+        }),
+        new("registrations", "مشرف التسجيلات", "مراجعة طلبات التسجيل وقبولها أو رفضها.", new[]
+        {
+            ManageRegistrations
+        }),
+        new("trainer", "مشرف تدريب", "إدارة الدورات والمدربين والفئات والتسجيلات.", new[]
+        {
+            ManageRegistrations, ManageCourses, ManageInstructors, ManageCategories
+        }),
+        new("certificates", "مسؤول الشهادات", "إصدار الشهادات وإدارة تصاميمها.", new[]
+        {
+            IssueCertificates, ManageCertificateDesigns
+        }),
+        new("content", "محرر المحتوى", "إدارة المنشورات والأخبار والصفحة الرئيسية.", new[]
+        {
+            ManagePosts, ManageNews, ManageHomepage
+        }),
+    };
 }
 
 public static class AdminPrincipalExtensions

@@ -1,0 +1,85 @@
+@model ECert.Models.ViewModels.EditUserViewModel
+@{
+    ViewData["Title"] = "تعديل مستخدم";
+    ViewData["PageIcon"] = "bi-person-gear";
+    ViewData["PageDesc"] = "حدّث بيانات المستخدم ودوره والدورات المسموح له بإدارتها";
+    Layout = "_AdminLayout";
+    var roles = ViewBag.Roles as List<Role> ?? new();
+    var scope = ViewBag.Scope as ECert.Models.ViewModels.CourseScopePickerViewModel ?? new();
+}
+
+@section Styles {
+    <link href="~/css/course-scope-picker.css" rel="stylesheet" asp-append-version="true" />
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للمستخدمين</a>
+    </div>
+</div>
+
+<div class="a-card a-card--form">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-person-gear" aria-hidden="true"></i> بيانات المستخدم</h2>
+    </div>
+    <div class="a-card__body">
+        <form asp-action="Edit" asp-route-id="@Model.UserId" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="UserId" />
+            <input type="hidden" asp-for="Username" />
+            <div asp-validation-summary="ModelOnly" class="a-error mb-3"></div>
+
+            <div class="a-form__grid a-form__grid--3">
+                <div class="a-field">
+                    <label class="a-label">اسم المستخدم</label>
+                    <input class="form-control" value="@Model.Username" disabled />
+                </div>
+                <div class="a-field">
+                    <label asp-for="FullName" class="a-label a-label--required"></label>
+                    <input asp-for="FullName" class="form-control" />
+                    <span asp-validation-for="FullName" class="a-error"></span>
+                </div>
+                <div class="a-field">
+                    <label asp-for="Email" class="a-label"></label>
+                    <input asp-for="Email" type="email" class="form-control" />
+                    <span asp-validation-for="Email" class="a-error"></span>
+                </div>
+                <div class="a-field">
+                    <label asp-for="Phone" class="a-label"></label>
+                    <input asp-for="Phone" class="form-control" />
+                    <span asp-validation-for="Phone" class="a-error"></span>
+                </div>
+                <div class="a-field">
+                    <label asp-for="RoleId" class="a-label a-label--required"></label>
+                    <select asp-for="RoleId" class="form-select">
+                        <option value="">-- اختر الدور --</option>
+                        @foreach (var role in roles)
+                        {
+                            <option value="@role.RoleId" selected="@(Model.RoleId == role.RoleId)">@role.RoleName</option>
+                        }
+                    </select>
+                    <span asp-validation-for="RoleId" class="a-error"></span>
+                </div>
+                <div class="a-field">
+                    <label class="a-label d-block">الحالة</label>
+                    <div class="form-check form-switch mt-2">
+                        <input asp-for="IsActive" class="form-check-input" type="checkbox" />
+                        <label asp-for="IsActive" class="form-check-label">نشط</label>
+                    </div>
+                </div>
+            </div>
+
+            <partial name="_CourseScopePicker" model="scope" />
+
+            <div class="a-form__actions">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ التعديلات</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">إلغاء</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/course-scope-picker.js" asp-append-version="true"></script>
+}

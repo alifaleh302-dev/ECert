@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using ECert.Data;
 using ECert.Models;
 using ECert.Models.ViewModels;
@@ -6,6 +7,7 @@ using ECert.Services.Excel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace ECert.Controllers;
 
@@ -18,10 +20,13 @@ public class PaymentsController : Controller
 
     private bool HasPermission(string perm) => User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
 
+    private static bool CanAccess(ClaimsPrincipal user, Invoice invoice) =>
+        invoice.Registration != null && user.CanAccessCourse(invoice.Registration.CourseId);
+
     public async Task<IActionResult> Index(string? search, DateTime? dateFrom, DateTime? dateTo, string? method, string? status, string? courseName, string? studentName, string? invoiceNumber)
     {
         if (!HasPermission("manage-payments")) return Forbid();
-        var query = _db.Payments.Include(p => p.Invoice).AsQueryable();
+        var query = _db.Payments.Include(p => p.Invoice).ThenInclude(i => i!.Registration).InScope(User).AsQueryable();
         if (!string.IsNullOrEmpty(search))
             query = query.Where(p => p.Invoice!.InvoiceNumber.Contains(search) || p.Invoice.TraineeName.Contains(search) || (p.Invoice.TraineeNameArabic != null && p.Invoice.TraineeNameArabic.Contains(search)) || (p.Invoice.TraineeNameEnglish != null && p.Invoice.TraineeNameEnglish.Contains(search)) || p.RecordedBy!.Contains(search));
         if (!string.IsNullOrEmpty(studentName))
@@ -54,8 +59,14 @@ public class PaymentsController : Controller
     public async Task<IActionResult> Add(int invoiceId)
     {
         if (!HasPermission("manage-payments")) return Forbid();
-        var invoice = await _db.Invoices.FindAsync(invoiceId);
+        var invoice = await _db.Invoices.Include(i => i.Registration).FirstOrDefaultAsync(i => i.InvoiceId == invoiceId);
         if (invoice == null) return NotFound();
+        if (!CanAccess(User, invoice)) return Forbid();
+        if (invoice.Status == "Cancelled")
+        {
+            TempData["Error"] = "لا يمكن تسجيل دفعة على فاتورة ملغية.";
+            return RedirectToAction("Details", "Invoices", new { id = invoiceId });
+        }
         ViewBag.Invoice = invoice;
         return View(new AddPaymentViewModel { InvoiceId = invoiceId });
     }
@@ -65,8 +76,15 @@ public class PaymentsController : Controller
     public async Task<IActionResult> Add(AddPaymentViewModel model)
     {
         if (!HasPermission("manage-payments")) return Forbid();
-        var invoice = await _db.Invoices.FindAsync(model.InvoiceId);
+        var invoice = await _db.Invoices.Include(i => i.Registration).FirstOrDefaultAsync(i => i.InvoiceId == model.InvoiceId);
         if (invoice == null) return NotFound();
+        if (!CanAccess(User, invoice)) return Forbid();
+
+        if (invoice.Status == "Cancelled")
+        {
+            TempData["Error"] = "لا يمكن تسجيل دفعة على فاتورة ملغية.";
+            return RedirectToAction("Details", "Invoices", new { id = model.InvoiceId });
+        }
 
         if (model.Amount <= 0)
         {
@@ -99,20 +117,44 @@ public class PaymentsController : Controller
             CreatedAt = DateTime.Now
         };
 
+        // Two operators can submit at once; without serialising on the invoice row both would
+        // pass the remaining-amount check and overpay. The lock plus a re-check closes that race.
+        await using var transaction = await _db.Database.BeginTransactionAsync();
+        await LockInvoiceRowAsync(invoice.InvoiceId);
+        await _db.Entry(invoice).ReloadAsync();
+
+        if (model.Amount > invoice.RemainingAmount)
+        {
+            await transaction.RollbackAsync();
+            TempData["Error"] = "المبلغ أكبر من المتبقي!";
+            return RedirectToAction("Add", new { invoiceId = model.InvoiceId });
+        }
+
         _db.Payments.Add(payment);
-        invoice.PaidAmount += model.Amount;
-
-        // Auto-update invoice status
-        if (invoice.PaidAmount >= invoice.TotalAmount)
-            invoice.Status = "Paid";
-        else if (invoice.PaidAmount > 0)
-            invoice.Status = "PartiallyPaid";
-
         await _db.SaveChangesAsync();
+
+        await RecomputeInvoiceAsync(invoice);
+        await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Create", "Payment", payment.PaymentId, null, $"Amount: {model.Amount}, Method: {model.PaymentMethod}");
 
         TempData["Success"] = $"تم تسجيل دفعة بقيمة {model.Amount} ريال بنجاح.";
         return RedirectToAction("Details", "Invoices", new { id = model.InvoiceId });
+    }
+
+    /// <summary>Takes an exclusive row lock so concurrent payments on one invoice serialise.</summary>
+    private async Task LockInvoiceRowAsync(int invoiceId)
+    {
+        var connection = _db.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open) await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.Transaction = _db.Database.CurrentTransaction?.GetDbTransaction();
+        command.CommandText = "SELECT `InvoiceId` FROM `Invoices` WHERE `InvoiceId` = @id FOR UPDATE";
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "@id";
+        parameter.Value = invoiceId;
+        command.Parameters.Add(parameter);
+        await command.ExecuteScalarAsync();
     }
 
     [HttpPost]
@@ -120,25 +162,15 @@ public class PaymentsController : Controller
     public async Task<IActionResult> Cancel(int id, string? reason)
     {
         if (!HasPermission("manage-payments")) return Forbid();
-        var payment = await _db.Payments.Include(p => p.Invoice).FirstOrDefaultAsync(p => p.PaymentId == id);
+        var payment = await _db.Payments.Include(p => p.Invoice).ThenInclude(i => i!.Registration).FirstOrDefaultAsync(p => p.PaymentId == id);
         if (payment == null) return NotFound();
+        if (payment.Invoice == null || !CanAccess(User, payment.Invoice)) return Forbid();
 
         payment.IsCancelled = true;
         payment.CancellationReason = reason;
 
-        // Reverse the amount
-        if (payment.Invoice != null)
-        {
-            payment.Invoice.PaidAmount -= payment.Amount;
-            if (payment.Invoice.PaidAmount <= 0)
-            {
-                payment.Invoice.PaidAmount = 0;
-                payment.Invoice.Status = "Unpaid";
-            }
-            else
-                payment.Invoice.Status = "PartiallyPaid";
-        }
-
+        await _db.SaveChangesAsync();
+        await RecomputeInvoiceAsync(payment.Invoice);
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Cancel", "Payment", id, null, $"Reason: {reason}");
 
@@ -151,26 +183,17 @@ public class PaymentsController : Controller
     public async Task<IActionResult> Delete(int id)
     {
         if (!HasPermission("manage-payments")) return Forbid();
-        var payment = await _db.Payments.Include(p => p.Invoice).FirstOrDefaultAsync(p => p.PaymentId == id);
+        var payment = await _db.Payments.Include(p => p.Invoice).ThenInclude(i => i!.Registration).FirstOrDefaultAsync(p => p.PaymentId == id);
         if (payment == null) return NotFound();
+        if (payment.Invoice == null || !CanAccess(User, payment.Invoice)) return Forbid();
 
         var invoiceId = payment.InvoiceId;
+        var invoice = payment.Invoice;
         var amount = payment.Amount;
 
-        // Reverse the amount from invoice
-        if (payment.Invoice != null && !payment.IsCancelled)
-        {
-            payment.Invoice.PaidAmount -= payment.Amount;
-            if (payment.Invoice.PaidAmount <= 0)
-            {
-                payment.Invoice.PaidAmount = 0;
-                payment.Invoice.Status = "Unpaid";
-            }
-            else
-                payment.Invoice.Status = "PartiallyPaid";
-        }
-
         _db.Payments.Remove(payment);
+        await _db.SaveChangesAsync();
+        await RecomputeInvoiceAsync(invoice);
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Delete", "Payment", id, null, $"Deleted payment: {amount} ريال");
 
@@ -181,7 +204,7 @@ public class PaymentsController : Controller
     public async Task<IActionResult> ExportXlsx(string? search, DateTime? dateFrom, DateTime? dateTo, string? method)
     {
         if (!HasPermission("manage-payments")) return Forbid();
-        var query = _db.Payments.Include(p => p.Invoice).AsQueryable();
+        var query = _db.Payments.Include(p => p.Invoice).ThenInclude(i => i!.Registration).InScope(User).AsQueryable();
         if (!string.IsNullOrEmpty(search))
             query = query.Where(p => p.Invoice!.InvoiceNumber.Contains(search) || p.Invoice.TraineeName.Contains(search) || p.PaymentMethod.Contains(search) || p.RecordedBy!.Contains(search));
         if (dateFrom.HasValue) query = query.Where(p => p.PaymentDate >= dateFrom.Value);
@@ -207,5 +230,24 @@ public class PaymentsController : Controller
         }
 
         return export.Build("payments");
+    }
+
+    /// <summary>
+    /// Recomputes <c>PaidAmount</c> and the status from the invoice's active payments. Deriving the
+    /// balance from the ledger (rather than adding/subtracting the delta) keeps it correct even if
+    /// an earlier write failed or a payment was cancelled twice.
+    /// </summary>
+    private async Task RecomputeInvoiceAsync(Invoice invoice)
+    {
+        var paid = await _db.Payments
+            .Where(p => p.InvoiceId == invoice.InvoiceId && !p.IsCancelled)
+            .SumAsync(p => (decimal?)p.Amount) ?? 0m;
+
+        invoice.PaidAmount = paid;
+        invoice.Status = invoice.Status == "Cancelled"
+            ? "Cancelled"
+            : paid >= invoice.TotalAmount && invoice.TotalAmount > 0 ? "Paid"
+            : paid > 0 ? "PartiallyPaid"
+            : "Unpaid";
     }
 }

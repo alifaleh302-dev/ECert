@@ -141,6 +141,57 @@ public class CreateUserViewModel
 
     [Display(Name = "الدور")]
     public int RoleId { get; set; }
+
+    /// <summary>
+    /// Courses the user may administer. Empty means unrestricted (every course). Only a
+    /// SuperAdmin may set this; other administrators inherit their own scope.
+    /// </summary>
+    [Display(Name = "الدورات المسموح بها")]
+    public List<int> CourseIds { get; set; } = new();
+
+    /// <summary>
+    /// Categories whose courses the user may administer, including courses added later.
+    /// Combined with <see cref="CourseIds"/>; empty on both means unrestricted.
+    /// </summary>
+    [Display(Name = "الفئات المسموح بها")]
+    public List<int> CategoryIds { get; set; } = new();
+}
+
+public class EditUserViewModel
+{
+    public int UserId { get; set; }
+
+    [Display(Name = "اسم المستخدم")]
+    public string Username { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "الاسم الكامل مطلوب")]
+    [StringLength(100)]
+    [Display(Name = "الاسم الكامل")]
+    public string FullName { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "البريد الإلكتروني مطلوب")]
+    [EmailAddress(ErrorMessage = "البريد الإلكتروني غير صحيح")]
+    [Display(Name = "البريد الإلكتروني")]
+    public string Email { get; set; } = string.Empty;
+
+    [Display(Name = "رقم الهاتف")]
+    public string? Phone { get; set; }
+
+    [Display(Name = "الدور")]
+    public int RoleId { get; set; }
+
+    [Display(Name = "نشط")]
+    public bool IsActive { get; set; }
+
+    [Display(Name = "الدورات المسموح بها")]
+    public List<int> CourseIds { get; set; } = new();
+
+    /// <summary>
+    /// Categories whose courses the user may administer, including courses added later.
+    /// Combined with <see cref="CourseIds"/>; empty on both means unrestricted.
+    /// </summary>
+    [Display(Name = "الفئات المسموح بها")]
+    public List<int> CategoryIds { get; set; } = new();
 }
 
 public class ReportsViewModel

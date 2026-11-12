@@ -78,6 +78,39 @@ public class AdminPermissionsCatalogTests
         Assert.False(user.CanAccessSection("SomeFutureController"));
     }
 
+    [Fact]
+    public void Every_preset_only_grants_known_permissions()
+    {
+        var catalogNames = AdminPermissions.Catalog.Select(d => d.Name).ToHashSet(StringComparer.Ordinal);
+        var unknown = AdminPermissions.Presets
+            .SelectMany(preset => preset.Permissions)
+            .Where(name => !catalogNames.Contains(name))
+            .Distinct()
+            .ToList();
+
+        Assert.True(unknown.Count == 0,
+            "Role presets reference permissions missing from the catalog: " + string.Join(", ", unknown));
+    }
+
+    [Fact]
+    public void Presets_never_hand_out_super_admin_only_permissions()
+    {
+        var leaked = AdminPermissions.Presets
+            .Where(preset => preset.Permissions.Any(AdminPermissions.SuperAdminOnly.Contains))
+            .Select(preset => preset.Key)
+            .ToList();
+
+        Assert.True(leaked.Count == 0,
+            "These presets would let a custom role escalate its own privileges: " + string.Join(", ", leaked));
+    }
+
+    [Fact]
+    public void Preset_keys_are_unique()
+    {
+        var keys = AdminPermissions.Presets.Select(preset => preset.Key).ToList();
+        Assert.Equal(keys.Count, keys.Distinct(StringComparer.Ordinal).Count());
+    }
+
     private static ClaimsPrincipal Principal(string type, string value) =>
         new(new ClaimsIdentity(new[] { new Claim(type, value) }, "Test"));
 }

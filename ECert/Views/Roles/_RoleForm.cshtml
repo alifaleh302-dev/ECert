@@ -32,6 +32,20 @@
             <button type="button" class="btn btn-sm btn-outline-primary" id="toggleAllPermissions"><i class="bi bi-check2-all"></i> تحديد الكل</button>
         </div>
     </div>
+
+    <div class="a-form__grid a-form__grid--2 mb-3">
+        <div class="a-field">
+            <label class="a-field__label" for="rolePreset">قالب جاهز</label>
+            <select class="form-select" id="rolePreset">
+                <option value="">— اختر قالباً لتعبئة الصلاحيات —</option>
+                @foreach (var preset in AdminPermissions.Presets)
+                {
+                    <option value="@preset.Key">@preset.Name</option>
+                }
+            </select>
+            <span class="a-hint" id="rolePresetHint">يضبط القالب الصلاحيات الشائعة لهذا الدور، ويمكنك تعديلها بعدها.</span>
+        </div>
+    </div>
     <span asp-validation-for="PermissionIds" class="a-error d-block mb-3"></span>
 
     <div class="a-form__grid a-form__grid--2">
@@ -80,5 +94,26 @@
             updateState();
         });
         updateState();
+
+        const presets = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            AdminPermissions.Presets.ToDictionary(
+                preset => preset.Key,
+                preset => preset.Permissions.Select(name => permissions
+                    .FirstOrDefault(permission => permission.PermissionName == name)?.PermissionId)
+                    .Where(id => id.HasValue)
+                    .Select(id => id!.Value)
+                    .ToArray())));
+        const presetSelect = document.getElementById('rolePreset');
+        const presetHint = document.getElementById('rolePresetHint');
+        if (presetSelect) {
+            presetSelect.addEventListener('change', function () {
+                const ids = presets[presetSelect.value];
+                if (!ids) { presetHint.textContent = 'يضبط القالب الصلاحيات الشائعة لهذا الدور، ويمكنك تعديلها بعدها.'; return; }
+                const wanted = new Set(ids.map(String));
+                checkboxes.forEach(checkbox => { checkbox.checked = wanted.has(checkbox.value); });
+                presetHint.textContent = `طُبّق القالب: ${ids.length} صلاحية. عدّل ما تريد ثم احفظ.`;
+                updateState();
+            });
+        }
     })();
 </script>

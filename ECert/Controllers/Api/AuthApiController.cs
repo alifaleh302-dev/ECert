@@ -75,6 +75,11 @@ public class AuthApiController : ControllerBase
         if (user.MustChangePassword)
             claims.Add(new Claim("MustChangePassword", "true"));
 
+        // Same course confinement as the cookie sign-in, so an API session cannot see more than
+        // a browser session would.
+        var isSuperAdmin = user.UserRoles.Any(ur => ur.Role!.RoleName == AdminPrincipalExtensions.SuperAdminRole);
+        await CourseScope.AddScopeClaimsAsync(claims, _db, user, isSuperAdmin);
+
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
 

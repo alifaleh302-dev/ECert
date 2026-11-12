@@ -98,6 +98,18 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
             return Convert.ToInt32(await command.ExecuteScalarAsync()) > 0;
         });
 
+    /// <summary>True when the given table exists in this factory's database.</summary>
+    public async Task<bool> TableExistsAsync(string table) =>
+        await WithDbAsync(async db =>
+        {
+            var connection = db.Database.GetDbConnection();
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @t;";
+            var t = command.CreateParameter(); t.ParameterName = "@t"; t.Value = table; command.Parameters.Add(t);
+            return Convert.ToInt32(await command.ExecuteScalarAsync()) > 0;
+        });
+
     public string ConnectionString
     {
         get
@@ -143,6 +155,15 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
         return await db.Users.Where(u => u.Username == username).Select(u => u.UserId).FirstAsync();
+    }
+
+    /// <summary>The name of the (single) role bound to a user, for form round-trips.</summary>
+    public async Task<string> RoleNameOfUserAsync(string username)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        return await db.UserRoles.Where(ur => ur.User!.Username == username)
+            .Select(ur => ur.Role!.RoleName).FirstAsync();
     }
 
     /// <summary>
@@ -250,6 +271,176 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
         var invoice = await db.Invoices.FirstAsync(i => i.InvoiceId == invoiceId);
         return (invoice.PaidAmount, invoice.Status);
     }
+
+    /// <summary>Creates a distinct course so a test can confine a user to it (or keep them out).</summary>
+    public async Task<int> CreateCourseAsync(string name)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        var course = new ECert.Models.Course
+        {
+            CourseName = name,
+            CourseNameArabic = name,
+            CourseNameEnglish = name,
+            CategoryId = await db.Categories.Select(c => c.CategoryId).FirstAsync(),
+            InstructorId = await db.Instructors.Select(i => i.InstructorId).FirstAsync(),
+            Price = 500m,
+            Status = "OpenForRegistration",
+            CreatedAt = DateTime.Now
+        };
+        db.Courses.Add(course);
+        await db.SaveChangesAsync();
+        return course.CourseId;
+    }
+
+    /// <summary>Creates an accepted registration and invoice in a specific course. Returns the invoice id.</summary>
+    public async Task<int> CreateInvoiceForCourseAsync(int courseId)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        var course = await db.Courses.FirstAsync(c => c.CourseId == courseId);
+        var registration = new ECert.Models.Registration
+        {
+            RequestNumber = $"REG-TEST-{Guid.NewGuid():N}"[..20],
+            FullName = "متدرب اختبار",
+            FullNameArabic = "متدرب اختبار",
+            FullNameEnglish = "Test Trainee",
+            Gender = "Male",
+            Phone = $"+9677{Random.Shared.Next(10000000, 99999999)}",
+            CourseId = courseId,
+            Status = "Accepted",
+            RegistrationDate = DateTime.Now
+        };
+        db.Registrations.Add(registration);
+        await db.SaveChangesAsync();
+
+        var invoice = new ECert.Models.Invoice
+        {
+            InvoiceNumber = $"INV-TEST-{Guid.NewGuid():N}"[..20],
+            RegistrationId = registration.RegistrationId,
+            TraineeName = registration.FullName,
+            TraineePhone = registration.Phone,
+            CourseName = course.CourseName,
+            OriginalAmount = 500m,
+            TotalAmount = 500m,
+            PaidAmount = 0m,
+            Status = "Unpaid",
+            CreatedAt = DateTime.Now
+        };
+        db.Invoices.Add(invoice);
+        await db.SaveChangesAsync();
+        return invoice.InvoiceId;
+    }
+
+    /// <summary>Adds an active payment directly, so an invoice can start with a non-zero balance.</summary>
+    public async Task<int> AddPaymentAsync(int invoiceId, decimal amount, string method = "Cash")
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        var invoice = await db.Invoices.FirstAsync(i => i.InvoiceId == invoiceId);
+        var payment = new ECert.Models.Payment
+        {
+            InvoiceId = invoiceId,
+            Amount = amount,
+            PaymentMethod = method,
+            PaymentDate = DateTime.Now,
+            RecordedBy = "seed",
+            CreatedAt = DateTime.Now
+        };
+        db.Payments.Add(payment);
+        invoice.PaidAmount += amount;
+        invoice.Status = invoice.PaidAmount >= invoice.TotalAmount ? "Paid" : "PartiallyPaid";
+        await db.SaveChangesAsync();
+        return payment.PaymentId;
+    }
+
+    /// <summary>Assigns a user to the given courses, replacing any existing assignment.</summary>
+    public async Task AssignCoursesAsync(string username, params int[] courseIds)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        var user = await db.Users.Include(u => u.CourseAssignments).FirstAsync(u => u.Username == username);
+        db.UserCourses.RemoveRange(user.CourseAssignments);
+        foreach (var courseId in courseIds)
+            db.UserCourses.Add(new ECert.Models.UserCourse { UserId = user.UserId, CourseId = courseId });
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Assigns a user to the given categories, replacing any existing category grants.</summary>
+    public async Task AssignCategoriesAsync(string username, params int[] categoryIds)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        var user = await db.Users.Include(u => u.CategoryAssignments).FirstAsync(u => u.Username == username);
+        db.UserCategories.RemoveRange(user.CategoryAssignments);
+        foreach (var categoryId in categoryIds)
+            db.UserCategories.Add(new ECert.Models.UserCategory { UserId = user.UserId, CategoryId = categoryId });
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Creates a category so a test can grant a whole category of courses.</summary>
+    public async Task<int> CreateCategoryAsync(string name)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        var category = new ECert.Models.Category { CategoryName = name };
+        db.Categories.Add(category);
+        await db.SaveChangesAsync();
+        return category.CategoryId;
+    }
+
+    /// <summary>Creates a course inside a specific category, for category-scope assertions.</summary>
+    public async Task<int> CreateCourseInCategoryAsync(string name, int categoryId)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        var course = new ECert.Models.Course
+        {
+            CourseName = name,
+            CourseNameArabic = name,
+            CourseNameEnglish = name,
+            CategoryId = categoryId,
+            InstructorId = await db.Instructors.Select(i => i.InstructorId).FirstAsync(),
+            Price = 500m,
+            Status = "OpenForRegistration",
+            CreatedAt = DateTime.Now
+        };
+        db.Courses.Add(course);
+        await db.SaveChangesAsync();
+        return course.CourseId;
+    }
+
+    /// <summary>The category id of a course, for asserting category membership.</summary>
+    public Task<int> CategoryIdOfCourseAsync(int courseId) =>
+        WithDbAsync(db => db.Courses.Where(c => c.CourseId == courseId).Select(c => c.CategoryId).FirstAsync());
+
+    /// <summary>Moves a course into a different category, to prove category grants track new members.</summary>
+    public async Task MoveCourseToCategoryAsync(int courseId, int categoryId)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        var course = await db.Courses.FirstAsync(c => c.CourseId == courseId);
+        course.CategoryId = categoryId;
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>The course id an invoice belongs to, for asserting isolation.</summary>
+    public Task<int> CourseIdOfInvoiceAsync(int invoiceId) =>
+        WithDbAsync(db => db.Invoices.Where(i => i.InvoiceId == invoiceId)
+            .Select(i => i.Registration!.CourseId).FirstAsync());
+
+    /// <summary>The invoice number of a specific invoice, for asserting it appears in a listing.</summary>
+    public Task<string> InvoiceNumberOfAsync(int invoiceId) =>
+        WithDbAsync(db => db.Invoices.Where(i => i.InvoiceId == invoiceId).Select(i => i.InvoiceNumber).FirstAsync());
+
+    /// <summary>The invoice number of the most recent invoice in a course, for isolation assertions.</summary>
+    public Task<string> InvoiceNumberForCourseAsync(int courseId) =>
+        WithDbAsync(db => db.Invoices.Where(i => i.Registration!.CourseId == courseId)
+            .OrderByDescending(i => i.InvoiceId).Select(i => i.InvoiceNumber).FirstAsync());
+
+    /// <summary>An invoice's current status, for asserting that an action did or did not change it.</summary>
+    public Task<string> InvoiceStatusAsync(int invoiceId) =>
+        WithDbAsync(async db => await db.Invoices.Where(i => i.InvoiceId == invoiceId).Select(i => i.Status).SingleAsync());
 
     /// <summary>Runs an arbitrary query against the throwaway database on a fresh scope.</summary>
     public async Task<T> WithDbAsync<T>(Func<ECertDbContext, Task<T>> query)

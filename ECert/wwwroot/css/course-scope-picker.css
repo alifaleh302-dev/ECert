@@ -1,0 +1,149 @@
+/* ==========================================================================
+   ECert — Course-scope picker (category + course grants)
+   Two panels: categories on one side, searchable/filterable courses on the
+   other, with select-all / clear-all and a live summary. RTL-first, and built
+   from the shared admin tokens so it follows the light/dark theme.
+   ========================================================================== */
+
+.a-scope {
+    display: flex;
+    flex-direction: column;
+    gap: var(--a-4, 16px);
+    margin-block: var(--a-5, 20px);
+}
+
+.a-scope__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--a-3, 12px);
+}
+
+.a-scope__summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.a-scope__grid {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(280px, 1.6fr);
+    gap: var(--a-4, 16px);
+    align-items: start;
+}
+
+.a-scope__panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: var(--a-surface, #fff);
+    border: 1px solid var(--a-border, #e2e8f0);
+    border-radius: var(--a-r-md, 10px);
+    overflow: hidden;
+}
+
+.a-scope__panel-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--a-2, 8px);
+    padding: var(--a-3, 12px) var(--a-3, 12px);
+    border-block-end: 1px solid var(--a-border, #e2e8f0);
+    background: var(--a-surface-2, #f9fafb);
+}
+
+.a-scope__panel-title {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--a-text, #0f172a);
+}
+
+.a-scope__selectall {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: var(--a-r-sm, 8px);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--a-text-2, #475569);
+    cursor: pointer;
+    user-select: none;
+}
+
+.a-scope__selectall:hover { background: var(--a-surface-3, #f1f4f9); }
+.a-scope__selectall .form-check-input { margin: 0; }
+
+.a-scope__controls {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: var(--a-2, 8px);
+    padding: var(--a-3, 12px) var(--a-3, 12px) var(--a-2, 8px);
+}
+
+.a-scope__list {
+    display: flex;
+    flex-direction: column;
+    max-height: 20rem;
+    overflow-y: auto;
+    padding: var(--a-2, 8px) var(--a-3, 12px) var(--a-3, 12px);
+    scrollbar-width: thin;
+}
+
+.a-scope__item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--a-2, 8px);
+    padding: 7px 8px;
+    border-radius: var(--a-r-sm, 8px);
+    cursor: pointer;
+    transition: background-color .12s ease;
+}
+
+.a-scope__item:hover { background: var(--a-surface-3, #f1f4f9); }
+
+.a-scope__item[hidden] { display: none; }
+
+.a-scope__item .form-check-input {
+    margin-block-start: 3px;
+    flex-shrink: 0;
+}
+
+.a-scope__item-body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.35;
+}
+
+.a-scope__item-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--a-text, #0f172a);
+    overflow-wrap: anywhere;
+}
+
+.a-scope__item-meta {
+    font-size: 0.74rem;
+    color: var(--a-text-3, #64748b);
+}
+
+.a-scope__empty {
+    margin: var(--a-3, 12px) 0 0;
+    text-align: center;
+    font-size: 0.82rem;
+    color: var(--a-text-3, #64748b);
+}
+
+@media (max-width: 900px) {
+    .a-scope__grid { grid-template-columns: 1fr; }
+    .a-scope__list { max-height: 15rem; }
+    .a-scope__controls { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+    .a-scope__head { flex-direction: column; }
+}

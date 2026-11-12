@@ -1175,6 +1175,9 @@ a.a-kpi:focus-visible {
 
 .a-card--narrow { max-width: 520px; margin-inline: auto; }
 
+/* Full-width card for data-entry forms; the page grid keeps it readable on wide screens. */
+.a-card--form { width: 100%; }
+
 .a-note {
     display: flex;
     align-items: flex-start;
@@ -1394,6 +1397,9 @@ a.a-kpi:focus-visible {
 }
 
 .a-form__grid--2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+
+/* Wide forms: three columns on desktop, folding to two then one on narrow screens. */
+.a-form__grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 .a-field--full { grid-column: 1 / -1; }
 
@@ -1718,11 +1724,13 @@ a.a-kpi:focus-visible {
     .a-kpi__icon { width: 40px; height: 40px; font-size: 1.1rem; }
     .a-toolbar { padding: var(--a-4); }
     .a-toolbar__field { flex: 1 1 100%; }
+    .a-form__grid--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 480px) {
     .a-kpis { grid-template-columns: 1fr 1fr; gap: var(--a-3); }
     .admin-usermenu__meta { display: none; }
+    .a-form__grid--3 { grid-template-columns: 1fr; }
 }
 
 /* Respect reduced-motion preferences */

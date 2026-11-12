@@ -58,6 +58,7 @@ public class CertificatesController : Controller
         if (!HasPermission("issue-certificates")) return Forbid();
 
         var query = _db.Certificates
+            .InScope(User)
             .Include(c => c.Registration)
             .ThenInclude(r => r!.Course)
             .AsQueryable();
@@ -100,7 +101,7 @@ public class CertificatesController : Controller
             CourseId = courseId,
             IssueFrom = issueFrom,
             IssueTo = issueTo,
-            Courses = await _db.Courses.OrderBy(c => c.CourseNameArabic).ToListAsync(),
+            Courses = await _db.Courses.InScope(User).OrderBy(c => c.CourseNameArabic).ToListAsync(),
             Certificates = certificates,
             VerificationUrls = certificates.ToDictionary(
                 c => c.CertificateId,
@@ -116,6 +117,7 @@ public class CertificatesController : Controller
         if (!HasPermission("issue-certificates")) return Forbid();
 
         var query = _db.Registrations
+            .InScope(User)
             .Include(r => r.Course)
             .Where(r => r.Status == "Accepted" && !r.CertificateIssued && r.Course != null && r.Course.Status == "Completed")
             .AsQueryable();
@@ -140,7 +142,7 @@ public class CertificatesController : Controller
             CourseId = courseId,
             RegistrationFrom = registrationFrom,
             RegistrationTo = registrationTo,
-            Courses = await _db.Courses.Where(c => c.Status == "Completed").OrderBy(c => c.CourseNameArabic).ToListAsync(),
+            Courses = await _db.Courses.InScope(User).Where(c => c.Status == "Completed").OrderBy(c => c.CourseNameArabic).ToListAsync(),
             EligibleRegistrations = await query.OrderByDescending(r => r.RegistrationDate).ThenBy(r => r.FullName).ToListAsync()
         };
 
@@ -182,6 +184,7 @@ public class CertificatesController : Controller
         }
 
         var registrations = await _db.Registrations
+            .InScope(User)
             .Include(r => r.Course)
             .Where(r => idList.Contains(r.RegistrationId) && r.Status == "Accepted" && !r.CertificateIssued && r.Course != null && r.Course.Status == "Completed")
             .OrderBy(r => r.RegistrationId)
@@ -265,6 +268,7 @@ public class CertificatesController : Controller
         }
 
         var certificates = await _db.Certificates
+            .InScope(User)
             .Include(c => c.Registration)
             .ThenInclude(r => r!.Course)
             .Where(c => idList.Contains(c.CertificateId))
@@ -286,6 +290,7 @@ public class CertificatesController : Controller
         if (!HasPermission("issue-certificates")) return Forbid();
 
         var query = _db.Certificates
+            .InScope(User)
             .Include(c => c.Registration)
             .ThenInclude(r => r!.Course)
             .AsQueryable();

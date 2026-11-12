@@ -69,6 +69,36 @@ public sealed class AppClient
             && !finalPath.Contains("/Auth/Login", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// True when the request was denied. A controller <c>Forbid()</c> becomes a redirect to the
+    /// access-denied page that the client follows to a 200, so the final path is inspected as well
+    /// as the status code.
+    /// </summary>
+    public static bool IsDenied(HttpResponseMessage response)
+    {
+        if (response.StatusCode is HttpStatusCode.Forbidden) return true;
+        var finalPath = response.RequestMessage?.RequestUri?.AbsolutePath ?? string.Empty;
+        return finalPath.Contains("/AccessDenied", StringComparison.OrdinalIgnoreCase)
+            || finalPath.Contains("/Auth/Login", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>True when a GET to the path is denied (see <see cref="IsDenied"/>).</summary>
+    public async Task<bool> IsDeniedAsync(string path) => IsDenied(await _http.GetAsync(path));
+
+    /// <summary>Fetches a fresh antiforgery token from a page, for callers that must post later.</summary>
+    public Task<string> FetchTokenAsync(string path) => GetTokenAsync(path);
+
+    /// <summary>Posts a form with a previously fetched antiforgery token.</summary>
+    public async Task<HttpResponseMessage> PostFormWithTokenAsync(
+        string token, string action, IEnumerable<KeyValuePair<string, string>> fields)
+    {
+        var payload = new List<KeyValuePair<string, string>>(fields)
+        {
+            new("__RequestVerificationToken", token)
+        };
+        return await _http.PostAsync(action, new FormUrlEncodedContent(payload));
+    }
+
     /// <summary>Posts a form after fetching a fresh antiforgery token from <paramref name="tokenPath"/>.</summary>
     public async Task<HttpResponseMessage> PostFormAsync(
         string tokenPath, string action, IEnumerable<KeyValuePair<string, string>> fields)

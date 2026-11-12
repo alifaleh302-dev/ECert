@@ -20,14 +20,14 @@ public class DashboardController : Controller
 
         var vm = new DashboardViewModel
         {
-            PendingRegistrations = await _db.Registrations.CountAsync(r => r.Status == "Pending"),
-            UnpaidInvoices = await _db.Invoices.CountAsync(i => i.Status != "Paid" && i.Status != "Cancelled"),
-            ActiveCourses = await _db.Courses.CountAsync(c => c.Status == "OpenForRegistration" || c.Status == "InProgress"),
+            PendingRegistrations = await _db.Registrations.InScope(User).CountAsync(r => r.Status == "Pending"),
+            UnpaidInvoices = await _db.Invoices.InScope(User).CountAsync(i => i.Status != "Paid" && i.Status != "Cancelled"),
+            ActiveCourses = await _db.Courses.InScope(User).CountAsync(c => c.Status == "OpenForRegistration" || c.Status == "InProgress"),
             NewPosts = await _db.Posts.CountAsync(p => p.Status == "Published" && p.PublishedAt >= DateTime.Now.AddDays(-7)),
-            TotalRevenue = (decimal)(await _db.Payments.Where(p => !p.IsCancelled).SumAsync(p => (double?)p.Amount) ?? 0),
-            TotalTrainees = await _db.Registrations.CountAsync(r => r.Status == "Accepted"),
-            RecentRegistrations = await _db.Registrations.Include(r => r.Course).OrderByDescending(r => r.RegistrationDate).Take(5).ToListAsync(),
-            RecentInvoices = await _db.Invoices.OrderByDescending(i => i.CreatedAt).Take(5).ToListAsync()
+            TotalRevenue = await _db.Payments.InScope(User).Where(p => !p.IsCancelled).SumAsync(p => (decimal?)p.Amount) ?? 0m,
+            TotalTrainees = await _db.Registrations.InScope(User).CountAsync(r => r.Status == "Accepted"),
+            RecentRegistrations = await _db.Registrations.InScope(User).Include(r => r.Course).OrderByDescending(r => r.RegistrationDate).Take(5).ToListAsync(),
+            RecentInvoices = await _db.Invoices.InScope(User).OrderByDescending(i => i.CreatedAt).Take(5).ToListAsync()
         };
         return View(vm);
     }
