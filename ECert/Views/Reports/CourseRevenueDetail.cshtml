@@ -1,0 +1,167 @@
+@model CourseRevenueDetailViewModel
+@{
+    ViewData["Title"] = "تفاصيل تحصيلات الدورة";
+    ViewData["PageIcon"] = "bi-bar-chart-line";
+    ViewData["PageDesc"] = "تحصيلات المتدربين وتوزيعها حسب الموظف وطريقة الدفع";
+    Layout = "_AdminLayout";
+
+    string StatusLabel(string s) => s switch
+    {
+        "Paid" => "مدفوعة",
+        "PartiallyPaid" => "جزئية",
+        "Unpaid" => "غير مدفوعة",
+        "Cancelled" => "ملغية",
+        _ => s
+    };
+    decimal totalEmployee = Model.ByEmployee.Sum(r => r.Amount);
+    decimal totalMethod = Model.ByMethod.Sum(r => r.Amount);
+    decimal Pct(decimal part, decimal whole) => whole > 0 ? Math.Round(part / whole * 100m, 1) : 0m;
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="PrintCourseRevenueDetail" asp-route-courseId="@Model.CourseId"
+           asp-route-from="@ViewBag.From" asp-route-to="@ViewBag.To" target="_blank" class="btn btn-outline-primary">
+            <i class="bi bi-printer"></i> طباعة (PDF)
+        </a>
+        <a asp-action="CourseRevenue" asp-route-courseId="@Model.CourseId" asp-route-from="@ViewBag.From"
+           asp-route-to="@ViewBag.To" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> عودة</a>
+    </div>
+</div>
+
+<div class="a-note a-note--info mb-4">
+    <i class="bi bi-book" aria-hidden="true"></i>
+    <div>
+        <strong>@Model.CourseName</strong>
+        @if (!string.IsNullOrWhiteSpace(Model.CategoryName))
+        {
+            <span> — @Model.CategoryName</span>
+        }
+        @if (Model.From.HasValue || Model.To.HasValue)
+        {
+            <span class="text-muted"> · الفترة: @(Model.From?.ToString("yyyy-MM-dd") ?? "البداية") إلى @(Model.To?.ToString("yyyy-MM-dd") ?? "الآن")</span>
+        }
+    </div>
+</div>
+
+<section class="a-kpis mb-4" aria-label="ملخص الدورة">
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "الإيراد المتوقع", Value = Model.Expected.ToString("N0"), Icon = "bi-cash-stack", Tone = "brand", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "المدفوع", Value = Model.Paid.ToString("N0"), Icon = "bi-cash", Tone = "success", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "المسترد", Value = Model.Refunds.ToString("N0"), Icon = "bi-arrow-counterclockwise", Tone = "warning", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "صافي الإيراد الفعلي", Value = Model.NetPaid.ToString("N0"), Icon = "bi-graph-up-arrow", Tone = "info", Hint = $"نسبة التحصيل {Model.CollectionPercent}%" })" />
+</section>
+
+<div class="a-grid-2 mb-4">
+    <section class="a-card">
+        <div class="a-card__header"><h2 class="a-card__title"><i class="bi bi-person-badge" aria-hidden="true"></i> التوزيع حسب الموظف</h2></div>
+        <div class="a-card__body @(Model.ByEmployee.Any() ? "a-card__body--flush" : "")">
+            @if (Model.ByEmployee.Any())
+            {
+                <div class="a-table-wrap">
+                    <table class="table a-table align-middle">
+                        <thead><tr><th>الموظف</th><th>عدد الدفعات</th><th>المبلغ</th><th style="min-width:130px">النسبة</th></tr></thead>
+                        <tbody>
+                            @foreach (var r in Model.ByEmployee)
+                            {
+                                var pct = Pct(r.Amount, totalEmployee);
+                                <tr>
+                                    <td class="a-table__primary">@r.Label</td>
+                                    <td>@r.Count</td>
+                                    <td class="a-amount a-amount--in fw-bold">@r.Amount.ToString("N2") @Currency.Symbol</td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="a-progress flex-grow-1"><div class="a-progress__bar a-progress__bar--brand" style="width:@(pct.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></div></div>
+                                            <span class="small">@pct%</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-person-badge", Title = "لا توجد تحصيلات", Text = "لم تُسجَّل دفعات على هذه الدورة في الفترة المحددة." })" />
+            }
+        </div>
+    </section>
+
+    <section class="a-card">
+        <div class="a-card__header"><h2 class="a-card__title"><i class="bi bi-credit-card" aria-hidden="true"></i> التوزيع حسب طريقة الدفع</h2></div>
+        <div class="a-card__body @(Model.ByMethod.Any() ? "a-card__body--flush" : "")">
+            @if (Model.ByMethod.Any())
+            {
+                <div class="a-table-wrap">
+                    <table class="table a-table align-middle">
+                        <thead><tr><th>طريقة الدفع</th><th>عدد الدفعات</th><th>المبلغ</th><th style="min-width:130px">النسبة</th></tr></thead>
+                        <tbody>
+                            @foreach (var r in Model.ByMethod)
+                            {
+                                var pct = Pct(r.Amount, totalMethod);
+                                <tr>
+                                    <td class="a-table__primary">@r.Label</td>
+                                    <td>@r.Count</td>
+                                    <td class="a-amount a-amount--in fw-bold">@r.Amount.ToString("N2") @Currency.Symbol</td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="a-progress flex-grow-1"><div class="a-progress__bar a-progress__bar--info" style="width:@(pct.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></div></div>
+                                            <span class="small">@pct%</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-credit-card", Title = "لا توجد دفعات", Text = "لا توجد دفعات مسجلة." })" />
+            }
+        </div>
+    </section>
+</div>
+
+<div class="a-card">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-people" aria-hidden="true"></i> تحصيلات المتدربين</h2>
+        <span class="a-badge a-badge--neutral a-badge--none">@Model.Trainees.Count متدرب</span>
+    </div>
+    <div class="a-card__body @(Model.Trainees.Any() ? "a-card__body--flush" : "")">
+        @if (Model.Trainees.Any())
+        {
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>الفاتورة</th><th>المتدرب</th><th>الهاتف</th><th>المتوقع</th>
+                            <th>المدفوع</th><th>المسترد</th><th>صافي المدفوع</th><th>المتبقي</th><th>الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in Model.Trainees)
+                        {
+                            <tr>
+                                <td><span class="a-code">@t.InvoiceNumber</span></td>
+                                <td class="a-table__primary">@t.TraineeName</td>
+                                <td class="small" dir="ltr">@t.Phone</td>
+                                <td>@t.Expected.ToString("N0")</td>
+                                <td class="text-success">@t.Paid.ToString("N0")</td>
+                                <td class="text-danger">@(t.Refunds > 0 ? t.Refunds.ToString("N0") : "—")</td>
+                                <td class="fw-bold">@t.NetPaid.ToString("N0") @Currency.Symbol</td>
+                                <td class="text-danger">@t.Remaining.ToString("N0") @Currency.Symbol</td>
+                                <td><span class="a-badge @(t.Status == "Paid" ? "a-badge--success" : t.Status == "PartiallyPaid" ? "a-badge--warning" : "a-badge--danger")">@StatusLabel(t.Status)</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-people", Title = "لا يوجد متدربون", Text = "لا توجد فواتير مرتبطة بهذه الدورة." })" />
+        }
+    </div>
+</div>

@@ -29,14 +29,18 @@
         }),
         ("finance", "الإدارة المالية", "bi-wallet2", new()
         {
+            ("Finance", "لوحة المؤشرات المالية", "bi-speedometer2"),
             ("Invoices", "الفواتير", "bi-receipt"),
             ("Payments", "الدفعات", "bi-cash-stack"),
+            ("Installments", "الأقساط والخطط", "bi-calendar-check"),
             ("Custody", "عهدة الموظف والتوريد", "bi-wallet2"),
             ("Receivables", "المتأخرات", "bi-exclamation-diamond"),
             ("Refunds", "استرداد الرسوم", "bi-arrow-counterclockwise"),
+            ("Expenses", "المصروفات", "bi-cart-dash"),
             ("Cashbox", "الصندوق", "bi-safe"),
             ("Reports", "تقارير الإيرادات", "bi-graph-up-arrow"),
             ("FinancialAudit", "سجل التدقيق المالي", "bi-shield-check"),
+            ("FinanceSettings", "إعدادات النظام المالية", "bi-sliders"),
         }),
         ("content", "المحتوى الإعلامي", "bi-megaphone", new()
         {
@@ -56,7 +60,12 @@
 
     // A section is visible when the signed-in role holds any of its permissions. The map in
     // AdminPermissions is the single source of truth, mirrored by the controller guards.
-    bool CanSee(string ctrl) => User.CanAccessSection(ctrl);
+    // The main fund (الصندوق) is SuperAdmin-only: it is deliberately absent from SectionAccess so
+    // no grantable permission can unlock it.
+    bool CanSee(string ctrl) =>
+        string.Equals(ctrl, "Cashbox", StringComparison.OrdinalIgnoreCase)
+            ? User.IsSuperAdmin()
+            : User.CanAccessSection(ctrl);
 
     var visibleGroups = groups
         .Select(g => (g.Key, g.Label, g.Icon, Items: g.Items.Where(i => CanSee(i.Ctrl)).ToList()))

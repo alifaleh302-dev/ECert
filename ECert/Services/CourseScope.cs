@@ -56,6 +56,13 @@ public static class CourseScope
         user.AllowedCourseIds() is not { } ids || ids.Contains(courseId);
 
     /// <summary>
+    /// True when the user may administer the given course id, treating a missing id (an entity whose
+    /// course could not be resolved) as inaccessible for a confined user.
+    /// </summary>
+    public static bool CanAccessCourse(this ClaimsPrincipal user, int? courseId) =>
+        user.AllowedCourseIds() is not { } ids || (courseId.HasValue && ids.Contains(courseId.Value));
+
+    /// <summary>
     /// True when the user may administer the course the registration belongs to. Used by every
     /// registration-scoped action so a crafted id cannot reach a course outside the scope.
     /// </summary>

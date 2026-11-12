@@ -23,7 +23,7 @@
             <i class="bi bi-info-circle" aria-hidden="true"></i>
             <div>
                 <strong>الفاتورة:</strong> @invoice?.InvoiceNumber — <strong>المتدرب:</strong> @invoice?.TraineeName<br />
-                <strong>الدورة:</strong> @invoice?.CourseName — <strong>المتبقي:</strong> @((invoice?.RemainingAmount ?? 0m).ToString("N0")) ريال
+                <strong>الدورة:</strong> @invoice?.CourseName — <strong>المتبقي:</strong> @((invoice?.RemainingAmount ?? 0m).ToString("N0")) @Currency.Symbol
             </div>
         </div>
         <form asp-action="Add" method="post" id="paymentForm">
@@ -35,7 +35,7 @@
                 <label asp-for="Amount" class="a-label a-label--required"></label>
                 <div class="input-group">
                     <input asp-for="Amount" type="number" step="0.01" class="form-control" max="@invoice?.RemainingAmount" placeholder="0.00" />
-                    <span class="input-group-text">ريال</span>
+                    <span class="input-group-text">@Currency.Symbol</span>
                 </div>
                 <span asp-validation-for="Amount" class="a-error"></span>
             </div>

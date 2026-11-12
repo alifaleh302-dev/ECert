@@ -1,0 +1,86 @@
+@{
+    ViewData["Title"] = "التدفق النقدي";
+    ViewData["PageIcon"] = "bi-graph-up-arrow";
+    ViewData["PageDesc"] = "التحصيل والاسترداد والسحب والمصروفات يوماً بيوم";
+    Layout = "_AdminLayout";
+    var rows = ViewBag.Rows as List<ECert.Services.FinanceReportService.CashFlowRow> ?? new();
+    decimal collections = ViewBag.Collections is decimal c ? c : 0m;
+    decimal refundsTotal = ViewBag.Refunds is decimal rt ? rt : 0m;
+    decimal withdrawals = ViewBag.Withdrawals is decimal w ? w : 0m;
+    decimal expenses = ViewBag.Expenses is decimal e ? e : 0m;
+    decimal net = ViewBag.Net is decimal n ? n : 0m;
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="ExportCashFlowXlsx" asp-route-from="@ViewBag.From" asp-route-to="@ViewBag.To" class="btn btn-success">
+            <i class="bi bi-file-earmark-excel"></i> تصدير XLSX
+        </a>
+    </div>
+</div>
+
+<form method="get" class="a-toolbar" role="search" aria-label="نطاق التاريخ">
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="cfFrom">من</label>
+        <input id="cfFrom" type="date" name="from" value="@ViewBag.From" class="form-control" />
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="cfTo">إلى</label>
+        <input id="cfTo" type="date" name="to" value="@ViewBag.To" class="form-control" />
+    </div>
+    <div class="a-toolbar__actions">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> عرض</button>
+        <a asp-action="CashFlow" class="btn btn-outline-secondary">إعادة تعيين</a>
+    </div>
+</form>
+
+<section class="a-kpis mb-4" aria-label="ملخص الفترة">
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي التحصيل", Value = collections.ToString("N2"), Icon = "bi-cash-stack", Tone = "success", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "الاستردادات", Value = refundsTotal.ToString("N2"), Icon = "bi-arrow-counterclockwise", Tone = "warning", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "السحوبات", Value = withdrawals.ToString("N2"), Icon = "bi-cash-withdraw", Tone = "danger", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "المصروفات", Value = expenses.ToString("N2"), Icon = "bi-cart-dash", Tone = "danger", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "الصافي", Value = net.ToString("N2"), Icon = "bi-graph-up", Tone = (net >= 0 ? "success" : "danger"), Hint = Currency.Symbol })" />
+</section>
+
+<div class="a-card">
+    <div class="a-card__body @(rows.Any() ? "a-card__body--flush" : "")">
+        @if (rows.Any())
+        {
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover align-middle">
+                    <thead>
+                        <tr><th>التاريخ</th><th>التحصيل</th><th>الاسترداد</th><th>السحب</th><th>المصروفات</th><th>الصافي</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in rows)
+                        {
+                            <tr>
+                                <td class="small">@r.Day.ToString("yyyy-MM-dd")</td>
+                                <td class="a-amount a-amount--in">@r.Collections.ToString("N2")</td>
+                                <td class="a-amount a-amount--out">@r.Refunds.ToString("N2")</td>
+                                <td class="a-amount a-amount--out">@r.Withdrawals.ToString("N2")</td>
+                                <td class="a-amount a-amount--out">@r.Expenses.ToString("N2")</td>
+                                <td class="a-amount fw-bold @(r.Net >= 0 ? "a-amount--in" : "a-amount--out")">@r.Net.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr class="fw-bold">
+                            <td>الإجمالي</td>
+                            <td class="a-amount a-amount--in">@collections.ToString("N2")</td>
+                            <td class="a-amount a-amount--out">@refundsTotal.ToString("N2")</td>
+                            <td class="a-amount a-amount--out">@withdrawals.ToString("N2")</td>
+                            <td class="a-amount a-amount--out">@expenses.ToString("N2")</td>
+                            <td class="a-amount @(net >= 0 ? "a-amount--in" : "a-amount--out")">@net.ToString("N2")</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        }
+        else
+        {
+            <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-graph-up-arrow", Title = "لا توجد حركات", Text = "لا توجد حركات نقدية في هذا النطاق." })" />
+        }
+    </div>
+</div>

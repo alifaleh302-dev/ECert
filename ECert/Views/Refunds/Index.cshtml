@@ -5,11 +5,60 @@
     Layout = "_AdminLayout";
     var refunds = ViewBag.Refunds as List<Refund> ?? new();
     var search = ViewBag.Search as string;
+    bool isSuperAdmin = User.IsSuperAdmin();
+    var pending = refunds.Where(r => r.Status == RefundStatus.PendingApproval).ToList();
 }
 
 <div class="page-header">
     <partial name="_PageHeader" />
 </div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="a-note a-note--success mb-4" role="status"><i class="bi bi-check-circle" aria-hidden="true"></i> <div>@TempData["Success"]</div></div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="a-note a-note--danger mb-4" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> <div>@TempData["Error"]</div></div>
+}
+
+@if (isSuperAdmin && pending.Any())
+{
+    <div class="a-card mb-4">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-hourglass-split" aria-hidden="true"></i> بانتظار الاعتماد</h2>
+            <span class="a-badge a-badge--warning">@pending.Count طلب</span>
+        </div>
+        <div class="a-card__body a-card__body--flush">
+            <div class="a-table-wrap">
+                <table class="table a-table align-middle">
+                    <thead><tr><th>رقم السند</th><th>الفاتورة</th><th>المتدرب</th><th>المبلغ</th><th>السبب</th><th>نفّذه</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var r in pending)
+                        {
+                            <tr>
+                                <td><span class="a-code">@(r.ReceiptNumber ?? $"R-{r.RefundId}")</span></td>
+                                <td><span class="a-code">@r.Invoice?.InvoiceNumber</span></td>
+                                <td class="a-table__primary">@(r.Invoice?.TraineeNameArabic ?? r.Invoice?.TraineeName)</td>
+                                <td class="a-amount a-amount--out">@r.Amount.ToString("N2") @Currency.Symbol</td>
+                                <td class="text-muted small">@r.Reason</td>
+                                <td class="small">@r.RefundedBy</td>
+                                <td>
+                                    <form asp-action="Approve" asp-route-id="@r.RefundId" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('اعتماد الاسترداد وخصمه من العهدة؟');">
+                                            <i class="bi bi-check-lg"></i> اعتماد
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
 
 <form method="get" class="a-toolbar" role="search" aria-label="بحث في الاستردادات">
     <div class="a-toolbar__field a-toolbar__field--grow">
@@ -41,6 +90,7 @@
                             <th>المبلغ</th>
                             <th>السبب</th>
                             <th>نفّذه</th>
+                            <th>الحالة</th>
                             <th>التاريخ</th>
                             <th></th>
                         </tr>
@@ -53,9 +103,14 @@
                                 <td><span class="a-code">@(r.ReceiptNumber ?? $"R-{r.RefundId}")</span></td>
                                 <td><span class="a-code">@r.Invoice?.InvoiceNumber</span></td>
                                 <td class="a-table__primary">@(r.Invoice?.TraineeNameArabic ?? r.Invoice?.TraineeName)</td>
-                                <td class="a-amount a-amount--out">@r.Amount.ToString("N2") ريال</td>
+                                <td class="a-amount a-amount--out">@r.Amount.ToString("N2") @Currency.Symbol</td>
                                 <td class="text-muted small">@r.Reason</td>
                                 <td class="small">@r.RefundedBy</td>
+                                <td>
+                                    <span class="a-badge @(r.Status == RefundStatus.Approved ? "a-badge--success" : "a-badge--warning")">
+                                        @(r.Status == RefundStatus.Approved ? "معتمد" : "بانتظار الاعتماد")
+                                    </span>
+                                </td>
                                 <td class="small">@r.RefundDate.ToString("yyyy-MM-dd HH:mm")</td>
                                 <td>
                                     <a class="btn btn-sm btn-outline-primary" asp-action="Receipt" asp-route-id="@r.RefundId">

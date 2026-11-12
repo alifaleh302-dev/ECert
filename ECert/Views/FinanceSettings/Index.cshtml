@@ -1,0 +1,157 @@
+@{
+    ViewData["Title"] = "إعدادات النظام المالية";
+    ViewData["PageIcon"] = "bi-sliders";
+    ViewData["PageDesc"] = "العملة، حد اعتماد الاسترداد، وإقفال الفترات المالية — لمدير النظام فقط";
+    Layout = "_AdminLayout";
+    var currencyName = ViewBag.CurrencyName as string;
+    var currencySymbol = ViewBag.CurrencySymbol as string;
+    var threshold = ViewBag.RefundThreshold as decimal?;
+    var lockedThrough = ViewBag.LockedThrough as DateTime?;
+    var history = ViewBag.History as List<AccountingPeriodLock> ?? new();
+    int usage = ViewBag.CurrencyUsage is int u ? u : 0;
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="a-note a-note--success mb-4" role="status"><i class="bi bi-check-circle" aria-hidden="true"></i> <div>@TempData["Success"]</div></div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="a-note a-note--danger mb-4" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> <div>@TempData["Error"]</div></div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="a-card h-100">
+            <div class="a-card__header">
+                <h2 class="a-card__title"><i class="bi bi-currency-exchange" aria-hidden="true"></i> العملة</h2>
+            </div>
+            <div class="a-card__body">
+                <form asp-action="SaveCurrency" method="post" class="a-form__grid">
+                    @Html.AntiForgeryToken()
+                    <div class="a-field">
+                        <label class="a-field__label a-label--required" for="curName">اسم العملة</label>
+                        <input id="curName" type="text" name="currencyName" maxlength="60" value="@currencyName" class="form-control" required />
+                    </div>
+                    <div class="a-field">
+                        <label class="a-field__label a-label--required" for="curSymbol">رمز العرض</label>
+                        <input id="curSymbol" type="text" name="currencySymbol" maxlength="20" value="@currencySymbol" class="form-control" required />
+                    </div>
+                    <div class="a-field a-field--full">
+                        <p class="a-hint mb-2">يُستخدم الرمز في كل الشاشات والتقارير والسندات. لا يقوم النظام بأي تحويل بين العملات — هو رمز عرض فقط.</p>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ العملة</button>
+                    </div>
+                </form>
+                <p class="a-hint mt-3 mb-0">يُطبَّق الرمز حالياً على @usage سجلاً مالياً (فواتير، دفعات، استردادات).</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="a-card h-100">
+            <div class="a-card__header">
+                <h2 class="a-card__title"><i class="bi bi-shield-check" aria-hidden="true"></i> حد اعتماد الاسترداد</h2>
+            </div>
+            <div class="a-card__body">
+                <form asp-action="SaveRefundThreshold" method="post" class="a-form__grid">
+                    @Html.AntiForgeryToken()
+                    <div class="a-field a-field--full">
+                        <label class="a-field__label" for="refThreshold">أقصى مبلغ يُسترد مباشرةً (@Currency.Symbol)</label>
+                        <input id="refThreshold" type="number" name="refundApprovalThreshold" min="0" step="0.01"
+                               value="@(threshold?.ToString("0.00") ?? "0")" class="form-control" />
+                        <p class="a-hint">أي استرداد يتجاوز هذا المبلغ يتطلب اعتماد مدير النظام قبل أن يُخصم من العهدة والفاتورة. صفر = كل الاستردادات تحتاج اعتماداً.</p>
+                    </div>
+                    <div class="a-field a-field--full">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ الحد</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="a-card mt-4">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-lock" aria-hidden="true"></i> إقفال الفترة المالية</h2>
+        @if (lockedThrough.HasValue)
+        {
+            <span class="a-badge a-badge--warning">مقفلة حتى @lockedThrough.Value.ToString("yyyy-MM-dd")</span>
+        }
+        else
+        {
+            <span class="a-badge a-badge--success">مفتوحة</span>
+        }
+    </div>
+    <div class="a-card__body">
+        <div class="a-note a-note--info mb-4">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            <div>عند إقفال الفترة حتى تاريخ معيّن، تُرفض أي حركة مالية (دفعة، استرداد، توريد، سحب، مصروف) تقع في تاريخ ≤ ذلك اليوم. الإقفال لا يحذف شيئاً؛ يمكن إعادة الفتح.</div>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-6">
+                <form asp-action="LockPeriod" method="post" class="a-form__grid">
+                    @Html.AntiForgeryToken()
+                    <div class="a-field a-field--full">
+                        <label class="a-field__label a-label--required" for="lockThrough">إقفال حتى تاريخ</label>
+                        <input id="lockThrough" type="date" name="lockedThrough" value="@(lockedThrough?.ToString("yyyy-MM-dd") ?? DateTime.Today.ToString("yyyy-MM-dd"))" class="form-control" required />
+                    </div>
+                    <div class="a-field a-field--full">
+                        <label class="a-field__label" for="lockNote">ملاحظة</label>
+                        <input id="lockNote" type="text" name="note" maxlength="500" class="form-control" placeholder="اختياري" />
+                    </div>
+                    <div class="a-field a-field--full">
+                        <button type="submit" class="btn btn-warning" onclick="return confirm('إقفال الفترة المالية؟');"><i class="bi bi-lock"></i> إقفال الفترة</button>
+                    </div>
+                </form>
+            </div>
+            <div class="col-md-6">
+                <form asp-action="ReopenPeriod" method="post" class="a-form__grid">
+                    @Html.AntiForgeryToken()
+                    <div class="a-field a-field--full">
+                        <label class="a-field__label" for="reopenNote">سبب إعادة الفتح</label>
+                        <input id="reopenNote" type="text" name="note" maxlength="500" class="form-control" placeholder="اختياري" />
+                    </div>
+                    <div class="a-field a-field--full">
+                        <button type="submit" class="btn btn-outline-danger" onclick="return confirm('إعادة فتح الفترة المالية؟');"><i class="bi bi-unlock"></i> إعادة الفتح</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="a-card mt-4">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-clock-history" aria-hidden="true"></i> سجل الإقفال</h2>
+    </div>
+    <div class="a-card__body @(history.Any() ? "a-card__body--flush" : "")">
+        @if (history.Any())
+        {
+            <div class="a-table-wrap">
+                <table class="table a-table align-middle">
+                    <thead><tr><th>مقفلة حتى</th><th>بواسطة</th><th>التاريخ</th><th>الحالة</th><th>ملاحظة</th></tr></thead>
+                    <tbody>
+                        @foreach (var l in history)
+                        {
+                            <tr>
+                                <td class="small">@l.LockedThrough.ToString("yyyy-MM-dd")</td>
+                                <td class="small">@l.LockedBy</td>
+                                <td class="small">@l.LockedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td><span class="a-badge @(l.IsActive ? "a-badge--warning" : "a-badge--neutral")">@(l.IsActive ? "سارية" : "منتهية")</span></td>
+                                <td class="small text-muted">@l.Note</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-unlock", Title = "لا يوجد سجل إقفال", Text = "لم تُقفل أي فترة مالية بعد." })" />
+        }
+    </div>
+</div>

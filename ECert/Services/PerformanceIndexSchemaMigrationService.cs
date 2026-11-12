@@ -43,7 +43,14 @@ public class PerformanceIndexSchemaMigrationService
             ("Certificates", "IX_Certificates_RegistrationId", "`RegistrationId`"),
             // Posts are filtered by PostType (news vs posts) and ordered by Status/date; the
             // table has no IsPublished column.
-            ("Posts", "IX_Posts_PostType_Status", "`PostType`, `Status`")
+            ("Posts", "IX_Posts_PostType_Status", "`PostType`, `Status`"),
+            // The financial reports filter/group by date; these keep them off full scans as the
+            // ledgers grow.
+            ("Expenses", "IX_Expenses_ExpenseDate", "`ExpenseDate`"),
+            ("Refunds", "IX_Refunds_RefundDate", "`RefundDate`"),
+            ("CustodyEntries", "IX_CustodyEntries_UserId_CreatedAt", "`UserId`, `CreatedAt`"),
+            ("CashboxTransfers", "IX_CashboxTransfers_CreatedAt", "`CreatedAt`"),
+            ("CashboxWithdrawals", "IX_CashboxWithdrawals_CreatedAt", "`CreatedAt`")
         };
 
         foreach (var (table, name, columns) in indexes)

@@ -46,12 +46,14 @@ public static class Sections
     public const string ViewInvoices = AdminPermissions.ViewInvoices;
     public const string ManagePayments = AdminPermissions.ManagePayments;
     public const string ViewReports = AdminPermissions.ViewReports;
-    public const string ManageCashbox = AdminPermissions.ManageCashbox;
-    public const string WithdrawCashbox = AdminPermissions.WithdrawCashbox;
     public const string ViewCustody = AdminPermissions.ViewCustody;
     public const string ManageRefunds = AdminPermissions.ManageRefunds;
     public const string ViewReceivables = AdminPermissions.ViewReceivables;
     public const string ViewFinancialAudit = AdminPermissions.ViewFinancialAudit;
+    public const string ManageExpenses = AdminPermissions.ManageExpenses;
+    public const string ManageInstallments = AdminPermissions.ManageInstallments;
+    public const string ViewFinanceDashboard = AdminPermissions.ViewFinanceDashboard;
+    public const string ManageFinanceSettings = AdminPermissions.ManageFinanceSettings;
     public const string ManagePosts = AdminPermissions.ManagePosts;
     public const string ManageNews = AdminPermissions.ManageNews;
     public const string ManageHomepage = AdminPermissions.ManageHomepage;
@@ -61,7 +63,7 @@ public static class Sections
     public const string ManageAcademicCatalog = AdminPermissions.ManageAcademicCatalog;
     public const string ManagePhoneCountries = AdminPermissions.ManagePhoneCountries;
 
-    public sealed record Section(string Name, string Path, string[] Permissions);
+    public sealed record Section(string Name, string Path, string[] Permissions, bool SuperAdminOnly = false);
 
     public static readonly Section[] All =
     {
@@ -73,11 +75,16 @@ public static class Sections
         new("CertificateDesigns", "/CertificateDesigns", new[] { ManageCertificateDesigns }),
         new("Invoices", "/Invoices", new[] { ViewInvoices, ManageFinance }),
         new("Payments", "/Payments", new[] { ManagePayments }),
-        new("Cashbox", "/Cashbox", new[] { ManageCashbox }),
+        // The main fund is SuperAdmin-only by design; no grantable permission unlocks it.
+        new("Cashbox", "/Cashbox", Array.Empty<string>(), SuperAdminOnly: true),
         new("Custody", "/Custody", new[] { ViewCustody }),
         new("Refunds", "/Refunds", new[] { ManageRefunds }),
         new("Receivables", "/Receivables", new[] { ViewReceivables }),
         new("FinancialAudit", "/FinancialAudit", new[] { ViewFinancialAudit }),
+        new("Expenses", "/Expenses", new[] { ManageExpenses }),
+        new("Installments", "/Installments", new[] { ManageInstallments }),
+        new("Finance", "/Finance", new[] { ViewFinanceDashboard }),
+        new("FinanceSettings", "/FinanceSettings", new[] { ManageFinanceSettings }),
         new("Reports", "/Reports/CourseRevenue", new[] { ViewReports }),
         new("PostsManage", "/PostsManage", new[] { ManagePosts }),
         new("NewsManage", "/NewsManage", new[] { ManageNews }),
@@ -89,12 +96,12 @@ public static class Sections
         new("PhoneCountries", "/PhoneCountries", new[] { ManagePhoneCountries }),
     };
 
-    /// <summary>Sections the role editor is allowed to grant (excludes SuperAdmin-only permissions).</summary>
-    public static IEnumerable<Section> Grantable => All.Where(section => !section.Permissions.All(AdminPermissions.SuperAdminOnly.Contains));
+    /// <summary>Sections the role editor is allowed to grant (excludes SuperAdmin-only sections).</summary>
+    public static IEnumerable<Section> Grantable => All.Where(section => !section.SuperAdminOnly);
 
     public static IEnumerable<Section> ExpectedFor(IEnumerable<string> grantedPermissions)
     {
         var granted = grantedPermissions.ToHashSet(StringComparer.Ordinal);
-        return All.Where(section => section.Permissions.Any(granted.Contains));
+        return All.Where(section => !section.SuperAdminOnly && section.Permissions.Any(granted.Contains));
     }
 }

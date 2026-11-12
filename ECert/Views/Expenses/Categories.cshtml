@@ -1,0 +1,86 @@
+@{
+    ViewData["Title"] = "بنود المصروفات";
+    ViewData["PageIcon"] = "bi-tags";
+    ViewData["PageDesc"] = "تصنيفات المصروفات التي يمكن اختيارها عند تسجيل مصروف جديد";
+    Layout = "_AdminLayout";
+    var categories = ViewBag.Categories as List<ExpenseCategory> ?? new();
+    var usage = ViewBag.Usage as Dictionary<int, int> ?? new();
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> المصروفات</a>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="a-note a-note--success mb-4" role="status"><i class="bi bi-check-circle" aria-hidden="true"></i> <div>@TempData["Success"]</div></div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="a-note a-note--danger mb-4" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> <div>@TempData["Error"]</div></div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="a-card">
+            <div class="a-card__header">
+                <h2 class="a-card__title"><i class="bi bi-plus-circle" aria-hidden="true"></i> إضافة بند</h2>
+            </div>
+            <div class="a-card__body">
+                <form asp-action="SaveCategory" method="post" class="a-form__grid">
+                    @Html.AntiForgeryToken()
+                    <div class="a-field a-field--full">
+                        <label class="a-field__label a-label--required" for="catName">اسم البند</label>
+                        <input id="catName" type="text" name="name" maxlength="120" class="form-control" required placeholder="مثلاً: إيجار، رواتب، مستلزمات" />
+                    </div>
+                    <div class="a-field">
+                        <label class="a-field__label" for="catOrder">الترتيب</label>
+                        <input id="catOrder" type="number" name="sortOrder" value="0" class="form-control" />
+                    </div>
+                    <div class="a-field">
+                        <label class="a-field__label" for="catActive">نشط</label>
+                        <div class="form-check mt-2">
+                            <input id="catActive" type="checkbox" name="isActive" value="true" class="form-check-input" checked />
+                        </div>
+                    </div>
+                    <div class="a-field a-field--full">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ البند</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="a-card">
+            <div class="a-card__body @(categories.Any() ? "a-card__body--flush" : "")">
+                @if (categories.Any())
+                {
+                    <div class="a-table-wrap">
+                        <table class="table a-table align-middle">
+                            <thead><tr><th>البند</th><th>الترتيب</th><th>الحالة</th><th>عدد المصروفات</th></tr></thead>
+                            <tbody>
+                                @foreach (var c in categories)
+                                {
+                                    <tr>
+                                        <td class="a-table__primary">@c.Name</td>
+                                        <td>@c.SortOrder</td>
+                                        <td><span class="a-badge @(c.IsActive ? "a-badge--success" : "a-badge--neutral")">@(c.IsActive ? "نشط" : "غير نشط")</span></td>
+                                        <td>@(usage.TryGetValue(c.ExpenseCategoryId, out var n) ? n : 0)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-tags", Title = "لا توجد بنود", Text = "أضف بند مصروف من النموذج المجاور." })" />
+                }
+            </div>
+        </div>
+    </div>
+</div>

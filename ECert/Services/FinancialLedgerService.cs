@@ -33,6 +33,22 @@ public class FinancialLedgerService
     public async Task<decimal> GetTotalCustodyAsync() =>
         await _db.CustodyEntries.SumAsync(e => (decimal?)e.Amount) ?? 0m;
 
+    /// <summary>
+    /// The main fund's balance: money that reached it (approved handovers) minus money that left it
+    /// (withdrawals and refunds paid directly from the fund). Every component is derived from a
+    /// ledger, so the balance is always reproducible. The fund is fed <em>only</em> by custody
+    /// handovers — there is no per-course transfer.
+    /// </summary>
+    public async Task<decimal> GetMainFundBalanceAsync()
+    {
+        var transferred = await _db.CashboxTransfers.SumAsync(t => (decimal?)t.Amount) ?? 0m;
+        var withdrawn = await _db.CashboxWithdrawals.SumAsync(w => (decimal?)w.Amount) ?? 0m;
+        var refundedFromFund = await _db.Refunds
+            .Where(r => r.PaidFromFund && r.Status == RefundStatus.Approved)
+            .SumAsync(r => (decimal?)r.Amount) ?? 0m;
+        return transferred - withdrawn - refundedFromFund;
+    }
+
     /// <summary>Adds a signed custody movement. Positive credits the employee, negative debits them.</summary>
     public CustodyEntry AddCustodyEntry(
         int userId,

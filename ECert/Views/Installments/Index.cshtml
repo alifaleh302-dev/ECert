@@ -1,0 +1,69 @@
+@{
+    ViewData["Title"] = "الأقساط والخطط";
+    ViewData["PageIcon"] = "bi-calendar-check";
+    ViewData["PageDesc"] = "خطط الأقساط المرتبطة بالفواتير وحالة كل قسط (مسدد / جزئي / متأخر / قادم)";
+    Layout = "_AdminLayout";
+    var rows = ViewBag.Rows as List<ECert.Services.InstallmentService.PlanRow> ?? new();
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Late" class="btn btn-outline-danger"><i class="bi bi-exclamation-triangle"></i> الأقساط المتأخرة</a>
+        <a asp-controller="Receivables" asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-list-check"></i> الفواتير غير المسددة</a>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="a-note a-note--success mb-4" role="status"><i class="bi bi-check-circle" aria-hidden="true"></i> <div>@TempData["Success"]</div></div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="a-note a-note--danger mb-4" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> <div>@TempData["Error"]</div></div>
+}
+
+<div class="a-card">
+    <div class="a-card__body @(rows.Any() ? "a-card__body--flush" : "")">
+        @if (rows.Any())
+        {
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>الفاتورة</th><th>المتدرب</th><th>الدورة</th><th>الأقساط</th>
+                            <th>المسدد</th><th>المتأخر</th><th>المتبقي</th><th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in rows)
+                        {
+                            var plan = row.Plan;
+                            <tr>
+                                <td><span class="a-code">@plan.Invoice?.InvoiceNumber</span></td>
+                                <td class="a-table__primary">@(plan.Invoice?.TraineeNameArabic ?? plan.Invoice?.TraineeName)</td>
+                                <td class="small">@plan.Invoice?.Registration?.Course?.CourseName</td>
+                                <td>@plan.Installments.Count</td>
+                                <td>@row.PaidCount</td>
+                                <td>@if (row.LateCount > 0) { <span class="a-badge a-badge--danger">@row.LateCount متأخر</span> } else { <span class="text-muted">—</span> }</td>
+                                <td class="a-amount a-amount--out fw-bold">@row.Remaining.ToString("N2")</td>
+                                <td>
+                                    <a class="btn btn-sm btn-outline-primary" asp-action="Create" asp-route-invoiceId="@plan.InvoiceId">
+                                        <i class="bi bi-pencil"></i> تعديل الخطة
+                                    </a>
+                                    <a class="btn btn-sm btn-outline-secondary" asp-action="Print" asp-route-invoiceId="@plan.InvoiceId" target="_blank" rel="noopener">
+                                        <i class="bi bi-printer"></i> طباعة
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-calendar-check", Title = "لا توجد خطط أقساط", Text = "أنشئ خطة أقساط من صفحة الفاتورة غير المسددة." })" />
+        }
+    </div>
+</div>

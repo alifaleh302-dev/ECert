@@ -23,7 +23,7 @@
 
 <section class="a-kpis mb-4" aria-label="ملخص السجل">
     <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "عدد الحركات", Value = count.ToString(), Icon = "bi-list-check", Tone = "brand" })" />
-    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المبالغ", Value = total.ToString("N2"), Icon = "bi-cash-stack", Tone = "neutral", Hint = "ريال" })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المبالغ", Value = total.ToString("N2"), Icon = "bi-cash-stack", Tone = "neutral", Hint = Currency.Symbol })" />
 </section>
 
 <form method="get" class="a-toolbar" role="search" aria-label="تصفية السجل">

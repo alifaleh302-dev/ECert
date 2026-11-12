@@ -38,9 +38,11 @@ public class CustodyController : Controller
 
     /// <summary>
     /// The custody page. A SuperAdmin sees every employee's custody and the pending handover queue;
-    /// everyone else sees only their own custody and ledger.
+    /// everyone else sees only their own custody and ledger. The movements table is filtered by entry
+    /// type, date range and free text, and paged 20 rows at a time.
     /// </summary>
-    public async Task<IActionResult> Index(int? userId)
+    public async Task<IActionResult> Index(int? userId, string? entryType, DateTime? from, DateTime? to,
+        string? search, int page = 1)
     {
         if (!HasPermission(AdminPermissions.ViewCustody)) return Forbid();
 
@@ -54,17 +56,43 @@ public class CustodyController : Controller
         var target = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == targetUserId.Value);
         if (target == null) return NotFound();
 
-        var entries = await _db.CustodyEntries
-            .Where(e => e.UserId == targetUserId.Value)
+        var movements = _db.CustodyEntries.Where(e => e.UserId == targetUserId.Value);
+        if (!string.IsNullOrWhiteSpace(entryType)) movements = movements.Where(e => e.EntryType == entryType);
+        if (from.HasValue) movements = movements.Where(e => e.CreatedAt >= from.Value.Date);
+        if (to.HasValue) movements = movements.Where(e => e.CreatedAt < to.Value.Date.AddDays(1));
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            movements = movements.Where(e => (e.Note != null && e.Note.Contains(term))
+                || (e.ReferenceNumber != null && e.ReferenceNumber.Contains(term))
+                || (e.ReferenceType != null && e.ReferenceType.Contains(term)));
+        }
+
+        const int pageSize = 20;
+        var totalMovements = await movements.CountAsync();
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalMovements / (double)pageSize));
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+
+        var entries = await movements
             .OrderByDescending(e => e.CreatedAt)
             .ThenByDescending(e => e.CustodyEntryId)
-            .Take(300)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
         ViewBag.TargetUser = target;
         ViewBag.Entries = entries;
-        ViewBag.Balance = entries.Sum(e => e.Amount);
+        ViewBag.Balance = await _ledger.GetCustodyBalanceAsync(targetUserId.Value);
         ViewBag.IsSuperAdmin = isSuperAdmin;
+        ViewBag.EntryType = entryType;
+        ViewBag.From = from?.ToString("yyyy-MM-dd");
+        ViewBag.To = to?.ToString("yyyy-MM-dd");
+        ViewBag.Search = search;
+        ViewBag.Page = page;
+        ViewBag.PageSize = pageSize;
+        ViewBag.TotalMovements = totalMovements;
+        ViewBag.TotalPages = totalPages;
 
         // The employee's own pending handover requests, and — for a SuperAdmin — the full queue.
         ViewBag.MyPending = await _db.CustodyHandovers

@@ -6,6 +6,14 @@
     var invoice = ViewBag.Invoice as Invoice;
     decimal refunded = ViewBag.RefundedAmount is decimal ra ? ra : 0m;
     decimal refundable = (invoice?.PaidAmount ?? 0m);
+    bool isSuperAdmin = ViewBag.IsSuperAdmin is bool sa && sa;
+    decimal custodyBalance = ViewBag.CustodyBalance is decimal cb ? cb : 0m;
+    decimal fundBalance = ViewBag.FundBalance is decimal fb ? fb : 0m;
+    // An employee may only refund out of their own custody. A SuperAdmin may draw the shortfall from
+    // the main fund, so their ceiling is custody + fund. Neither can ever push a custody below zero.
+    string sourceLabel = isSuperAdmin ? "عهدتك ثم الصندوق الرئيسي" : "عهدتك";
+    decimal sourceBalance = isSuperAdmin ? custodyBalance + fundBalance : custodyBalance;
+    decimal maxRefund = Math.Max(0m, Math.Min(refundable, sourceBalance));
 }
 
 <div class="page-header">
@@ -26,21 +34,22 @@
             <i class="bi bi-info-circle" aria-hidden="true"></i>
             <div>
                 <strong>الفاتورة:</strong> @invoice?.InvoiceNumber — <strong>المتدرب:</strong> @(invoice?.TraineeNameArabic ?? invoice?.TraineeName)<br />
-                <strong>المدفوع حالياً:</strong> @refundable.ToString("N2") ريال — <strong>المُستردّ سابقاً:</strong> @refunded.ToString("N2") ريال
+                <strong>المدفوع حالياً:</strong> @refundable.ToString("N2") @Currency.Symbol — <strong>المُستردّ سابقاً:</strong> @refunded.ToString("N2") @Currency.Symbol<br />
+                <strong>مصدر الصرف:</strong> @sourceLabel — <strong>الرصيد المتاح:</strong> @sourceBalance.ToString("N2") @Currency.Symbol
             </div>
         </div>
 
-        <form asp-action="Create" method="post" onsubmit="return confirm('تأكيد تسجيل سند الاسترداد؟ سيُخصم المبلغ من عهدة الموظف المنفّذ.')">
+        <form asp-action="Create" method="post" onsubmit="return confirm('تأكيد تسجيل سند الاسترداد؟ سيُخصم المبلغ من @(isSuperAdmin ? "الصندوق الرئيسي" : "عهدتك").')">
             @Html.AntiForgeryToken()
             <input type="hidden" name="invoiceId" value="@invoice?.InvoiceId" />
 
             <div class="a-field">
-                <label class="a-label a-label--required">المبلغ (ريال)</label>
+                <label class="a-label a-label--required">المبلغ (@Currency.Symbol)</label>
                 <div class="input-group">
-                    <input type="number" name="amount" min="0.01" step="0.01" max="@refundable.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required placeholder="0.00" />
-                    <span class="input-group-text">ريال</span>
+                    <input type="number" name="amount" min="0.01" step="0.01" max="@maxRefund.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required placeholder="0.00" />
+                    <span class="input-group-text">@Currency.Symbol</span>
                 </div>
-                <span class="a-hint">أقصى مبلغ قابل للاسترداد: <strong>@refundable.ToString("N2")</strong> ريال</span>
+                <span class="a-hint">أقصى مبلغ قابل للاسترداد: <strong>@refundable.ToString("N2")</strong> @Currency.Symbol (لا يتجاوز @sourceLabel: <strong>@sourceBalance.ToString("N2")</strong>)</span>
             </div>
 
             <div class="a-field">

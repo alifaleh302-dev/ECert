@@ -42,22 +42,22 @@
                 <p class="a-dl__value" dir="ltr">@(Model.CourseNameEnglish ?? Model.CourseName)</p>
 
                 <span class="a-dl__label">الرسوم الأصلية</span>
-                <p class="a-dl__value">@Model.OriginalAmount.ToString("N2") ريال</p>
+                <p class="a-dl__value">@Model.OriginalAmount.ToString("N2") @Currency.Symbol</p>
 
                 @if (Model.ExemptionAmount > 0)
                 {
                     <span class="a-dl__label">الإعفاء</span>
-                    <p class="a-dl__value text-success">@Model.ExemptionAmount.ToString("N2") ريال@(string.IsNullOrWhiteSpace(Model.ExemptionReason) ? "" : $" — {Model.ExemptionReason}")</p>
+                    <p class="a-dl__value text-success">@Model.ExemptionAmount.ToString("N2") @Currency.Symbol@(string.IsNullOrWhiteSpace(Model.ExemptionReason) ? "" : $" — {Model.ExemptionReason}")</p>
                 }
 
                 <span class="a-dl__label">المبلغ المستحق</span>
-                <p class="a-dl__value fw-bold">@Model.TotalAmount.ToString("N2") ريال</p>
+                <p class="a-dl__value fw-bold">@Model.TotalAmount.ToString("N2") @Currency.Symbol</p>
 
                 <span class="a-dl__label">المبلغ المدفوع</span>
-                <p class="a-dl__value text-success">@Model.PaidAmount.ToString("N2") ريال</p>
+                <p class="a-dl__value text-success">@Model.PaidAmount.ToString("N2") @Currency.Symbol</p>
 
                 <span class="a-dl__label">المبلغ المتبقي</span>
-                <p class="a-dl__value text-danger">@Model.RemainingAmount.ToString("N0") ريال</p>
+                <p class="a-dl__value text-danger">@Model.RemainingAmount.ToString("N0") @Currency.Symbol</p>
 
                 <span class="a-dl__label">تاريخ الإنشاء</span>
                 <p class="a-dl__value">@Model.CreatedAt.ToString("yyyy-MM-dd")</p>
@@ -73,6 +73,10 @@
         {
             <div class="a-card__footer d-flex flex-wrap gap-2">
                 <a asp-controller="Payments" asp-action="Add" asp-route-invoiceId="@Model.InvoiceId" class="btn btn-success btn-sm"><i class="bi bi-cash"></i> تسجيل دفعة</a>
+                @if (User.HasPermission(AdminPermissions.ManageInstallments))
+                {
+                    <a asp-controller="Installments" asp-action="Create" asp-route-invoiceId="@Model.InvoiceId" class="btn btn-outline-primary btn-sm"><i class="bi bi-calendar3"></i> خطة أقساط</a>
+                }
                 <form asp-action="Cancel" method="post" onsubmit="return confirm('هل أنت متأكد من إلغاء الفاتورة؟')">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="id" value="@Model.InvoiceId" />
@@ -94,7 +98,7 @@
                 {
                     <div class="a-payment @(p.IsCancelled ? "a-payment--cancelled" : "")">
                         <div class="a-payment__head">
-                            <span class="a-payment__amount">@p.Amount.ToString("N0") ريال</span>
+                            <span class="a-payment__amount">@p.Amount.ToString("N0") @Currency.Symbol</span>
                             @if (p.IsCancelled)
                             {
                                 <span class="a-badge a-badge--danger">ملغاة</span>

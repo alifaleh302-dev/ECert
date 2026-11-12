@@ -6,6 +6,8 @@
     var verificationUrl = ViewBag.VerificationUrl as string ?? "";
     var qrDataUri = ViewBag.QrDataUri as string ?? "";
     var whatsAppLink = ViewBag.WhatsAppLink as string ?? "";
+    var siteName = (ViewBag.SiteSettings as List<SiteSetting>)?.FirstOrDefault(s => s.Key == "SiteName")?.Value;
+    if (string.IsNullOrWhiteSpace(siteName)) siteName = "مركز التدريب";
 }
 
 @section Styles {
@@ -38,7 +40,7 @@
         <div class="rp-sheet__brand">
             <span class="rp-sheet__seal" aria-hidden="true"><i class="bi bi-patch-check-fill"></i></span>
             <div>
-                <p class="rp-sheet__org">مركز التدريب</p>
+                <p class="rp-sheet__org">@siteName</p>
                 <p class="rp-sheet__org-sub">Training Center</p>
             </div>
         </div>
@@ -63,19 +65,19 @@
         <tbody>
             <tr>
                 <th>المبلغ المستحق</th>
-                <td>@((invoice?.TotalAmount ?? 0m).ToString("N2")) ريال</td>
+                <td>@((invoice?.TotalAmount ?? 0m).ToString("N2")) @Currency.Symbol</td>
             </tr>
             <tr class="rp-amounts__paid">
                 <th>المبلغ المدفوع</th>
-                <td>@Model.Amount.ToString("N2") ريال</td>
+                <td>@Model.Amount.ToString("N2") @Currency.Symbol</td>
             </tr>
             <tr>
                 <th>إجمالي المدفوع</th>
-                <td>@((invoice?.PaidAmount ?? 0m).ToString("N2")) ريال</td>
+                <td>@((invoice?.PaidAmount ?? 0m).ToString("N2")) @Currency.Symbol</td>
             </tr>
             <tr class="rp-amounts__remaining">
                 <th>المتبقي</th>
-                <td>@((invoice?.RemainingAmount ?? 0m).ToString("N2")) ريال</td>
+                <td>@((invoice?.RemainingAmount ?? 0m).ToString("N2")) @Currency.Symbol</td>
             </tr>
         </tbody>
     </table>

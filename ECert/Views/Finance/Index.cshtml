@@ -1,0 +1,186 @@
+@{
+    ViewData["Title"] = "لوحة المؤشرات المالية";
+    ViewData["PageIcon"] = "bi-speedometer2";
+    ViewData["PageDesc"] = "المؤشرات الرئيسية للإيرادات والمصروفات والعهد والصندوق، ضمن نطاق دوراتك";
+    Layout = "_AdminLayout";
+    var d = ViewBag.Data as ECert.Services.FinanceReportService.DashboardData;
+    var aging = ViewBag.Aging as List<ECert.Services.FinanceReportService.AgingRow> ?? new();
+    var cashFlow = ViewBag.CashFlow as List<ECert.Services.FinanceReportService.CashFlowRow> ?? new();
+    var recentPayments = ViewBag.RecentPayments as List<Payment> ?? new();
+    var recentRefunds = ViewBag.RecentRefunds as List<Refund> ?? new();
+    decimal outstanding = d?.OutstandingTotal ?? 0m;
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-controller="Reports" asp-action="IncomeStatement" class="btn btn-outline-primary">
+            <i class="bi bi-file-earmark-text"></i> قائمة الدخل
+        </a>
+        <a asp-controller="Reports" asp-action="CashFlow" class="btn btn-outline-primary">
+            <i class="bi bi-graph-up-arrow"></i> التدفق النقدي
+        </a>
+    </div>
+</div>
+
+@if (d != null)
+{
+    <section class="a-kpis mb-4" aria-label="ملخص الشهر">
+        <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "تحصيل اليوم", Value = d.CollectedToday.ToString("N2"), Icon = "bi-cash-coin", Tone = "brand", Hint = Currency.Symbol })" />
+        <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "تحصيل هذا الشهر", Value = d.CollectedThisMonth.ToString("N2"), Icon = "bi-cash-stack", Tone = "success", Hint = Currency.Symbol })" />
+        <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "مصروفات هذا الشهر", Value = d.ExpensesThisMonth.ToString("N2"), Icon = "bi-cart-dash", Tone = "danger", Hint = Currency.Symbol })" />
+        <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "صافي الشهر", Value = d.NetThisMonth.ToString("N2"), Icon = "bi-graph-up", Tone = (d.NetThisMonth >= 0 ? "success" : "danger"), Hint = "التحصيل − الاسترداد − المصروفات" })" />
+    </section>
+
+    <section class="a-kpis mb-4" aria-label="الأرصدة">
+        <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المتأخرات", Value = outstanding.ToString("N2"), Icon = "bi-exclamation-diamond", Tone = "warning", Hint = $"{d.UnpaidInvoices} فاتورة" })" />
+        <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "استردادات هذا الشهر", Value = d.RefundedThisMonth.ToString("N2"), Icon = "bi-arrow-counterclockwise", Tone = "neutral", Hint = Currency.Symbol })" />
+        <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي العهد", Value = d.CustodyTotal.ToString("N2"), Icon = "bi-wallet2", Tone = "neutral", Hint = "لدى الموظفين" })" />
+        <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "رصيد الصندوق", Value = d.FundBalance.ToString("N2"), Icon = "bi-safe", Tone = "brand", Hint = "المرحَّل − المسحوب" })" />
+    </section>
+}
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="a-card h-100">
+            <div class="a-card__header">
+                <h2 class="a-card__title"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i> التدفق النقدي (آخر 14 يوم)</h2>
+                <a asp-controller="Reports" asp-action="CashFlow" class="btn btn-sm btn-outline-secondary">عرض التفاصيل</a>
+            </div>
+            <div class="a-card__body @(cashFlow.Any() ? "a-card__body--flush" : "")">
+                @if (cashFlow.Any())
+                {
+                    <div class="a-table-wrap">
+                        <table class="table a-table align-middle">
+                            <thead>
+                                <tr><th>التاريخ</th><th>التحصيل</th><th>الاسترداد</th><th>السحب</th><th>المصروفات</th><th>الصافي</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var r in cashFlow)
+                                {
+                                    <tr>
+                                        <td class="small">@r.Day.ToString("yyyy-MM-dd")</td>
+                                        <td class="a-amount a-amount--in">@r.Collections.ToString("N2")</td>
+                                        <td class="a-amount a-amount--out">@r.Refunds.ToString("N2")</td>
+                                        <td class="a-amount a-amount--out">@r.Withdrawals.ToString("N2")</td>
+                                        <td class="a-amount a-amount--out">@r.Expenses.ToString("N2")</td>
+                                        <td class="a-amount fw-bold @(r.Net >= 0 ? "a-amount--in" : "a-amount--out")">@r.Net.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-graph-up", Title = "لا توجد حركات", Text = "لا توجد حركات نقدية خلال آخر 14 يوماً." })" />
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="a-card h-100">
+            <div class="a-card__header">
+                <h2 class="a-card__title"><i class="bi bi-hourglass-split" aria-hidden="true"></i> أعمار المتأخرات</h2>
+                <a asp-controller="Reports" asp-action="Aging" class="btn btn-sm btn-outline-secondary">التفاصيل</a>
+            </div>
+            <div class="a-card__body @(aging.Any() ? "a-card__body--flush" : "")">
+                @if (aging.Any())
+                {
+                    <div class="a-table-wrap">
+                        <table class="table a-table align-middle">
+                            <thead>
+                                <tr><th>الفئة</th><th>عدد الفواتير</th><th>المبلغ</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in aging)
+                                {
+                                    <tr>
+                                        <td class="small">@row.Label</td>
+                                        <td>@row.Count</td>
+                                        <td class="a-amount a-amount--out fw-bold">@row.Amount.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-check2-circle", Title = "لا توجد متأخرات", Text = "لا توجد أرصدة مستحقة." })" />
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-1">
+    <div class="col-lg-6">
+        <div class="a-card h-100">
+            <div class="a-card__header">
+                <h2 class="a-card__title"><i class="bi bi-cash-stack" aria-hidden="true"></i> أحدث الدفعات</h2>
+                <a asp-controller="Payments" asp-action="Index" class="btn btn-sm btn-outline-secondary">الكل</a>
+            </div>
+            <div class="a-card__body @(recentPayments.Any() ? "a-card__body--flush" : "")">
+                @if (recentPayments.Any())
+                {
+                    <div class="a-table-wrap">
+                        <table class="table a-table align-middle">
+                            <thead><tr><th>الفاتورة</th><th>المتدرب</th><th>المبلغ</th><th>التاريخ</th></tr></thead>
+                            <tbody>
+                                @foreach (var p in recentPayments)
+                                {
+                                    <tr>
+                                        <td><span class="a-code">@p.Invoice?.InvoiceNumber</span></td>
+                                        <td class="a-table__primary">@(p.Invoice?.TraineeNameArabic ?? p.Invoice?.TraineeName)</td>
+                                        <td class="a-amount a-amount--in">@p.Amount.ToString("N2")</td>
+                                        <td class="small">@p.PaymentDate.ToString("yyyy-MM-dd HH:mm")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-cash-stack", Title = "لا توجد دفعات", Text = "لم تُسجَّل دفعات بعد." })" />
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="a-card h-100">
+            <div class="a-card__header">
+                <h2 class="a-card__title"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> أحدث الاستردادات</h2>
+                <a asp-controller="Refunds" asp-action="Index" class="btn btn-sm btn-outline-secondary">الكل</a>
+            </div>
+            <div class="a-card__body @(recentRefunds.Any() ? "a-card__body--flush" : "")">
+                @if (recentRefunds.Any())
+                {
+                    <div class="a-table-wrap">
+                        <table class="table a-table align-middle">
+                            <thead><tr><th>الفاتورة</th><th>المتدرب</th><th>المبلغ</th><th>التاريخ</th></tr></thead>
+                            <tbody>
+                                @foreach (var r in recentRefunds)
+                                {
+                                    <tr>
+                                        <td><span class="a-code">@r.Invoice?.InvoiceNumber</span></td>
+                                        <td class="a-table__primary">@(r.Invoice?.TraineeNameArabic ?? r.Invoice?.TraineeName)</td>
+                                        <td class="a-amount a-amount--out">@r.Amount.ToString("N2")</td>
+                                        <td class="small">@r.RefundDate.ToString("yyyy-MM-dd HH:mm")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-arrow-counterclockwise", Title = "لا توجد استردادات", Text = "لم تُسجَّل استردادات بعد." })" />
+                }
+            </div>
+        </div>
+    </div>
+</div>

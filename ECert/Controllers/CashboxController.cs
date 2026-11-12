@@ -8,12 +8,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ECert.Controllers;
 
-/// <summary>واجهة الصندوق — ثلاث عمليات:
-/// 1) واجهة ترحيل الرصيد (متاحة لمدير المركز والمالي والـ SuperAdmin).
-/// 2) واجهة الصندوق تَعرض كل الترحيلات والسحوبات وإجمالي الصندوق (لمدير المركز والـ SuperAdmin).
-/// 3) سحب من الصندوق (SuperAdmin فقط).
+/// <summary>
+/// The main fund (الصندوق الرئيسي) — SuperAdmin only.
 ///
-/// كل المبالغ تُشتق من الـ Ledger في وقت الاستعلام، لا توجد حقل متغيّر.
+/// Money reaches the fund through exactly one path: an employee requests a handover (توريد) from
+/// <c>/Custody</c> and a SuperAdmin approves it. The legacy per-course "transfer" action is retired;
+/// this controller only reads the fund's movements (handovers in, withdrawals out) and lets the
+/// SuperAdmin withdraw from the fund. Every balance is derived from the ledgers at query time —
+/// there is no mutable stored balance.
 /// </summary>
 [Authorize]
 public class CashboxController : Controller
@@ -21,27 +23,26 @@ public class CashboxController : Controller
     private readonly ECertDbContext _db;
     private readonly AuditLogService _audit;
     private readonly FinancialLedgerService _ledger;
-    public CashboxController(ECertDbContext db, AuditLogService audit, FinancialLedgerService ledger)
-    { _db = db; _audit = audit; _ledger = ledger; }
+    private readonly PeriodLockService _periods;
+
+    public CashboxController(ECertDbContext db, AuditLogService audit, FinancialLedgerService ledger,
+        PeriodLockService periods)
+    {
+        _db = db;
+        _audit = audit;
+        _ledger = ledger;
+        _periods = periods;
+    }
 
     private bool IsSuperAdmin => User.IsSuperAdmin();
-    private bool CanTransfer => IsSuperAdmin
-        || User.HasPermission(CashboxRoles.PermTransfer);
-    private bool CanWithdraw => IsSuperAdmin
-        || User.HasPermission(CashboxRoles.PermWithdraw);
 
-    /// <summary>منظر الصندوق الشامل — يعرض إجمالي الصندوق، إجمالي الرصيد بدون ترحيل،
-    /// السحوبات، وعمليات الترحيل المجمَّعة حسب الدورة.</summary>
+    /// <summary>منظر الصندوق الشامل — إجمالي الصندوق، التوريدات (من العهد)، والسحوبات.</summary>
     [HttpGet]
     public async Task<IActionResult> Index()
     {
-        if (!IsSuperAdmin && !CanTransfer) return Forbid();
+        if (!IsSuperAdmin) return Forbid();
 
-        // A course-scoped administrator only ever sees their own courses' movements; the global
-        // fund and its withdrawals stay hidden from them.
-        var allowedCourseIds = User.AllowedCourseIds();
-
-        // جلب كل الترحيلات والسحوبات عبر ADO.NET لتجاوز sqlite/pomelo edge case في EF.
+        // الترحيلات تُقرأ عبر ADO.NET لتجاوز edge case في EF مع Pomelo.
         var transfers = new List<CashboxTransfer>();
         var withdrawals = new List<CashboxWithdrawal>();
         var conn = _db.Database.GetDbConnection();
@@ -81,23 +82,11 @@ public class CashboxController : Controller
         }
         finally { if (shouldClose) await conn.CloseAsync(); }
 
-        if (allowedCourseIds is not null)
-        {
-            transfers = transfers.Where(t => t.CourseId.HasValue && allowedCourseIds.Contains(t.CourseId.Value)).ToList();
-            withdrawals = new List<CashboxWithdrawal>();
-        }
-
-        // إجماليات
         decimal totalTransferred = transfers.Sum(t => t.Amount);
         decimal totalWithdrawn = withdrawals.Sum(w => w.Amount);
-        decimal totalCollected = await _db.Payments.InScope(User).Where(p => !p.IsCancelled)
+        decimal totalCollected = await _db.Payments.Where(p => !p.IsCancelled)
             .SumAsync(p => (decimal?)p.Amount) ?? 0m;
-
-        // رصيد كل دورة خارج الصندوق
-        var byCourse = transfers
-            .Where(t => t.CourseId.HasValue)
-            .GroupBy(t => t.CourseId!.Value)
-            .ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
+        decimal custodyTotal = await _ledger.GetTotalCustodyAsync();
 
         ViewBag.Transfers = transfers;
         ViewBag.Withdrawals = withdrawals;
@@ -105,104 +94,18 @@ public class CashboxController : Controller
         ViewBag.TotalTransferred = totalTransferred;
         ViewBag.TotalWithdrawn = totalWithdrawn;
         ViewBag.FundRemaining = totalTransferred - totalWithdrawn;
-        ViewBag.UntransferredTotal = totalCollected - totalTransferred;
-        ViewBag.TransfersByCourse = byCourse;
-        // Razor iterates ViewBag values as dynamic; anonymous-type properties are
-        // inaccessible to the generated view and cause RuntimeBinderException.
-        ViewBag.Courses = await _db.Courses.InScope(User).OrderBy(c => c.CourseName).ToListAsync();
-        ViewBag.CanTransfer = CanTransfer;
-        ViewBag.CanWithdraw = CanWithdraw;
+        ViewBag.CustodyTotal = custodyTotal;
+        ViewBag.Courses = await _db.Courses.OrderBy(c => c.CourseName).ToListAsync();
         ViewBag.IsSuperAdmin = IsSuperAdmin;
         return View();
     }
 
-    /// <summary>تنفيذ عملية ترحيل رصيد دورة إلى الصندوق.
-    /// يفرض: صلاحية ترحيل، مبلغ > 0، رصيد الدورة المدفوع > الرصيد المرحل منها (لا يمكن ترحيل مبلغ أكبر من المتاح).
-    /// </summary>
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Transfer(int courseId, decimal amount, string? note)
-    {
-        if (!CanTransfer) return Forbid();
-
-        if (amount <= 0)
-        {
-            TempData["Error"] = "المبلغ يجب أن يكون أكبر من صفر.";
-            return RedirectToAction("CourseRevenue", "Reports");
-        }
-
-        // اجلب الدورة وأحسب PaidAmount و TransferredAmount يدوياً ثم قارن.
-        var course = await _db.Courses
-            .Include(c => c.Registrations).ThenInclude(r => r.Invoice).ThenInclude(i => i!.Payments)
-            .FirstOrDefaultAsync(c => c.CourseId == courseId);
-        if (course == null)
-        {
-            TempData["Error"] = "الدورة غير موجودة.";
-            return RedirectToAction("CourseRevenue", "Reports");
-        }
-        if (!User.CanAccessCourse(course.CourseId))
-        {
-            TempData["Error"] = "لا تملك صلاحية إدارة هذه الدورة.";
-            return RedirectToAction("CourseRevenue", "Reports");
-        }
-
-        var invoices = course.Registrations.Where(r => r.Invoice != null).Select(r => r.Invoice!).ToList();
-        var collected = invoices.SelectMany(i => i.Payments).Where(p => !p.IsCancelled).Sum(p => p.Amount);
-
-        // قراءة SUM(Amount) لعمليات ترحيل هذه الدورة
-        decimal alreadyTransferred = 0m;
-        var conn = _db.Database.GetDbConnection();
-        var shouldClose = conn.State != ConnectionState.Open;
-        if (shouldClose) await conn.OpenAsync();
-        try
-        {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT COALESCE(SUM(`Amount`),0) FROM `CashboxTransfers` WHERE `CourseId`=@cid";
-            var p = cmd.CreateParameter(); p.ParameterName = "@cid"; p.Value = courseId; cmd.Parameters.Add(p);
-            var v = await cmd.ExecuteScalarAsync();
-            if (v != null && v != DBNull.Value) alreadyTransferred = Convert.ToDecimal(v);
-        }
-        finally { if (shouldClose) await conn.CloseAsync(); }
-
-        var available = collected - alreadyTransferred;
-        if (amount > available)
-        {
-            TempData["Error"] = $"المبلغ المُرحَّل ({amount:N2}) أكبر من الرصيد المتاح ({available:N2}) لهذه الدورة.";
-            return RedirectToAction("CourseRevenue", "Reports");
-        }
-
-        var actor = User.Identity?.Name ?? CashboxRoles.SystemManager;
-        var entry = new CashboxTransfer
-        {
-            CourseId = courseId,
-            Amount = amount,
-            Note = note,
-            CreatedBy = actor,
-            CreatedAt = DateTime.Now
-        };
-        _db.CashboxTransfers.Add(entry);
-        await _db.SaveChangesAsync();
-
-        _ledger.AddAudit(actor, FinancialActionTypes.Transfer, amount,
-            referenceType: "CashboxTransfer", referenceId: entry.Id,
-            details: $"ترحيل رصيد دورة {course.CourseName} إلى الصندوق");
-        await _db.SaveChangesAsync();
-
-        await _audit.LogAsync(actor, "Transfer", "Cashbox", entry.Id, null,
-            $"دورة {course.CourseName} — مبلغ {amount:N2}");
-
-        TempData["Success"] = $"تم ترحيل {amount:N2} ريال من دورة «{course.CourseName}» إلى الصندوق.";
-        return RedirectToAction("CourseRevenue", "Reports",
-            new { courseId });
-    }
-
-    /// <summary>سحب من الصندوق — SuperAdmin فقط.</summary>
+    /// <summary>سحب من الصندوق — SuperAdmin فقط، مع احترام إقفال الفترة المالية.</summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Withdraw(decimal amount, string reason)
     {
-        // The fund is global, so a course-scoped user must never draw from it.
-        if (!CanWithdraw || User.IsCourseRestricted()) return Forbid();
+        if (!IsSuperAdmin) return Forbid();
 
         if (amount <= 0)
         {
@@ -214,28 +117,15 @@ public class CashboxController : Controller
             TempData["Error"] = "يجب ذكر سبب السحب.";
             return RedirectToAction("Index");
         }
-
-        // الصندوق المتاح = إجمالي الترحيلات − إجمالي السحوبات
-        decimal totalTransferred = 0m, totalWithdrawn = 0m;
-        var conn = _db.Database.GetDbConnection();
-        var shouldClose = conn.State != ConnectionState.Open;
-        if (shouldClose) await conn.OpenAsync();
-        try
+        if (await _periods.IsLockedAsync(DateTime.Now))
         {
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = "SELECT COALESCE(SUM(`Amount`),0) FROM `CashboxTransfers`";
-                var v = await cmd.ExecuteScalarAsync();
-                if (v != null && v != DBNull.Value) totalTransferred = Convert.ToDecimal(v);
-            }
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = "SELECT COALESCE(SUM(`Amount`),0) FROM `CashboxWithdrawals`";
-                var v = await cmd.ExecuteScalarAsync();
-                if (v != null && v != DBNull.Value) totalWithdrawn = Convert.ToDecimal(v);
-            }
+            TempData["Error"] = await _periods.BlockedMessageAsync(DateTime.Now);
+            return RedirectToAction("Index");
         }
-        finally { if (shouldClose) await conn.CloseAsync(); }
+
+        // الصندوق المتاح = إجمالي التوريدات − إجمالي السحوبات
+        decimal totalTransferred = await _db.CashboxTransfers.SumAsync(t => (decimal?)t.Amount) ?? 0m;
+        decimal totalWithdrawn = await _db.CashboxWithdrawals.SumAsync(w => (decimal?)w.Amount) ?? 0m;
 
         var available = totalTransferred - totalWithdrawn;
         if (amount > available)

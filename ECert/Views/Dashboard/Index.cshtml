@@ -12,7 +12,7 @@
     {
         ("Registrations", new() { Label = "تسجيلات معلقة", Value = Model.PendingRegistrations.ToString("N0"), Icon = "bi-hourglass-split", Tone = "warning", Hint = "بحاجة إلى مراجعة", Href = Url.Action("Index", "Registrations", new { status = "Pending" }) }),
         ("Invoices", new() { Label = "فواتير غير مدفوعة", Value = Model.UnpaidInvoices.ToString("N0"), Icon = "bi-receipt", Tone = "danger", Hint = "تحتاج إلى متابعة", Href = Url.Action("Index", "Invoices") }),
-        ("Reports", new() { Label = "إجمالي الإيرادات", Value = Model.TotalRevenue.ToString("N0"), Icon = "bi-cash-stack", Tone = "success", Hint = "ريال سعودي", Href = Url.Action("CourseRevenue", "Reports") }),
+        ("Reports", new() { Label = "إجمالي الإيرادات", Value = Model.TotalRevenue.ToString("N0"), Icon = "bi-cash-stack", Tone = "success", Hint = Currency.Symbol, Href = Url.Action("CourseRevenue", "Reports") }),
         ("CoursesManage", new() { Label = "دورات نشطة", Value = Model.ActiveCourses.ToString("N0"), Icon = "bi-book", Tone = "brand", Hint = "متاحة للتسجيل", Href = Url.Action("Index", "CoursesManage") }),
         ("Registrations", new() { Label = "المتدربون", Value = Model.TotalTrainees.ToString("N0"), Icon = "bi-people", Tone = "info", Hint = "مقبولون", Href = Url.Action("Index", "Registrations", new { status = "Accepted" }) }),
         ("PostsManage", new() { Label = "منشورات جديدة", Value = Model.NewPosts.ToString("N0"), Icon = "bi-newspaper", Tone = "neutral", Hint = "بانتظار النشر", Href = Url.Action("Index", "PostsManage") }),
@@ -152,7 +152,7 @@
                                 <tr>
                                     <td><span class="a-code">@inv.InvoiceNumber</span></td>
                                     <td class="a-table__primary">@inv.TraineeName</td>
-                                    <td class="a-table__num">@inv.TotalAmount.ToString("N0") ريال</td>
+                                    <td class="a-table__num">@inv.TotalAmount.ToString("N0") @Currency.Symbol</td>
                                     <td>
                                         @switch (inv.Status)
                                         {

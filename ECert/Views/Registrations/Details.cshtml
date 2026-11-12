@@ -83,13 +83,13 @@
                         <p class="a-dl__value"><span class="a-code">@Model.Invoice.InvoiceNumber</span></p>
 
                         <span class="a-dl__label">المبلغ</span>
-                        <p class="a-dl__value">@Model.Invoice.TotalAmount.ToString("N0") ريال</p>
+                        <p class="a-dl__value">@Model.Invoice.TotalAmount.ToString("N0") @Currency.Symbol</p>
 
                         <span class="a-dl__label">المدفوع</span>
-                        <p class="a-dl__value text-success">@Model.Invoice.PaidAmount.ToString("N0") ريال</p>
+                        <p class="a-dl__value text-success">@Model.Invoice.PaidAmount.ToString("N0") @Currency.Symbol</p>
 
                         <span class="a-dl__label">المتبقي</span>
-                        <p class="a-dl__value text-danger">@Model.Invoice.RemainingAmount.ToString("N0") ريال</p>
+                        <p class="a-dl__value text-danger">@Model.Invoice.RemainingAmount.ToString("N0") @Currency.Symbol</p>
                     </div>
                     <div class="mt-3">
                         <a asp-controller="Invoices" asp-action="Details" asp-route-id="@Model.Invoice.InvoiceId" class="btn btn-sm btn-outline-primary"><i class="bi bi-box-arrow-up-left"></i> عرض الفاتورة</a>
@@ -119,15 +119,15 @@
                     <div class="a-form__grid mb-3">
                         <div class="a-field mb-0">
                             <span class="a-field__label">الرسوم الأصلية</span>
-                            <strong>@originalFee.ToString("N2") ريال</strong>
+                            <strong>@originalFee.ToString("N2") @Currency.Symbol</strong>
                         </div>
                         <div class="a-field mb-0">
                             <span class="a-field__label">الإعفاء الحالي</span>
-                            <strong class="text-success">@currentExemption.ToString("N2") ريال</strong>
+                            <strong class="text-success">@currentExemption.ToString("N2") @Currency.Symbol</strong>
                         </div>
                         <div class="a-field mb-0">
                             <span class="a-field__label">المستحق</span>
-                            <strong>@payableFee.ToString("N2") ريال</strong>
+                            <strong>@payableFee.ToString("N2") @Currency.Symbol</strong>
                         </div>
                     </div>
                     @if (Model.ExemptionAppliedAt.HasValue)
@@ -140,7 +140,7 @@
                         <div class="a-field mb-0">
                             <label class="a-field__label" for="ExemptionAmount">مبلغ الإعفاء</label>
                             <input class="form-control form-control-sm" id="ExemptionAmount" name="ExemptionAmount" type="number" min="0" max="@originalFee" step="0.01" value="@currentExemption.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" required />
-                            <span class="a-hint">لإعفاء كامل أدخل @originalFee.ToString("N2") ريال.</span>
+                            <span class="a-hint">لإعفاء كامل أدخل @originalFee.ToString("N2") @Currency.Symbol.</span>
                         </div>
                         <div class="a-field mb-0">
                             <label class="a-field__label" for="Reason">سبب الإعفاء</label>

@@ -49,6 +49,11 @@ public class ECertDbContext : DbContext, IDataProtectionKeyContext
     public DbSet<CustodyHandover> CustodyHandovers => Set<CustodyHandover>();
     public DbSet<Refund> Refunds => Set<Refund>();
     public DbSet<FinancialAuditEntry> FinancialAuditEntries => Set<FinancialAuditEntry>();
+    public DbSet<AccountingPeriodLock> AccountingPeriodLocks => Set<AccountingPeriodLock>();
+    public DbSet<ExpenseCategory> ExpenseCategories => Set<ExpenseCategory>();
+    public DbSet<Expense> Expenses => Set<Expense>();
+    public DbSet<InstallmentPlan> InstallmentPlans => Set<InstallmentPlan>();
+    public DbSet<Installment> Installments => Set<Installment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

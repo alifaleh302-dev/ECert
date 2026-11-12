@@ -91,7 +91,8 @@ public static class WhatsAppLinkBuilder
         string courseName,
         decimal amount,
         decimal remaining,
-        string verificationUrl)
+        string verificationUrl,
+        string currencySymbol = SystemSettingsService.DefaultCurrencySymbol)
     {
         var builder = new StringBuilder();
         builder.AppendLine($"{institutionName}");
@@ -99,8 +100,8 @@ public static class WhatsAppLinkBuilder
         builder.AppendLine($"المتدرب: {traineeName}");
         if (!string.IsNullOrWhiteSpace(courseName))
             builder.AppendLine($"الدورة: {courseName}");
-        builder.AppendLine($"المبلغ: {amount:N2} ريال");
-        builder.AppendLine($"المتبقي: {remaining:N2} ريال");
+        builder.AppendLine($"المبلغ: {amount:N2} {currencySymbol}");
+        builder.AppendLine($"المتبقي: {remaining:N2} {currencySymbol}");
         if (!string.IsNullOrWhiteSpace(verificationUrl))
             builder.AppendLine($"للتحقق من صحة السند: {verificationUrl}");
         return builder.ToString().TrimEnd();

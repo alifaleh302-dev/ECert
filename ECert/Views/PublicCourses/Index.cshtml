@@ -114,11 +114,11 @@
                             <p class="small mb-1"><i class="bi bi-geo-alt"></i> @(string.IsNullOrWhiteSpace(course.Location) ? "عن بعد أو يحدد لاحقاً" : course.Location)</p>
                             @if (!string.IsNullOrEmpty(course.DiscountType) && course.DiscountValue > 0)
                             {
-                                <p class="mb-0"><span class="text-muted text-decoration-line-through small">@course.Price.ToString("N0") ريال</span> <span class="fw-bold text-danger fs-5">@course.FinalPrice.ToString("N0") ريال</span></p>
+                                <p class="mb-0"><span class="text-muted text-decoration-line-through small">@course.Price.ToString("N0") @Currency.Symbol</span> <span class="fw-bold text-danger fs-5">@course.FinalPrice.ToString("N0") @Currency.Symbol</span></p>
                             }
                             else
                             {
-                                <p class="fw-bold text-primary fs-5 mb-0">@course.Price.ToString("N0") ريال</p>
+                                <p class="fw-bold text-primary fs-5 mb-0">@course.Price.ToString("N0") @Currency.Symbol</p>
                             }
                         </div>
                         <div class="card-footer bg-white">

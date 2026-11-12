@@ -1,0 +1,56 @@
+@{
+    ViewData["Title"] = "الأقساط المتأخرة";
+    ViewData["PageIcon"] = "bi-exclamation-triangle";
+    ViewData["PageDesc"] = "الأقساط التي تجاوزت تاريخ استحقاقها ولم تُسدد بعد";
+    Layout = "_AdminLayout";
+    var rows = ViewBag.Rows as List<ECert.Services.InstallmentService.LatePlanRow> ?? new();
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> كل الخطط</a>
+    </div>
+</div>
+
+<div class="a-card">
+    <div class="a-card__body @(rows.Any() ? "a-card__body--flush" : "")">
+        @if (rows.Any())
+        {
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover align-middle">
+                    <thead>
+                        <tr><th>الفاتورة</th><th>المتدرب</th><th>الدورة</th><th>القسط</th><th>الاستحقاق</th><th>المتبقي</th><th>التأخير</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in rows)
+                        {
+                            var plan = row.Plan;
+                            foreach (var v in row.LateViews)
+                            {
+                                <tr>
+                                    <td><span class="a-code">@plan.Invoice?.InvoiceNumber</span></td>
+                                    <td class="a-table__primary">@(plan.Invoice?.TraineeNameArabic ?? plan.Invoice?.TraineeName)</td>
+                                    <td class="small">@plan.Invoice?.Registration?.Course?.CourseName</td>
+                                    <td>قسط @v.Sequence</td>
+                                    <td class="small">@v.DueDate.ToString("yyyy-MM-dd")</td>
+                                    <td class="a-amount a-amount--out fw-bold">@v.Remaining.ToString("N2")</td>
+                                    <td><span class="a-badge a-badge--danger">@v.DaysOverdue يوم</span></td>
+                                    <td>
+                                        <a class="btn btn-sm btn-outline-success" asp-controller="Payments" asp-action="Add" asp-route-invoiceId="@plan.InvoiceId">
+                                            <i class="bi bi-cash"></i> قبض
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-check2-circle", Title = "لا توجد أقساط متأخرة", Text = "كل الأقساط المستحقة مسددة في موعدها." })" />
+        }
+    </div>
+</div>
