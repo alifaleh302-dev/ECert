@@ -4,6 +4,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ECert.Services;
 
+/// <summary>
+/// Appends to the operation log. The row's hash-chain link is filled in by
+/// <see cref="AuditChainSaveChangesInterceptor"/> on save, and the table itself rejects
+/// UPDATE/DELETE, so the log is append-only and tamper-evident.
+/// </summary>
 public class AuditLogService
 {
     private readonly ECertDbContext _db;

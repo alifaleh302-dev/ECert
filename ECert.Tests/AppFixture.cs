@@ -62,6 +62,8 @@ public static class Sections
     public const string ViewAuditLog = AdminPermissions.ViewAuditLog;
     public const string ManageAcademicCatalog = AdminPermissions.ManageAcademicCatalog;
     public const string ManagePhoneCountries = AdminPermissions.ManagePhoneCountries;
+    public const string ManageSecuritySettings = AdminPermissions.ManageSecuritySettings;
+    public const string ViewSecurityAudit = AdminPermissions.ViewSecurityAudit;
 
     public sealed record Section(string Name, string Path, string[] Permissions, bool SuperAdminOnly = false);
 
@@ -86,6 +88,7 @@ public static class Sections
         new("Finance", "/Finance", new[] { ViewFinanceDashboard }),
         new("FinanceSettings", "/FinanceSettings", new[] { ManageFinanceSettings }),
         new("Reports", "/Reports/CourseRevenue", new[] { ViewReports }),
+        new("SecuritySettings", "/SecuritySettings", new[] { ManageSecuritySettings }, SuperAdminOnly: true),
         new("PostsManage", "/PostsManage", new[] { ManagePosts }),
         new("NewsManage", "/NewsManage", new[] { ManageNews }),
         new("HomepageManage", "/HomepageManage", new[] { ManageHomepage }),

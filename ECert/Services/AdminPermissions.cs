@@ -37,6 +37,8 @@ public static class AdminPermissions
     public const string ViewAuditLog = "view-audit-log";
     public const string ManageAcademicCatalog = "manage-academic-catalog";
     public const string ManagePhoneCountries = "manage-phone-countries";
+    public const string ViewSecurityAudit = "view-security-audit";
+    public const string ManageSecuritySettings = "manage-security-settings";
 
     public sealed record PermissionDefinition(string Name, string Description, string Group);
 
@@ -72,6 +74,8 @@ public static class AdminPermissions
         new(ViewAuditLog, "مشاهدة سجل العمليات", "النظام"),
         new(ManageAcademicCatalog, "إدارة البيانات الجامعية", "النظام"),
         new(ManagePhoneCountries, "إدارة مفاتيح الهواتف", "النظام"),
+        new(ViewSecurityAudit, "مراجعة سجلات العمليات والتدقيق (قراءة فقط)", "النظام"),
+        new(ManageSecuritySettings, "إعدادات الأمان والنسخ الاحتياطي", "النظام"),
     };
 
     /// <summary>
@@ -107,9 +111,10 @@ public static class AdminPermissions
             ["HomepageManage"] = new[] { ManageHomepage },
             ["Users"] = new[] { ManageUsers },
             ["Roles"] = new[] { ManageRoles },
-            ["AuditLog"] = new[] { ViewAuditLog },
+            ["AuditLog"] = new[] { ViewAuditLog, ViewSecurityAudit },
             ["AcademicCatalog"] = new[] { ManageAcademicCatalog },
             ["PhoneCountries"] = new[] { ManagePhoneCountries },
+            ["SecuritySettings"] = new[] { ManageSecuritySettings },
         };
 
     /// <summary>
@@ -126,7 +131,7 @@ public static class AdminPermissions
     /// Only the built-in SuperAdmin holds them.
     /// </summary>
     public static readonly IReadOnlySet<string> SuperAdminOnly =
-        new HashSet<string>(StringComparer.Ordinal) { ManageRoles, ManageFinanceSettings };
+        new HashSet<string>(StringComparer.Ordinal) { ManageRoles, ManageFinanceSettings, ManageSecuritySettings };
 
     /// <summary>
     /// Ready-made permission bundles for the common staff roles. A preset is only a starting
@@ -162,6 +167,10 @@ public static class AdminPermissions
         new("content", "محرر المحتوى", "إدارة المنشورات والأخبار والصفحة الرئيسية.", new[]
         {
             ManagePosts, ManageNews, ManageHomepage
+        }),
+        new("auditor", "مدقق أمني", "مراجعة سجلات العمليات والتدقيق والتقارير المالية (قراءة فقط).", new[]
+        {
+            ViewSecurityAudit, ViewAuditLog, ViewReports, ViewFinancialAudit, ViewFinanceDashboard
         }),
     };
 }

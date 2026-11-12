@@ -41,6 +41,22 @@ public class User
     /// </summary>
     public bool MustChangePassword { get; set; }
 
+    /// <summary>
+    /// Telegram chat id bound to this account. When set (and 2FA is enabled globally), a login
+    /// must be confirmed with an OTP delivered to this chat.
+    /// </summary>
+    [StringLength(40)]
+    [Display(Name = "معرّف تليجرام")]
+    public string? TelegramChatId { get; set; }
+
+    /// <summary>
+    /// One-time code the employee sends to the bot to bind their chat. Null once linked.
+    /// </summary>
+    [StringLength(20)]
+    public string? TelegramLinkCode { get; set; }
+
+    public DateTime? TelegramLinkedAt { get; set; }
+
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
 
     /// <summary>

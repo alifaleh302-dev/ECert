@@ -20,6 +20,12 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish .
 
+# The encrypted-backup job shells out to mysqldump to snapshot the database. The client
+# package is the only extra runtime dependency.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends default-mysql-client \
+    && rm -rf /var/lib/apt/lists/*
+
 # Runtime folders for user uploads and QR codes
 RUN mkdir -p /app/wwwroot/uploads /app/wwwroot/qrcodes
 

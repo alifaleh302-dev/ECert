@@ -13,11 +13,13 @@ public class RolesController : Controller
 {
     private readonly ECertDbContext _db;
     private readonly AuditLogService _audit;
+    private readonly SecurityAlertService _alerts;
 
-    public RolesController(ECertDbContext db, AuditLogService audit)
+    public RolesController(ECertDbContext db, AuditLogService audit, SecurityAlertService alerts)
     {
         _db = db;
         _audit = audit;
+        _alerts = alerts;
     }
 
     private bool CanManageRoles => User.HasPermission(AdminPermissions.ManageRoles);
@@ -142,6 +144,8 @@ public class RolesController : Controller
 
         await _audit.LogAsync(User.Identity?.Name ?? string.Empty, "Update", "Role", role.RoleId, null,
             $"Role: {role.RoleName}; Permissions: {string.Join(',', permissionIds)}");
+        await _alerts.AlertPermissionsChangedAsync(User.Identity?.Name ?? string.Empty, role.RoleName,
+            $"تحديث صلاحيات الدور ({permissionIds.Count} صلاحية)");
 
         TempData["Success"] = "تم تحديث الدور وصلاحياته. تسري الصلاحيات الجديدة عند تسجيل دخول المستخدمين المرتبطين به مرة أخرى.";
         return RedirectToAction(nameof(Index));

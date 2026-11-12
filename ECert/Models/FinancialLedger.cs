@@ -235,6 +235,18 @@ public class FinancialAuditEntry
 
     [Display(Name = "التاريخ والوقت")]
     public DateTime Timestamp { get; set; } = DateTime.Now;
+
+    /// <summary>
+    /// Hash of the previous row in the chain (empty for the first row). Together with
+    /// <see cref="RowHash"/> this makes the log tamper-evident: altering or deleting any row
+    /// breaks every hash that follows it, which the integrity check detects.
+    /// </summary>
+    [StringLength(64)]
+    public string? PreviousHash { get; set; }
+
+    /// <summary>SHA-256 over this row's content plus <see cref="PreviousHash"/>.</summary>
+    [StringLength(64)]
+    public string? RowHash { get; set; }
 }
 
 public static class RefundStatus

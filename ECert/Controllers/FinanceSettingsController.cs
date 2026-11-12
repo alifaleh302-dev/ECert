@@ -21,15 +21,17 @@ public class FinanceSettingsController : Controller
     private readonly PeriodLockService _periods;
     private readonly FinancialLedgerService _ledger;
     private readonly AuditLogService _audit;
+    private readonly SecurityAlertService _alerts;
 
     public FinanceSettingsController(ECertDbContext db, SystemSettingsService settings, PeriodLockService periods,
-        FinancialLedgerService ledger, AuditLogService audit)
+        FinancialLedgerService ledger, AuditLogService audit, SecurityAlertService alerts)
     {
         _db = db;
         _settings = settings;
         _periods = periods;
         _ledger = ledger;
         _audit = audit;
+        _alerts = alerts;
     }
 
     private string Actor => User.Identity?.Name ?? "System";
@@ -111,6 +113,7 @@ public class FinanceSettingsController : Controller
             details: $"إعادة فتح الفترة المالية{(string.IsNullOrWhiteSpace(note) ? "" : $" — {note}")}");
         await _db.SaveChangesAsync();
         await _audit.LogAsync(Actor, "ReopenPeriod", "AccountingPeriod", null, null, note);
+        await _alerts.AlertPeriodReopenedAsync(Actor, note);
         TempData["Success"] = "تم إعادة فتح الفترة المالية.";
         return RedirectToAction(nameof(Index));
     }
