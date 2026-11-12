@@ -1,0 +1,104 @@
+@model Payment
+@{
+    ViewData["Title"] = "سند قبض " + (Model.ReferenceNumber ?? ("P-" + Model.PaymentId));
+    Layout = "_AdminLayout";
+    var invoice = Model.Invoice;
+    var verificationUrl = ViewBag.VerificationUrl as string ?? "";
+    var qrDataUri = ViewBag.QrDataUri as string ?? "";
+    var whatsAppLink = ViewBag.WhatsAppLink as string ?? "";
+}
+
+@section Styles {
+    <link href="~/css/receipt-print.css" rel="stylesheet" asp-append-version="true" />
+}
+
+<div class="rp-actions no-print">
+    <a asp-controller="Invoices" asp-action="Details" asp-route-id="@invoice?.InvoiceId" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-right"></i> العودة للفاتورة
+    </a>
+    <button type="button" class="btn btn-primary" onclick="window.print()">
+        <i class="bi bi-printer"></i> طباعة
+    </button>
+    @if (!string.IsNullOrEmpty(whatsAppLink))
+    {
+        <a class="btn btn-success" href="@whatsAppLink" target="_blank" rel="noopener">
+            <i class="bi bi-whatsapp"></i> إرسال عبر واتساب
+        </a>
+    }
+    else
+    {
+        <span class="btn btn-outline-secondary disabled" title="لا يوجد رقم هاتف صالح">
+            <i class="bi bi-whatsapp"></i> واتساب (لا يوجد رقم)
+        </span>
+    }
+</div>
+
+<div class="rp-sheet">
+    <header class="rp-sheet__head">
+        <div class="rp-sheet__brand">
+            <span class="rp-sheet__seal" aria-hidden="true"><i class="bi bi-patch-check-fill"></i></span>
+            <div>
+                <p class="rp-sheet__org">مركز التدريب</p>
+                <p class="rp-sheet__org-sub">Training Center</p>
+            </div>
+        </div>
+        <div class="rp-sheet__title">
+            <h1>سند قبض</h1>
+            <p>Payment Receipt</p>
+        </div>
+    </header>
+
+    <dl class="rp-grid">
+        <div><dt>رقم السند</dt><dd class="rp-code">@(Model.ReferenceNumber ?? $"P-{Model.PaymentId}")</dd></div>
+        <div><dt>رقم الفاتورة</dt><dd class="rp-code">@invoice?.InvoiceNumber</dd></div>
+        <div><dt>التاريخ</dt><dd>@Model.PaymentDate.ToString("yyyy-MM-dd HH:mm")</dd></div>
+        <div><dt>المتدرب</dt><dd>@(invoice?.TraineeNameArabic ?? invoice?.TraineeName)</dd></div>
+        <div><dt>الهاتف</dt><dd dir="ltr">@invoice?.TraineePhone</dd></div>
+        <div><dt>الدورة</dt><dd>@(invoice?.CourseNameArabic ?? invoice?.CourseName)</dd></div>
+        <div><dt>طريقة الدفع</dt><dd>@(Model.PaymentMethod switch { "Cash" => "نقد", "BankTransfer" => "تحويل بنكي", "EWallet" => "محفظة إلكترونية", "Card" => "بطاقة", _ => Model.PaymentMethod })</dd></div>
+        <div><dt>المحصّل</dt><dd>@Model.RecordedBy</dd></div>
+    </dl>
+
+    <table class="rp-amounts">
+        <tbody>
+            <tr>
+                <th>المبلغ المستحق</th>
+                <td>@((invoice?.TotalAmount ?? 0m).ToString("N2")) ريال</td>
+            </tr>
+            <tr class="rp-amounts__paid">
+                <th>المبلغ المدفوع</th>
+                <td>@Model.Amount.ToString("N2") ريال</td>
+            </tr>
+            <tr>
+                <th>إجمالي المدفوع</th>
+                <td>@((invoice?.PaidAmount ?? 0m).ToString("N2")) ريال</td>
+            </tr>
+            <tr class="rp-amounts__remaining">
+                <th>المتبقي</th>
+                <td>@((invoice?.RemainingAmount ?? 0m).ToString("N2")) ريال</td>
+            </tr>
+        </tbody>
+    </table>
+
+    @if (!string.IsNullOrEmpty(Model.Notes))
+    {
+        <p class="rp-note"><strong>ملاحظة:</strong> @Model.Notes</p>
+    }
+
+    <footer class="rp-sheet__foot">
+        <div class="rp-sheet__verify">
+            @if (!string.IsNullOrEmpty(qrDataUri))
+            {
+                <img src="@qrDataUri" alt="رمز التحقق من السند" width="96" height="96" />
+            }
+            <div>
+                <p>للتحقق من صحة السند امسح الرمز أو زُر الرابط:</p>
+                <p class="rp-code rp-code--url">@verificationUrl</p>
+            </div>
+        </div>
+        <div class="rp-sheet__sign">
+            <span>توقيع المحصّل</span>
+            <span class="rp-sheet__sign-line">@Model.RecordedBy</span>
+        </div>
+    </footer>
+</div>

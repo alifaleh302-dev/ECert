@@ -1,0 +1,107 @@
+@{
+    ViewData["Title"] = "المتأخرات";
+    ViewData["PageIcon"] = "bi-exclamation-diamond";
+    ViewData["PageDesc"] = "الفواتير غير المسددة وأعمار المتأخرات، ضمن نطاق دوراتك فقط";
+    Layout = "_AdminLayout";
+    var rows = ViewBag.Data as List<ECert.Controllers.ReceivableRow> ?? new();
+    var courses = ViewBag.Courses as List<Course> ?? new();
+    decimal total = ViewBag.TotalOutstanding is decimal t ? t : 0m;
+    string? bucket = ViewBag.Bucket as string;
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="ExportXlsx" asp-route-courseId="@ViewBag.CourseId" asp-route-search="@ViewBag.Search" class="btn btn-success">
+            <i class="bi bi-file-earmark-excel"></i> تصدير XLSX
+        </a>
+    </div>
+</div>
+
+<section class="a-kpis mb-4" aria-label="ملخص المتأخرات">
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المتأخرات", Value = total.ToString("N2"), Icon = "bi-exclamation-diamond", Tone = "danger", Hint = "ريال" })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "عدد الفواتير غير المسددة", Value = rows.Count.ToString(), Icon = "bi-receipt", Tone = "warning", Hint = "فاتورة" })" />
+</section>
+
+<form method="get" class="a-toolbar" role="search" aria-label="تصفية المتأخرات">
+    <div class="a-toolbar__field a-toolbar__field--grow">
+        <label class="a-field__label" for="recCourse">الدورة</label>
+        <select id="recCourse" name="courseId" class="form-select">
+            <option value="">كل الدورات</option>
+            @foreach (var c in courses)
+            {
+                <option value="@c.CourseId" selected="@(ViewBag.CourseId == c.CourseId)">@c.CourseName</option>
+            }
+        </select>
+    </div>
+    <div class="a-toolbar__field a-toolbar__field--grow">
+        <label class="a-field__label" for="recSearch">بحث</label>
+        <input id="recSearch" type="search" name="search" value="@ViewBag.Search" class="form-control" placeholder="رقم الفاتورة أو اسم المتدرب أو الهاتف" />
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="recBucket">الفئة العمرية</label>
+        <select id="recBucket" name="bucket" class="form-select">
+            <option value="">الكل</option>
+            <option value="current" selected="@(bucket == "current")">غير مستحق بعد</option>
+            <option value="d30" selected="@(bucket == "d30")">متأخر 1–30 يوم</option>
+            <option value="d60" selected="@(bucket == "d60")">متأخر 31–60 يوم</option>
+            <option value="d90" selected="@(bucket == "d90")">متأخر 61–90 يوم</option>
+            <option value="d90plus" selected="@(bucket == "d90plus")">أكثر من 90 يوم</option>
+            <option value="none" selected="@(bucket == "none")">بلا تاريخ استحقاق</option>
+        </select>
+    </div>
+    <div class="a-toolbar__actions">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> تصفية</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">مسح</a>
+    </div>
+</form>
+
+<div class="a-card">
+    <div class="a-card__body @(rows.Any() ? "a-card__body--flush" : "")">
+        @if (rows.Any())
+        {
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>رقم الفاتورة</th>
+                            <th>المتدرب</th>
+                            <th>الدورة</th>
+                            <th>المستحق</th>
+                            <th>المدفوع</th>
+                            <th>المتبقي</th>
+                            <th>الاستحقاق</th>
+                            <th>الفئة</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in rows)
+                        {
+                            <tr>
+                                <td><span class="a-code">@r.InvoiceNumber</span></td>
+                                <td class="a-table__primary">@r.TraineeName<div class="small text-muted" dir="ltr">@r.TraineePhone</div></td>
+                                <td class="small">@r.CourseName</td>
+                                <td class="a-amount">@r.Total.ToString("N2")</td>
+                                <td class="a-amount a-amount--in">@r.Paid.ToString("N2")</td>
+                                <td class="a-amount a-amount--out fw-bold">@r.Remaining.ToString("N2")</td>
+                                <td class="small">@(r.DueDate?.ToString("yyyy-MM-dd") ?? "—")</td>
+                                <td><span class="a-badge @(r.Bucket == "current" ? "a-badge--neutral" : r.Bucket == "none" ? "a-badge--neutral" : "a-badge--danger")">@r.BucketLabel</span></td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <a class="btn btn-sm btn-outline-primary" asp-action="Statement" asp-route-invoiceId="@r.InvoiceId"><i class="bi bi-journal-text"></i> كشف</a>
+                                        <a class="btn btn-sm btn-outline-success" asp-controller="Payments" asp-action="Add" asp-route-invoiceId="@r.InvoiceId"><i class="bi bi-cash"></i> قبض</a>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-check2-circle", Title = "لا توجد متأخرات", Text = "لا توجد فواتير غير مسددة ضمن النطاق الحالي." })" />
+        }
+    </div>
+</div>

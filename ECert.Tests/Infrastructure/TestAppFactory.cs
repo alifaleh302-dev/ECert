@@ -442,6 +442,42 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
     public Task<string> InvoiceStatusAsync(int invoiceId) =>
         WithDbAsync(async db => await db.Invoices.Where(i => i.InvoiceId == invoiceId).Select(i => i.Status).SingleAsync());
 
+    /// <summary>The signed custody balance of a user (sum of their custody entries).</summary>
+    public Task<decimal> CustodyBalanceAsync(int userId) =>
+        WithDbAsync(async db => await db.CustodyEntries.Where(e => e.UserId == userId)
+            .SumAsync(e => (decimal?)e.Amount) ?? 0m);
+
+    /// <summary>How many custody entries of a given type a user has.</summary>
+    public Task<int> CustodyEntryCountAsync(int userId, string entryType) =>
+        WithDbAsync(db => db.CustodyEntries.CountAsync(e => e.UserId == userId && e.EntryType == entryType));
+
+    /// <summary>Total amount refunded on an invoice.</summary>
+    public Task<decimal> RefundedTotalAsync(int invoiceId) =>
+        WithDbAsync(async db => await db.Refunds.Where(r => r.InvoiceId == invoiceId)
+            .SumAsync(r => (decimal?)r.Amount) ?? 0m);
+
+    /// <summary>Counts financial audit rows of a given action type.</summary>
+    public Task<int> FinancialAuditCountAsync(string actionType) =>
+        WithDbAsync(db => db.FinancialAuditEntries.CountAsync(e => e.ActionType == actionType));
+
+    /// <summary>Latest custody-handover status for a user (or null when they have none).</summary>
+    public Task<string?> LatestHandoverStatusAsync(int userId) =>
+        WithDbAsync(async db => await db.CustodyHandovers.Where(h => h.UserId == userId)
+            .OrderByDescending(h => h.CustodyHandoverId).Select(h => h.Status).FirstOrDefaultAsync());
+
+    /// <summary>The user id of the seeded admin account.</summary>
+    public Task<int> AdminUserIdAsync() => UserIdAsync("admin");
+
+    /// <summary>Sets the DueDate of an invoice, so receivables ageing can be asserted.</summary>
+    public async Task SetInvoiceDueDateAsync(int invoiceId, DateTime dueDate)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        var invoice = await db.Invoices.FirstAsync(i => i.InvoiceId == invoiceId);
+        invoice.DueDate = dueDate;
+        await db.SaveChangesAsync();
+    }
+
     /// <summary>Runs an arbitrary query against the throwaway database on a fresh scope.</summary>
     public async Task<T> WithDbAsync<T>(Func<ECertDbContext, Task<T>> query)
     {

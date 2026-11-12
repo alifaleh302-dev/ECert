@@ -1,0 +1,278 @@
+@{
+    ViewData["Title"] = "عهدة الموظف والتوريد للصندوق";
+    ViewData["PageIcon"] = "bi-wallet2";
+    ViewData["PageDesc"] = "رصيد عهدتك النقدية، حركاتها، وتقديم طلب توريد للصندوق الرئيسي";
+    Layout = "_AdminLayout";
+
+    var target = ViewBag.TargetUser as User;
+    var entries = ViewBag.Entries as List<CustodyEntry> ?? new();
+    decimal balance = ViewBag.Balance is decimal b ? b : 0m;
+    bool isSuperAdmin = ViewBag.IsSuperAdmin is bool sa && sa;
+    var myPending = ViewBag.MyPending as List<CustodyHandover> ?? new();
+    var myHandovers = ViewBag.MyHandovers as List<CustodyHandover> ?? new();
+    var employees = ViewBag.Employees as List<ECert.Controllers.CustodySummaryRow> ?? new();
+    var pendingHandovers = ViewBag.PendingHandovers as List<CustodyHandover> ?? new();
+    decimal totalCustody = ViewBag.TotalCustody is decimal tc ? tc : 0m;
+
+    string EntryLabel(string type) => type switch
+    {
+        CustodyEntryTypes.Collection => "قبض",
+        CustodyEntryTypes.Refund => "استرداد",
+        CustodyEntryTypes.Handover => "توريد للصندوق",
+        CustodyEntryTypes.Adjustment => "تسوية",
+        _ => type
+    };
+    string StatusLabel(string s) => s switch
+    {
+        CustodyHandoverStatus.Pending => "قيد المراجعة",
+        CustodyHandoverStatus.Approved => "معتمد",
+        CustodyHandoverStatus.Rejected => "مرفوض",
+        _ => s
+    };
+    string StatusBadge(string s) => s switch
+    {
+        CustodyHandoverStatus.Pending => "a-badge--warning",
+        CustodyHandoverStatus.Approved => "a-badge--success",
+        CustodyHandoverStatus.Rejected => "a-badge--danger",
+        _ => "a-badge--neutral"
+    };
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+</div>
+
+<section class="a-kpis mb-4" aria-label="ملخص العهدة">
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "رصيد العهدة الحالي", Value = balance.ToString("N2"), Icon = "bi-wallet2", Tone = "brand", Hint = "ريال" })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "طلبات قيد المراجعة", Value = myPending.Count.ToString(), Icon = "bi-hourglass-split", Tone = "warning", Hint = "بانتظار اعتماد مدير النظام" })" />
+    @if (isSuperAdmin)
+    {
+        <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي العهد لدى الموظفين", Value = totalCustody.ToString("N2"), Icon = "bi-people", Tone = "neutral", Hint = "ريال" })" />
+        <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "طلبات توريد معلّقة (الكل)", Value = pendingHandovers.Count.ToString(), Icon = "bi-inbox", Tone = "info", Hint = "بحاجة إلى قرار" })" />
+    }
+</section>
+
+@if (target != null && isSuperAdmin)
+{
+    <div class="a-note a-note--info mb-4">
+        <i class="bi bi-person-badge" aria-hidden="true"></i>
+        <div>عرض عهدة الموظف: <strong>@target.FullName</strong> (@target.Username)</div>
+    </div>
+}
+
+@if (isSuperAdmin && pendingHandovers.Any())
+{
+    <div class="a-card mb-4">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-inbox" aria-hidden="true"></i> طلبات التوريد بانتظار القرار</h2>
+        </div>
+        <div class="a-card__body a-card__body--flush">
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>الموظف</th>
+                            <th>المبلغ</th>
+                            <th>ملاحظة الموظف</th>
+                            <th>تاريخ التقديم</th>
+                            <th>القرار</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var h in pendingHandovers)
+                        {
+                            <tr>
+                                <td class="a-table__primary">@(h.User?.FullName ?? h.RequestedBy)</td>
+                                <td class="a-amount a-amount--in">@h.Amount.ToString("N2") ريال</td>
+                                <td class="text-muted small">@h.Note</td>
+                                <td class="small">@h.RequestedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <form asp-action="Approve" method="post" class="d-flex gap-1" onsubmit="return confirm('اعتماد توريد المبلغ إلى الصندوق الرئيسي؟')">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@h.CustodyHandoverId" />
+                                            <input type="text" name="note" class="form-control form-control-sm" placeholder="ملاحظة (اختياري)" style="max-width:160px" />
+                                            <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i> اعتماد</button>
+                                        </form>
+                                        <form asp-action="Reject" method="post" onsubmit="return confirm('رفض طلب التوريد؟')">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@h.CustodyHandoverId" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i> رفض</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="a-grid-2 mb-4">
+    <section class="a-card">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-arrow-left-circle" aria-hidden="true"></i> توريد / ترحيل للصندوق الرئيسي</h2>
+        </div>
+        <div class="a-card__body">
+            @if (myPending.Any())
+            {
+                <div class="a-note a-note--warning mb-3">
+                    <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+                    <div>
+                        لديك طلب قيد المراجعة بمبلغ <strong>@myPending.Sum(h => h.Amount).ToString("N2")</strong> ريال.
+                        لا يمكن تقديم طلب آخر حتى يتم اعتماده أو رفضه.
+                    </div>
+                </div>
+            }
+            <form asp-action="RequestHandover" method="post" class="a-form__grid">
+                @Html.AntiForgeryToken()
+                <div class="a-field">
+                    <label class="a-label a-label--required">المبلغ (ريال)</label>
+                    <input type="number" name="amount" min="0.01" step="0.01" max="@balance.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required @(myPending.Any() ? "disabled" : "") />
+                    <span class="a-hint">الرصيد المتاح للتوريد: <strong>@balance.ToString("N2")</strong> ريال</span>
+                </div>
+                <div class="a-field a-field--full">
+                    <label class="a-label">ملاحظة للمراجعة (اختياري)</label>
+                    <input type="text" name="note" maxlength="500" class="form-control" placeholder="مثلاً: توريد تحصيل يوم الأحد" @(myPending.Any() ? "disabled" : "") />
+                </div>
+                <div class="a-form__actions">
+                    <button type="submit" class="btn btn-primary" @(myPending.Any() ? "disabled" : "")>
+                        <i class="bi bi-send"></i> تقديم طلب توريد
+                    </button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <section class="a-card">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-clock-history" aria-hidden="true"></i> سجل طلبات التوريد</h2>
+        </div>
+        <div class="a-card__body @(myHandovers.Any() ? "a-card__body--flush" : "")">
+            @if (myHandovers.Any())
+            {
+                <div class="a-table-wrap">
+                    <table class="table a-table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>المبلغ</th>
+                                <th>الحالة</th>
+                                <th>راجعها</th>
+                                <th>التاريخ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var h in myHandovers)
+                            {
+                                <tr>
+                                    <td>@h.CustodyHandoverId</td>
+                                    <td class="a-amount">@h.Amount.ToString("N2") ريال</td>
+                                    <td><span class="a-badge @StatusBadge(h.Status)">@StatusLabel(h.Status)</span></td>
+                                    <td class="small">@(h.ReviewedBy ?? "—")</td>
+                                    <td class="small">@h.RequestedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-clock-history", Title = "لا توجد طلبات توريد", Text = "لم تُقدَّم أي طلبات توريد بعد." })" />
+            }
+        </div>
+    </section>
+</div>
+
+<div class="a-card mb-4">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-journal-text" aria-hidden="true"></i> حركات العهدة</h2>
+        <span class="a-badge a-badge--neutral a-badge--none">الرصيد: @balance.ToString("N2") ريال</span>
+    </div>
+    <div class="a-card__body @(entries.Any() ? "a-card__body--flush" : "")">
+        @if (entries.Any())
+        {
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>النوع</th>
+                            <th>المبلغ</th>
+                            <th>المرجع</th>
+                            <th>ملاحظة</th>
+                            <th>التاريخ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var e in entries)
+                        {
+                            <tr>
+                                <td>@e.CustodyEntryId</td>
+                                <td>@EntryLabel(e.EntryType)</td>
+                                <td class="a-amount @(e.Amount >= 0 ? "a-amount--in" : "a-amount--out")">
+                                    @(e.Amount >= 0 ? "+" : "")@e.Amount.ToString("N2") ريال
+                                </td>
+                                <td class="small">@(e.ReferenceNumber ?? e.ReferenceType ?? "—")</td>
+                                <td class="text-muted small">@e.Note</td>
+                                <td class="small">@e.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-journal-text", Title = "لا توجد حركات", Text = "لم تُسجَّل أي حركة على هذه العهدة بعد." })" />
+        }
+    </div>
+</div>
+
+@if (isSuperAdmin)
+{
+    <div class="a-card">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-people" aria-hidden="true"></i> أرصدة العهد لدى الموظفين</h2>
+        </div>
+        <div class="a-card__body @(employees.Any() ? "a-card__body--flush" : "")">
+            @if (employees.Any())
+            {
+                <div class="a-table-wrap">
+                    <table class="table a-table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>الموظف</th>
+                                <th>اسم المستخدم</th>
+                                <th>رصيد العهدة</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var emp in employees)
+                            {
+                                <tr>
+                                    <td class="a-table__primary">@emp.FullName</td>
+                                    <td class="small">@emp.Username</td>
+                                    <td class="a-amount a-amount--in">@emp.Balance.ToString("N2") ريال</td>
+                                    <td>
+                                        <a class="btn btn-sm btn-outline-primary" asp-action="Index" asp-route-userId="@emp.UserId">
+                                            <i class="bi bi-eye"></i> عرض
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-people", Title = "لا توجد عهد", Text = "لم تُسجَّل أي عهد لدى الموظفين بعد." })" />
+            }
+        </div>
+    </div>
+}

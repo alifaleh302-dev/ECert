@@ -64,6 +64,10 @@ builder.Services.AddScoped<CertificateDesignService>();
 builder.Services.AddScoped<LegacyCertificateImportService>();
 builder.Services.AddScoped<CertificateDesignSchemaMigrationService>();
 builder.Services.AddScoped<CashboxSchemaMigrationService>();
+builder.Services.AddScoped<FinancialSchemaMigrationService>();
+builder.Services.AddScoped<FinancialLedgerService>();
+builder.Services.AddScoped<FinancialService>();
+builder.Services.AddScoped<ReceiptVerificationService>();
 builder.Services.AddScoped<UserCourseSchemaMigrationService>();
 builder.Services.AddScoped<UserCategorySchemaMigrationService>();
 builder.Services.AddScoped<InvoiceNumberIndexSchemaMigrationService>();
@@ -213,6 +217,10 @@ using (var scope = app.Services.CreateScope())
         await academicMigration.EnsureAsync();
         var cashboxMigration = scope.ServiceProvider.GetRequiredService<CashboxSchemaMigrationService>();
         await cashboxMigration.EnsureAsync();
+        // Creates the custody, refund and financial-audit tables plus Payments.PublicId. Must run
+        // before any migration or the seeder that loads those entities (EF selects every column).
+        var financialMigration = scope.ServiceProvider.GetRequiredService<FinancialSchemaMigrationService>();
+        await financialMigration.EnsureAsync();
         // Must exist before DbSeeder loads Users with their course assignments.
         var userCourseMigration = scope.ServiceProvider.GetRequiredService<UserCourseSchemaMigrationService>();
         await userCourseMigration.EnsureAsync();

@@ -1,0 +1,120 @@
+@{
+    ViewData["Title"] = "سجل التدقيق المالي";
+    ViewData["PageIcon"] = "bi-shield-check";
+    ViewData["PageDesc"] = "سجل غير قابل للتعديل لكل الحركات المالية: القبض، الاسترداد، الإلغاء، الإعفاء، التوريد، الترحيل والسحب";
+    Layout = "_AdminLayout";
+    var entries = ViewBag.Entries as List<FinancialAuditEntry> ?? new();
+    var actionTypes = ViewBag.ActionTypes as List<string> ?? new();
+    var users = ViewBag.Users as List<string> ?? new();
+    decimal total = ViewBag.TotalAmount is decimal t ? t : 0m;
+    int count = ViewBag.Count is int c ? c : entries.Count;
+    string? search = ViewBag.Search as string;
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="ExportXlsx" asp-route-actionType="@ViewBag.ActionType" asp-route-userName="@ViewBag.UserName"
+           asp-route-from="@ViewBag.From" asp-route-to="@ViewBag.To" asp-route-search="@ViewBag.Search" class="btn btn-success">
+            <i class="bi bi-file-earmark-excel"></i> تصدير XLSX
+        </a>
+    </div>
+</div>
+
+<section class="a-kpis mb-4" aria-label="ملخص السجل">
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "عدد الحركات", Value = count.ToString(), Icon = "bi-list-check", Tone = "brand" })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المبالغ", Value = total.ToString("N2"), Icon = "bi-cash-stack", Tone = "neutral", Hint = "ريال" })" />
+</section>
+
+<form method="get" class="a-toolbar" role="search" aria-label="تصفية السجل">
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="faType">نوع العملية</label>
+        <select id="faType" name="actionType" class="form-select">
+            <option value="">الكل</option>
+            @foreach (var a in actionTypes)
+            {
+                <option value="@a" selected="@(ViewBag.ActionType == a)">@ECert.Controllers.FinancialAuditController.ActionLabel(a)</option>
+            }
+        </select>
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="faUser">المستخدم</label>
+        <select id="faUser" name="userName" class="form-select">
+            <option value="">الكل</option>
+            @foreach (var u in users)
+            {
+                <option value="@u" selected="@(ViewBag.UserName == u)">@u</option>
+            }
+        </select>
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="faFrom">من</label>
+        <input id="faFrom" type="date" name="from" value="@ViewBag.From" class="form-control" />
+    </div>
+    <div class="a-toolbar__field">
+        <label class="a-field__label" for="faTo">إلى</label>
+        <input id="faTo" type="date" name="to" value="@ViewBag.To" class="form-control" />
+    </div>
+    <div class="a-toolbar__field a-toolbar__field--grow">
+        <label class="a-field__label" for="faSearch">بحث</label>
+        <input id="faSearch" type="search" name="search" value="@search" class="form-control" placeholder="رقم المستند أو نص التفاصيل" />
+    </div>
+    <div class="a-toolbar__actions">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> تصفية</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">مسح</a>
+    </div>
+</form>
+
+<div class="a-card">
+    <div class="a-card__body @(entries.Any() ? "a-card__body--flush" : "")">
+        @if (entries.Any())
+        {
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>التاريخ</th>
+                            <th>المستخدم</th>
+                            <th>العملية</th>
+                            <th>المبلغ</th>
+                            <th>المرجع</th>
+                            <th>التفاصيل</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var e in entries)
+                        {
+                            <tr>
+                                <td>@e.FinancialAuditEntryId</td>
+                                <td class="small">@e.Timestamp.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td class="small">@e.UserName</td>
+                                <td><span class="a-badge a-badge--neutral">@ECert.Controllers.FinancialAuditController.ActionLabel(e.ActionType)</span></td>
+                                <td class="a-amount">@e.Amount.ToString("N2")</td>
+                                <td class="small">
+                                    @if (!string.IsNullOrEmpty(e.ReferenceNumber))
+                                    {
+                                        <span class="a-code">@e.ReferenceNumber</span>
+                                    }
+                                    else if (e.ReferenceId.HasValue)
+                                    {
+                                        <span class="text-muted">@e.ReferenceType #@e.ReferenceId</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                </td>
+                                <td class="text-muted small">@e.Details</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-shield-check", Title = "لا توجد حركات", Text = "لا توجد حركات مالية مطابقة للفلاتر الحالية." })" />
+        }
+    </div>
+</div>

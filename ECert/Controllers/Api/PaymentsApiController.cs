@@ -5,6 +5,7 @@ using ECert.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace ECert.Controllers.Api;
 
@@ -15,9 +16,14 @@ public class PaymentsApiController : ControllerBase
 {
     private readonly ECertDbContext _db;
     private readonly AuditLogService _audit;
-    public PaymentsApiController(ECertDbContext db, AuditLogService audit) { _db = db; _audit = audit; }
+    private readonly FinancialLedgerService _ledger;
+    public PaymentsApiController(ECertDbContext db, AuditLogService audit, FinancialLedgerService ledger)
+    { _db = db; _audit = audit; _ledger = ledger; }
 
     private bool HasPermission(string perm) => User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
+
+    private int? CurrentUserId =>
+        int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : null;
 
     private bool CanAccess(Invoice invoice) =>
         invoice.Registration != null && User.CanAccessCourse(invoice.Registration.CourseId);
@@ -73,6 +79,15 @@ public class PaymentsApiController : ControllerBase
 
         _db.Payments.Add(payment);
         await _db.SaveChangesAsync();
+
+        // Mirror the web path: the collected amount lands in the collector's custody and is audited.
+        if (CurrentUserId is { } collectorId)
+        {
+            await _ledger.EnsurePaymentPublicIdAsync(payment);
+            _ledger.AddCollection(collectorId, payment.Amount, payment.RecordedBy,
+                payment.PaymentId, payment.ReferenceNumber, $"قبض على الفاتورة {invoice.InvoiceNumber}");
+        }
+
         await RecomputeInvoiceAsync(invoice);
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Create", "Payment", payment.PaymentId, null, $"Amount: {req.Amount}");
@@ -103,18 +118,22 @@ public class PaymentsApiController : ControllerBase
         return Ok(ApiResponse.Ok("تم إلغاء الدفعة بنجاح"));
     }
 
-    /// <summary>Derives the invoice balance from its active payments so it can never drift.</summary>
+    /// <summary>Derives the invoice balance from its active payments minus its refunds so it can never drift.</summary>
     private async Task RecomputeInvoiceAsync(Invoice invoice)
     {
         var paid = await _db.Payments
             .Where(p => p.InvoiceId == invoice.InvoiceId && !p.IsCancelled)
             .SumAsync(p => (decimal?)p.Amount) ?? 0m;
+        var refunded = await _db.Refunds
+            .Where(r => r.InvoiceId == invoice.InvoiceId)
+            .SumAsync(r => (decimal?)r.Amount) ?? 0m;
+        var net = paid - refunded;
 
-        invoice.PaidAmount = paid;
+        invoice.PaidAmount = net;
         invoice.Status = invoice.Status == "Cancelled"
             ? "Cancelled"
-            : paid >= invoice.TotalAmount && invoice.TotalAmount > 0 ? "Paid"
-            : paid > 0 ? "PartiallyPaid"
+            : net >= invoice.TotalAmount && invoice.TotalAmount > 0 ? "Paid"
+            : net > 0 ? "PartiallyPaid"
             : "Unpaid";
     }
 }

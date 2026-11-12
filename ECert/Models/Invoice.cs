@@ -123,5 +123,9 @@ public class Payment
     [Display(Name = "سبب الإلغاء")]
     public string? CancellationReason { get; set; }
 
+    /// <summary>Opaque id used by the public verification link/QR for the receipt; never exposes the sequential key.</summary>
+    [StringLength(64)]
+    public string? PublicId { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 }

@@ -20,8 +20,9 @@ public class CashboxController : Controller
 {
     private readonly ECertDbContext _db;
     private readonly AuditLogService _audit;
-    public CashboxController(ECertDbContext db, AuditLogService audit)
-    { _db = db; _audit = audit; }
+    private readonly FinancialLedgerService _ledger;
+    public CashboxController(ECertDbContext db, AuditLogService audit, FinancialLedgerService ledger)
+    { _db = db; _audit = audit; _ledger = ledger; }
 
     private bool IsSuperAdmin => User.IsSuperAdmin();
     private bool CanTransfer => IsSuperAdmin
@@ -182,6 +183,11 @@ public class CashboxController : Controller
         _db.CashboxTransfers.Add(entry);
         await _db.SaveChangesAsync();
 
+        _ledger.AddAudit(actor, FinancialActionTypes.Transfer, amount,
+            referenceType: "CashboxTransfer", referenceId: entry.Id,
+            details: $"ترحيل رصيد دورة {course.CourseName} إلى الصندوق");
+        await _db.SaveChangesAsync();
+
         await _audit.LogAsync(actor, "Transfer", "Cashbox", entry.Id, null,
             $"دورة {course.CourseName} — مبلغ {amount:N2}");
 
@@ -247,6 +253,11 @@ public class CashboxController : Controller
             CreatedAt = DateTime.Now
         };
         _db.CashboxWithdrawals.Add(entry);
+        await _db.SaveChangesAsync();
+
+        _ledger.AddAudit(actor, FinancialActionTypes.Withdraw, amount,
+            referenceType: "CashboxWithdrawal", referenceId: entry.Id,
+            details: $"سحب من الصندوق — {reason}");
         await _db.SaveChangesAsync();
 
         await _audit.LogAsync(actor, "Withdraw", "Cashbox", entry.Id, null,

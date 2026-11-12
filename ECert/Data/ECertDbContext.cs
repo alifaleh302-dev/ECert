@@ -45,6 +45,10 @@ public class ECertDbContext : DbContext, IDataProtectionKeyContext
     public DbSet<AcademicLevelOption> AcademicLevelOptions => Set<AcademicLevelOption>();
     public DbSet<CashboxTransfer> CashboxTransfers => Set<CashboxTransfer>();
     public DbSet<CashboxWithdrawal> CashboxWithdrawals => Set<CashboxWithdrawal>();
+    public DbSet<CustodyEntry> CustodyEntries => Set<CustodyEntry>();
+    public DbSet<CustodyHandover> CustodyHandovers => Set<CustodyHandover>();
+    public DbSet<Refund> Refunds => Set<Refund>();
+    public DbSet<FinancialAuditEntry> FinancialAuditEntries => Set<FinancialAuditEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -231,6 +235,48 @@ public class ECertDbContext : DbContext, IDataProtectionKeyContext
 
         modelBuilder.Entity<Certificate>()
             .HasIndex(c => c.Source);
+
+        // Financial custody / refunds / audit trail
+        modelBuilder.Entity<CustodyEntry>()
+            .HasOne(e => e.User)
+            .WithMany()
+            .HasForeignKey(e => e.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CustodyEntry>()
+            .HasIndex(e => new { e.UserId, e.CreatedAt });
+
+        modelBuilder.Entity<CustodyHandover>()
+            .HasOne(h => h.User)
+            .WithMany()
+            .HasForeignKey(h => h.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CustodyHandover>()
+            .HasIndex(h => new { h.Status, h.RequestedAt });
+
+        modelBuilder.Entity<Refund>()
+            .HasOne(r => r.Invoice)
+            .WithMany()
+            .HasForeignKey(r => r.InvoiceId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Refund>()
+            .HasIndex(r => r.InvoiceId);
+
+        modelBuilder.Entity<Refund>()
+            .HasIndex(r => r.PublicId)
+            .IsUnique();
+
+        modelBuilder.Entity<Payment>()
+            .HasIndex(p => p.PublicId)
+            .IsUnique();
+
+        modelBuilder.Entity<FinancialAuditEntry>()
+            .HasIndex(e => e.Timestamp);
+
+        modelBuilder.Entity<FinancialAuditEntry>()
+            .HasIndex(e => e.ActionType);
 
     }
 }

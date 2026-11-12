@@ -1,0 +1,103 @@
+@{
+    ViewData["Title"] = "كشف حساب";
+    ViewData["PageIcon"] = "bi-journal-text";
+    ViewData["PageDesc"] = "كشف حساب المتدرب: الفاتورة وكل الدفعات والاستردادات";
+    Layout = "_AdminLayout";
+    var invoice = ViewBag.Invoice as Invoice;
+    var refunds = ViewBag.Refunds as List<Refund> ?? new();
+    decimal refunded = ViewBag.Refunded is decimal rf ? rf : 0m;
+    var payments = invoice?.Payments.Where(p => !p.IsCancelled).OrderBy(p => p.PaymentDate).ToList() ?? new();
+
+    // One chronological ledger of every movement on this account.
+    var movements = new List<(DateTime When, string Kind, string Ref, decimal Amount, string By)>();
+    foreach (var p in payments)
+        movements.Add((p.PaymentDate, "قبض", p.ReferenceNumber ?? $"P-{p.PaymentId}", p.Amount, p.RecordedBy));
+    foreach (var r in refunds)
+        movements.Add((r.RefundDate, "استرداد", r.ReceiptNumber ?? $"R-{r.RefundId}", -r.Amount, r.RefundedBy));
+    movements = movements.OrderBy(m => m.When).ToList();
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> المتأخرات</a>
+        <a asp-controller="Invoices" asp-action="Details" asp-route-id="@invoice?.InvoiceId" class="btn btn-outline-primary"><i class="bi bi-receipt"></i> الفاتورة</a>
+        <a asp-controller="Payments" asp-action="Add" asp-route-invoiceId="@invoice?.InvoiceId" class="btn btn-success"><i class="bi bi-cash"></i> تسجيل دفعة</a>
+        <a asp-controller="Refunds" asp-action="Create" asp-route-invoiceId="@invoice?.InvoiceId" class="btn btn-outline-danger"><i class="bi bi-arrow-counterclockwise"></i> استرداد</a>
+    </div>
+</div>
+
+<section class="a-kpis mb-4" aria-label="ملخص الحساب">
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "المبلغ المستحق", Value = (invoice?.TotalAmount ?? 0m).ToString("N2"), Icon = "bi-receipt", Tone = "brand", Hint = "ريال" })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المدفوع", Value = (invoice?.PaidAmount ?? 0m).ToString("N2"), Icon = "bi-cash-stack", Tone = "success", Hint = "ريال" })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المسترد", Value = refunded.ToString("N2"), Icon = "bi-arrow-counterclockwise", Tone = "warning", Hint = "ريال" })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "المتبقي", Value = (invoice?.RemainingAmount ?? 0m).ToString("N2"), Icon = "bi-exclamation-diamond", Tone = "danger", Hint = "ريال" })" />
+</section>
+
+<div class="a-grid-2">
+    <section class="a-card">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-person-vcard" aria-hidden="true"></i> بيانات الحساب</h2>
+            <span class="a-badge @(invoice?.Status switch { "Paid" => "a-badge--success", "PartiallyPaid" => "a-badge--warning", "Cancelled" => "a-badge--neutral", _ => "a-badge--danger" })">
+                @(invoice?.Status switch { "Unpaid" => "غير مدفوعة", "PartiallyPaid" => "مدفوعة جزئياً", "Paid" => "مدفوعة", "Cancelled" => "ملغية", _ => invoice?.Status })
+            </span>
+        </div>
+        <div class="a-card__body">
+            <div class="a-dl">
+                <span class="a-dl__label">رقم الفاتورة</span>
+                <p class="a-dl__value"><span class="a-code">@invoice?.InvoiceNumber</span></p>
+                <span class="a-dl__label">المتدرب</span>
+                <p class="a-dl__value">@(invoice?.TraineeNameArabic ?? invoice?.TraineeName)</p>
+                <span class="a-dl__label">الهاتف</span>
+                <p class="a-dl__value" dir="ltr">@invoice?.TraineePhone</p>
+                <span class="a-dl__label">الدورة</span>
+                <p class="a-dl__value">@(invoice?.CourseNameArabic ?? invoice?.CourseName)</p>
+                <span class="a-dl__label">تاريخ الاستحقاق</span>
+                <p class="a-dl__value">@(invoice?.DueDate?.ToString("yyyy-MM-dd") ?? "—")</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="a-card">
+        <div class="a-card__header">
+            <h2 class="a-card__title"><i class="bi bi-list-ol" aria-hidden="true"></i> حركات الحساب</h2>
+            <span class="a-badge a-badge--neutral a-badge--none">@movements.Count حركة</span>
+        </div>
+        <div class="a-card__body @(movements.Any() ? "a-card__body--flush" : "")">
+            @if (movements.Any())
+            {
+                <div class="a-table-wrap">
+                    <table class="table a-table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>التاريخ</th>
+                                <th>النوع</th>
+                                <th>المرجع</th>
+                                <th>المبلغ</th>
+                                <th>الموظف</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var m in movements)
+                            {
+                                <tr>
+                                    <td class="small">@m.When.ToString("yyyy-MM-dd HH:mm")</td>
+                                    <td>@m.Kind</td>
+                                    <td class="small"><span class="a-code">@m.Ref</span></td>
+                                    <td class="a-amount @(m.Amount >= 0 ? "a-amount--in" : "a-amount--out")">
+                                        @(m.Amount >= 0 ? "+" : "")@m.Amount.ToString("N2")
+                                    </td>
+                                    <td class="small">@m.By</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-list-ol", Title = "لا توجد حركات", Text = "لا توجد دفعات أو استردادات على هذا الحساب." })" />
+            }
+        </div>
+    </section>
+</div>

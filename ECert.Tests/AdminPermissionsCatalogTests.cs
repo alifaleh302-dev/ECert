@@ -51,9 +51,35 @@ public class AdminPermissionsCatalogTests
     [InlineData("view-invoices", "Invoices")]
     [InlineData("manage-cashbox", "Cashbox")]
     [InlineData("withdraw-cashbox", "Cashbox")]
+    [InlineData("view-custody", "Custody")]
+    [InlineData("manage-refunds", "Refunds")]
+    [InlineData("view-receivables", "Receivables")]
+    [InlineData("view-financial-audit", "FinancialAudit")]
     public void Permission_maps_to_its_section(string permission, string section)
     {
         Assert.Contains(section, AdminPermissions.SectionsFor(permission));
+    }
+
+    [Fact]
+    public void Financial_permissions_are_all_defined_in_the_catalog()
+    {
+        string[] financial =
+        {
+            AdminPermissions.ViewCustody, AdminPermissions.ManageRefunds,
+            AdminPermissions.ViewReceivables, AdminPermissions.ViewFinancialAudit
+        };
+        var catalogNames = AdminPermissions.Catalog.Select(d => d.Name).ToHashSet(StringComparer.Ordinal);
+        Assert.All(financial, name => Assert.Contains(name, catalogNames));
+    }
+
+    [Fact]
+    public void The_finance_preset_grants_the_new_financial_permissions()
+    {
+        var finance = AdminPermissions.Presets.Single(p => p.Key == "finance");
+        Assert.Contains(AdminPermissions.ViewCustody, finance.Permissions);
+        Assert.Contains(AdminPermissions.ManageRefunds, finance.Permissions);
+        Assert.Contains(AdminPermissions.ViewReceivables, finance.Permissions);
+        Assert.Contains(AdminPermissions.ViewFinancialAudit, finance.Permissions);
     }
 
     [Fact]

@@ -16,12 +16,31 @@ public class PaymentsController : Controller
 {
     private readonly ECertDbContext _db;
     private readonly AuditLogService _audit;
-    public PaymentsController(ECertDbContext db, AuditLogService audit) { _db = db; _audit = audit; }
+    private readonly FinancialLedgerService _ledger;
+    private readonly ReceiptVerificationService _receipts;
+    private readonly IConfiguration _configuration;
+    public PaymentsController(ECertDbContext db, AuditLogService audit, FinancialLedgerService ledger,
+        ReceiptVerificationService receipts, IConfiguration configuration)
+    { _db = db; _audit = audit; _ledger = ledger; _receipts = receipts; _configuration = configuration; }
+
+    private string InstitutionName =>
+        _configuration["Institution:Name"] is { Length: > 0 } name ? name : "مركز التدريب";
+
+    private string GetPublicBaseUrl()
+    {
+        var configured = _configuration["CertificateSecurity:PublicBaseUrl"];
+        if (!string.IsNullOrWhiteSpace(configured)) return configured.Trim().TrimEnd('/');
+        return $"{Request.Scheme}://{Request.Host}";
+    }
 
     private bool HasPermission(string perm) => User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
 
     private static bool CanAccess(ClaimsPrincipal user, Invoice invoice) =>
         invoice.Registration != null && user.CanAccessCourse(invoice.Registration.CourseId);
+
+    /// <summary>The signed-in user's id, or null when it cannot be resolved.</summary>
+    private int? CurrentUserId =>
+        int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : null;
 
     public async Task<IActionResult> Index(string? search, DateTime? dateFrom, DateTime? dateTo, string? method, string? status, string? courseName, string? studentName, string? invoiceNumber)
     {
@@ -133,13 +152,54 @@ public class PaymentsController : Controller
         _db.Payments.Add(payment);
         await _db.SaveChangesAsync();
 
+        // The collected cash lands in the collector's custody, and the movement is audited.
+        var collectorId = CurrentUserId;
+        if (collectorId.HasValue)
+        {
+            await _ledger.EnsurePaymentPublicIdAsync(payment);
+            _ledger.AddCollection(collectorId.Value, payment.Amount, payment.RecordedBy,
+                payment.PaymentId, payment.ReferenceNumber,
+                $"قبض على الفاتورة {invoice.InvoiceNumber}");
+            await _db.SaveChangesAsync();
+        }
+
         await RecomputeInvoiceAsync(invoice);
         await _db.SaveChangesAsync();
         await transaction.CommitAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Create", "Payment", payment.PaymentId, null, $"Amount: {model.Amount}, Method: {model.PaymentMethod}");
 
         TempData["Success"] = $"تم تسجيل دفعة بقيمة {model.Amount} ريال بنجاح.";
-        return RedirectToAction("Details", "Invoices", new { id = model.InvoiceId });
+        return RedirectToAction("Receipt", new { id = payment.PaymentId });
+    }
+
+    /// <summary>
+    /// Printable receipt (سند قبض) for a single payment, with a public verification QR and a
+    /// WhatsApp share link. Rendered on its own print-friendly layout.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> Receipt(int id)
+    {
+        if (!HasPermission("manage-payments")) return Forbid();
+        var payment = await _db.Payments
+            .Include(p => p.Invoice).ThenInclude(i => i!.Registration)
+            .FirstOrDefaultAsync(p => p.PaymentId == id);
+        if (payment?.Invoice == null) return NotFound();
+        if (!CanAccess(User, payment.Invoice)) return Forbid();
+
+        if (string.IsNullOrWhiteSpace(payment.PublicId))
+        {
+            await _ledger.EnsurePaymentPublicIdAsync(payment);
+            await _db.SaveChangesAsync();
+        }
+
+        ViewBag.VerificationUrl = _receipts.BuildVerificationUrl(payment.PublicId!, GetPublicBaseUrl());
+        ViewBag.QrDataUri = _receipts.BuildQrDataUri((string)ViewBag.VerificationUrl);
+        ViewBag.WhatsAppLink = WhatsAppLinkBuilder.BuildLink(payment.Invoice.TraineePhone,
+            WhatsAppLinkBuilder.BuildReceiptMessage(
+                InstitutionName, "سند قبض", payment.ReferenceNumber ?? $"P-{payment.PaymentId}",
+                payment.Invoice.TraineeName, payment.Invoice.CourseName, payment.Amount,
+                payment.Invoice.RemainingAmount, (string)ViewBag.VerificationUrl));
+        return View(payment);
     }
 
     /// <summary>Takes an exclusive row lock so concurrent payments on one invoice serialise.</summary>
@@ -169,6 +229,18 @@ public class PaymentsController : Controller
         payment.IsCancelled = true;
         payment.CancellationReason = reason;
 
+        // Cancelling a collection reverses it in the collector's custody and is audited.
+        var collector = await ResolveCollectorAsync(payment.RecordedBy);
+        if (collector.HasValue)
+            _ledger.AddCustodyEntry(collector.Value, -payment.Amount, CustodyEntryTypes.Adjustment,
+                User.Identity?.Name ?? "System", nameof(Payment), payment.PaymentId, payment.ReferenceNumber,
+                $"إلغاء دفعة على الفاتورة {payment.Invoice.InvoiceNumber}");
+
+        _ledger.AddAudit(User.Identity?.Name ?? "", FinancialActionTypes.Cancel, payment.Amount,
+            referenceType: nameof(Payment), referenceId: payment.PaymentId,
+            referenceNumber: payment.ReferenceNumber,
+            details: $"إلغاء دفعة — السبب: {reason ?? "-"}");
+
         await _db.SaveChangesAsync();
         await RecomputeInvoiceAsync(payment.Invoice);
         await _db.SaveChangesAsync();
@@ -176,6 +248,14 @@ public class PaymentsController : Controller
 
         TempData["Success"] = "تم إلغاء الدفعة بنجاح.";
         return RedirectToAction("Details", "Invoices", new { id = payment.InvoiceId });
+    }
+
+    /// <summary>Finds the user who recorded a payment, so its reversal debits the right custody.</summary>
+    private Task<int?> ResolveCollectorAsync(string? recordedBy)
+    {
+        if (string.IsNullOrWhiteSpace(recordedBy)) return Task.FromResult<int?>(null);
+        return _db.Users.Where(u => u.FullName == recordedBy || u.Username == recordedBy)
+            .Select(u => (int?)u.UserId).FirstOrDefaultAsync();
     }
 
     [HttpPost]
@@ -190,6 +270,17 @@ public class PaymentsController : Controller
         var invoiceId = payment.InvoiceId;
         var invoice = payment.Invoice;
         var amount = payment.Amount;
+
+        // Removing a collection also reverses it in the collector's custody and is audited.
+        var collector = await ResolveCollectorAsync(payment.RecordedBy);
+        if (collector.HasValue)
+            _ledger.AddCustodyEntry(collector.Value, -amount, CustodyEntryTypes.Adjustment,
+                User.Identity?.Name ?? "System", nameof(Payment), payment.PaymentId, payment.ReferenceNumber,
+                $"حذف دفعة على الفاتورة {invoice.InvoiceNumber}");
+
+        _ledger.AddAudit(User.Identity?.Name ?? "", FinancialActionTypes.Cancel, amount,
+            referenceType: nameof(Payment), referenceId: payment.PaymentId,
+            referenceNumber: payment.ReferenceNumber, details: $"حذف دفعة على الفاتورة {invoice.InvoiceNumber}");
 
         _db.Payments.Remove(payment);
         await _db.SaveChangesAsync();
@@ -233,21 +324,25 @@ public class PaymentsController : Controller
     }
 
     /// <summary>
-    /// Recomputes <c>PaidAmount</c> and the status from the invoice's active payments. Deriving the
-    /// balance from the ledger (rather than adding/subtracting the delta) keeps it correct even if
-    /// an earlier write failed or a payment was cancelled twice.
+    /// Recomputes <c>PaidAmount</c> and the status from the invoice's active payments minus its
+    /// refunds. Deriving the balance from the ledger (rather than adding/subtracting the delta)
+    /// keeps it correct even if an earlier write failed or a payment was cancelled twice.
     /// </summary>
     private async Task RecomputeInvoiceAsync(Invoice invoice)
     {
         var paid = await _db.Payments
             .Where(p => p.InvoiceId == invoice.InvoiceId && !p.IsCancelled)
             .SumAsync(p => (decimal?)p.Amount) ?? 0m;
+        var refunded = await _db.Refunds
+            .Where(r => r.InvoiceId == invoice.InvoiceId)
+            .SumAsync(r => (decimal?)r.Amount) ?? 0m;
+        var net = paid - refunded;
 
-        invoice.PaidAmount = paid;
+        invoice.PaidAmount = net;
         invoice.Status = invoice.Status == "Cancelled"
             ? "Cancelled"
-            : paid >= invoice.TotalAmount && invoice.TotalAmount > 0 ? "Paid"
-            : paid > 0 ? "PartiallyPaid"
+            : net >= invoice.TotalAmount && invoice.TotalAmount > 0 ? "Paid"
+            : net > 0 ? "PartiallyPaid"
             : "Unpaid";
     }
 }

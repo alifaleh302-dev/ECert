@@ -29,11 +29,17 @@ ALTER TABLE `Courses` DROP COLUMN `PartnerName`;
 ALTER TABLE `Courses` DROP COLUMN `PartnerLogoUrl`;
 ALTER TABLE `Instructors` DROP COLUMN `SignatureImageUrl`;
 ALTER TABLE `CertificateDesigns` DROP COLUMN `BackgroundImageUrl`;
+ALTER TABLE `Payments` DROP COLUMN `PublicId`;
+ALTER TABLE `Refunds` DROP COLUMN `PublicId`;
 DROP TABLE `CoursePartners`;
-DROP TABLE `UserCategories`;");
+DROP TABLE `UserCategories`;
+DROP TABLE `CustodyEntries`;
+DROP TABLE `CustodyHandovers`;
+DROP TABLE `FinancialAuditEntries`;");
 
             Assert.False(await bootstrap.ColumnExistsAsync("Courses", "PartnerName"));
             Assert.False(await bootstrap.TableExistsAsync("UserCategories"));
+            Assert.False(await bootstrap.TableExistsAsync("CustodyEntries"));
         }
         finally
         {
@@ -52,7 +58,12 @@ DROP TABLE `UserCategories`;");
             Assert.True(await upgraded.ColumnExistsAsync("Courses", "PartnerLogoUrl"));
             Assert.True(await upgraded.ColumnExistsAsync("Instructors", "SignatureImageUrl"));
             Assert.True(await upgraded.ColumnExistsAsync("CertificateDesigns", "BackgroundImageUrl"));
+            Assert.True(await upgraded.ColumnExistsAsync("Payments", "PublicId"));
+            Assert.True(await upgraded.ColumnExistsAsync("Refunds", "PublicId"));
             Assert.True(await upgraded.TableExistsAsync("UserCategories"));
+            Assert.True(await upgraded.TableExistsAsync("CustodyEntries"));
+            Assert.True(await upgraded.TableExistsAsync("CustodyHandovers"));
+            Assert.True(await upgraded.TableExistsAsync("FinancialAuditEntries"));
         }
         finally
         {

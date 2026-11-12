@@ -1,0 +1,90 @@
+@model Refund
+@{
+    ViewData["Title"] = "سند استرداد " + (Model.ReceiptNumber ?? ("R-" + Model.RefundId));
+    Layout = "_AdminLayout";
+    var invoice = Model.Invoice;
+    var verificationUrl = ViewBag.VerificationUrl as string ?? "";
+    var qrDataUri = ViewBag.QrDataUri as string ?? "";
+    var whatsAppLink = ViewBag.WhatsAppLink as string ?? "";
+}
+
+@section Styles {
+    <link href="~/css/receipt-print.css" rel="stylesheet" asp-append-version="true" />
+}
+
+<div class="rp-actions no-print">
+    <a asp-controller="Invoices" asp-action="Details" asp-route-id="@invoice?.InvoiceId" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-right"></i> العودة للفاتورة
+    </a>
+    <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-list-ul"></i> كل الاستردادات</a>
+    <button type="button" class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> طباعة</button>
+    @if (!string.IsNullOrEmpty(whatsAppLink))
+    {
+        <a class="btn btn-success" href="@whatsAppLink" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i> إرسال عبر واتساب</a>
+    }
+</div>
+
+<div class="rp-sheet">
+    <header class="rp-sheet__head">
+        <div class="rp-sheet__brand">
+            <span class="rp-sheet__seal" aria-hidden="true"><i class="bi bi-arrow-counterclockwise"></i></span>
+            <div>
+                <p class="rp-sheet__org">مركز التدريب</p>
+                <p class="rp-sheet__org-sub">Training Center</p>
+            </div>
+        </div>
+        <div class="rp-sheet__title">
+            <h1>سند استرداد</h1>
+            <p>Refund Voucher</p>
+        </div>
+    </header>
+
+    <dl class="rp-grid">
+        <div><dt>رقم السند</dt><dd class="rp-code">@(Model.ReceiptNumber ?? $"R-{Model.RefundId}")</dd></div>
+        <div><dt>رقم الفاتورة</dt><dd class="rp-code">@invoice?.InvoiceNumber</dd></div>
+        <div><dt>التاريخ</dt><dd>@Model.RefundDate.ToString("yyyy-MM-dd HH:mm")</dd></div>
+        <div><dt>المتدرب</dt><dd>@(invoice?.TraineeNameArabic ?? invoice?.TraineeName)</dd></div>
+        <div><dt>الهاتف</dt><dd dir="ltr">@invoice?.TraineePhone</dd></div>
+        <div><dt>الدورة</dt><dd>@(invoice?.CourseNameArabic ?? invoice?.CourseName)</dd></div>
+        <div><dt>طريقة الاسترداد</dt><dd>@(Model.RefundMethod switch { "Cash" => "نقد", "BankTransfer" => "تحويل بنكي", "EWallet" => "محفظة إلكترونية", _ => Model.RefundMethod })</dd></div>
+        <div><dt>نفّذه</dt><dd>@Model.RefundedBy</dd></div>
+    </dl>
+
+    <table class="rp-amounts">
+        <tbody>
+            <tr>
+                <th>سبب الاسترداد</th>
+                <td>@Model.Reason</td>
+            </tr>
+            <tr class="rp-amounts__remaining">
+                <th>المبلغ المسترد</th>
+                <td>@Model.Amount.ToString("N2") ريال</td>
+            </tr>
+            <tr>
+                <th>إجمالي المدفوع بعد الاسترداد</th>
+                <td>@((invoice?.PaidAmount ?? 0m).ToString("N2")) ريال</td>
+            </tr>
+            <tr>
+                <th>المتبقي على الفاتورة</th>
+                <td>@((invoice?.RemainingAmount ?? 0m).ToString("N2")) ريال</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <footer class="rp-sheet__foot">
+        <div class="rp-sheet__verify">
+            @if (!string.IsNullOrEmpty(qrDataUri))
+            {
+                <img src="@qrDataUri" alt="رمز التحقق من السند" width="96" height="96" />
+            }
+            <div>
+                <p>للتحقق من صحة السند امسح الرمز أو زُر الرابط:</p>
+                <p class="rp-code rp-code--url">@verificationUrl</p>
+            </div>
+        </div>
+        <div class="rp-sheet__sign">
+            <span>توقيع المستلم</span>
+            <span class="rp-sheet__sign-line">@(invoice?.TraineeNameArabic ?? invoice?.TraineeName)</span>
+        </div>
+    </footer>
+</div>

@@ -1,0 +1,39 @@
+@model ECert.Controllers.PublicReceiptVerificationViewModel
+@{
+    ViewData["Title"] = "التحقق من سند";
+    Layout = "_Layout";
+}
+
+<div class="container py-5" style="max-width:640px">
+    <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex align-items-center gap-2">
+            <i class="bi bi-patch-check-fill text-success fs-4"></i>
+            <h1 class="h5 mb-0">التحقق من صحة السند</h1>
+        </div>
+        <div class="card-body">
+            @if (Model.IsFound)
+            {
+                <div class="alert @(Model.IsCancelled ? "alert-warning" : "alert-success") d-flex gap-2">
+                    <i class="bi @(Model.IsCancelled ? "bi-exclamation-triangle-fill" : "bi-check-circle-fill")"></i>
+                    <div>@Model.Message</div>
+                </div>
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">نوع السند</dt><dd class="col-sm-8">@Model.Kind</dd>
+                    <dt class="col-sm-4">رقم السند</dt><dd class="col-sm-8"><code>@Model.ReceiptNumber</code></dd>
+                    <dt class="col-sm-4">المبلغ</dt><dd class="col-sm-8 fw-bold">@Model.Amount.ToString("N2") ريال</dd>
+                    <dt class="col-sm-4">المتدرب</dt><dd class="col-sm-8">@Model.TraineeName</dd>
+                    <dt class="col-sm-4">الدورة</dt><dd class="col-sm-8">@Model.CourseName</dd>
+                    <dt class="col-sm-4">التاريخ</dt><dd class="col-sm-8">@Model.Date.ToString("yyyy-MM-dd HH:mm")</dd>
+                    <dt class="col-sm-4">الموظف</dt><dd class="col-sm-8">@Model.RecordedBy</dd>
+                </dl>
+            }
+            else
+            {
+                <div class="alert alert-danger d-flex gap-2">
+                    <i class="bi bi-x-circle-fill"></i>
+                    <div>@Model.Message</div>
+                </div>
+            }
+        </div>
+    </div>
+</div>

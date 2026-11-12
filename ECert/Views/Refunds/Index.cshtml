@@ -1,0 +1,76 @@
+@{
+    ViewData["Title"] = "استرداد الرسوم";
+    ViewData["PageIcon"] = "bi-arrow-counterclockwise";
+    ViewData["PageDesc"] = "سندات استرداد الرسوم؛ كل استرداد حركة مستقلة تُخصم من عهدة الموظف المنفّذ";
+    Layout = "_AdminLayout";
+    var refunds = ViewBag.Refunds as List<Refund> ?? new();
+    var search = ViewBag.Search as string;
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+</div>
+
+<form method="get" class="a-toolbar" role="search" aria-label="بحث في الاستردادات">
+    <div class="a-toolbar__field a-toolbar__field--grow">
+        <label class="a-field__label" for="refundSearch">بحث</label>
+        <input id="refundSearch" type="search" name="search" value="@search" class="form-control" placeholder="رقم الفاتورة أو اسم المتدرب أو رقم السند" />
+    </div>
+    <div class="a-toolbar__actions">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> بحث</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">مسح</a>
+    </div>
+</form>
+
+<div class="a-card">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> الاستردادات</h2>
+        <span class="a-badge a-badge--neutral a-badge--none">@refunds.Count سند</span>
+    </div>
+    <div class="a-card__body @(refunds.Any() ? "a-card__body--flush" : "")">
+        @if (refunds.Any())
+        {
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>رقم السند</th>
+                            <th>الفاتورة</th>
+                            <th>المتدرب</th>
+                            <th>المبلغ</th>
+                            <th>السبب</th>
+                            <th>نفّذه</th>
+                            <th>التاريخ</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in refunds)
+                        {
+                            <tr>
+                                <td>@r.RefundId</td>
+                                <td><span class="a-code">@(r.ReceiptNumber ?? $"R-{r.RefundId}")</span></td>
+                                <td><span class="a-code">@r.Invoice?.InvoiceNumber</span></td>
+                                <td class="a-table__primary">@(r.Invoice?.TraineeNameArabic ?? r.Invoice?.TraineeName)</td>
+                                <td class="a-amount a-amount--out">@r.Amount.ToString("N2") ريال</td>
+                                <td class="text-muted small">@r.Reason</td>
+                                <td class="small">@r.RefundedBy</td>
+                                <td class="small">@r.RefundDate.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>
+                                    <a class="btn btn-sm btn-outline-primary" asp-action="Receipt" asp-route-id="@r.RefundId">
+                                        <i class="bi bi-printer"></i> سند
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-arrow-counterclockwise", Title = "لا توجد استردادات", Text = "لم تُسجَّل أي سندات استرداد بعد." })" />
+        }
+    </div>
+</div>

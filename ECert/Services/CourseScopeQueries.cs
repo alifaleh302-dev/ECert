@@ -30,4 +30,9 @@ public static class CourseScopeQueries
         user.AllowedCourseIds() is { } ids
             ? query.Where(c => c.Registration != null && ids.Contains(c.Registration.CourseId))
             : query;
+
+    public static IQueryable<Refund> InScope(this IQueryable<Refund> query, ClaimsPrincipal user) =>
+        user.AllowedCourseIds() is { } ids
+            ? query.Where(r => r.Invoice != null && r.Invoice.Registration != null && ids.Contains(r.Invoice.Registration.CourseId))
+            : query;
 }

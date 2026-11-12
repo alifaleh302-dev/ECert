@@ -17,13 +17,16 @@ public class RegistrationsController : Controller
     private readonly AuditLogService _audit;
     private readonly NotificationService _notify;
     private readonly RegistrationInvoiceService _invoiceService;
+    private readonly FinancialLedgerService _ledger;
 
-    public RegistrationsController(ECertDbContext db, AuditLogService audit, NotificationService notify, RegistrationInvoiceService invoiceService)
+    public RegistrationsController(ECertDbContext db, AuditLogService audit, NotificationService notify,
+        RegistrationInvoiceService invoiceService, FinancialLedgerService ledger)
     {
         _db = db;
         _audit = audit;
         _notify = notify;
         _invoiceService = invoiceService;
+        _ledger = ledger;
     }
 
     private bool HasPermission(string perm) => User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
@@ -223,6 +226,11 @@ public class RegistrationsController : Controller
         try
         {
             await _invoiceService.ApplyExemptionAsync(reg, model.ExemptionAmount, model.Reason, User.Identity?.Name ?? "System");
+            await _db.SaveChangesAsync();
+            // Exemptions reduce the expected revenue, so they belong in the financial audit trail.
+            _ledger.AddAudit(User.Identity?.Name ?? "System", FinancialActionTypes.Exemption, reg.ExemptionAmount,
+                referenceType: "Registration", referenceId: reg.RegistrationId,
+                details: $"إعفاء على التسجيل {reg.RequestNumber} — السبب: {reg.ExemptionReason ?? "-"}");
             await _db.SaveChangesAsync();
             await _audit.LogAsync(User.Identity?.Name ?? "", "ApplyExemption", "Registration", reg.RegistrationId, null,
                 $"Exemption: {reg.ExemptionAmount}; Reason: {reg.ExemptionReason ?? "-"}");

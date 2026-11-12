@@ -23,6 +23,10 @@ public static class AdminPermissions
     public const string ViewReports = "view-reports";
     public const string ManageCashbox = "manage-cashbox";
     public const string WithdrawCashbox = "withdraw-cashbox";
+    public const string ViewCustody = "view-custody";
+    public const string ManageRefunds = "manage-refunds";
+    public const string ViewReceivables = "view-receivables";
+    public const string ViewFinancialAudit = "view-financial-audit";
     public const string ManagePosts = "manage-posts";
     public const string ManageNews = "manage-news";
     public const string ManageHomepage = "manage-homepage";
@@ -52,6 +56,10 @@ public static class AdminPermissions
         new(ViewReports, "مشاهدة تقارير الإيرادات", "الإدارة المالية"),
         new(ManageCashbox, "ترحيل أرصدة الدورات إلى الصندوق", "الإدارة المالية"),
         new(WithdrawCashbox, "سحب من الصندوق العام", "الإدارة المالية"),
+        new(ViewCustody, "عهدة الموظف والتوريد للصندوق", "الإدارة المالية"),
+        new(ManageRefunds, "استرداد الرسوم", "الإدارة المالية"),
+        new(ViewReceivables, "تقارير المتأخرات وكشف الحساب", "الإدارة المالية"),
+        new(ViewFinancialAudit, "سجل التدقيق المالي", "الإدارة المالية"),
         new(ManagePosts, "إدارة المنشورات", "المحتوى"),
         new(ManageNews, "إدارة الأخبار", "المحتوى"),
         new(ManageHomepage, "إدارة الصفحة الرئيسية", "المحتوى"),
@@ -82,6 +90,10 @@ public static class AdminPermissions
             ["Invoices"] = new[] { ViewInvoices, ManageFinance },
             ["Payments"] = new[] { ManagePayments },
             ["Cashbox"] = new[] { ManageCashbox, WithdrawCashbox },
+            ["Custody"] = new[] { ViewCustody },
+            ["Refunds"] = new[] { ManageRefunds },
+            ["Receivables"] = new[] { ViewReceivables },
+            ["FinancialAudit"] = new[] { ViewFinancialAudit },
             ["Reports"] = new[] { ViewReports },
             ["PostsManage"] = new[] { ManagePosts },
             ["NewsManage"] = new[] { ManageNews },
@@ -120,11 +132,12 @@ public static class AdminPermissions
     {
         new("finance", "محاسب", "تسجيل الدفعات ومتابعة الفواتير والصندوق دون إدارة النظام.", new[]
         {
-            ManageFinance, ViewInvoices, ManagePayments, ViewReports, ManageCashbox, WithdrawCashbox
+            ManageFinance, ViewInvoices, ManagePayments, ViewReports, ManageCashbox, WithdrawCashbox,
+            ViewCustody, ManageRefunds, ViewReceivables, ViewFinancialAudit
         }),
-        new("collections", "محصّل رسوم", "تسجيل الدفعات ومتابعة الفواتير فقط.", new[]
+        new("collections", "محصّل رسوم", "تسجيل الدفعات ومتابعة الفواتير وعهدته فقط.", new[]
         {
-            ViewInvoices, ManagePayments
+            ViewInvoices, ManagePayments, ViewCustody
         }),
         new("registrations", "مشرف التسجيلات", "مراجعة طلبات التسجيل وقبولها أو رفضها.", new[]
         {

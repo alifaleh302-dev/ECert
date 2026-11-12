@@ -47,6 +47,11 @@ public static class Sections
     public const string ManagePayments = AdminPermissions.ManagePayments;
     public const string ViewReports = AdminPermissions.ViewReports;
     public const string ManageCashbox = AdminPermissions.ManageCashbox;
+    public const string WithdrawCashbox = AdminPermissions.WithdrawCashbox;
+    public const string ViewCustody = AdminPermissions.ViewCustody;
+    public const string ManageRefunds = AdminPermissions.ManageRefunds;
+    public const string ViewReceivables = AdminPermissions.ViewReceivables;
+    public const string ViewFinancialAudit = AdminPermissions.ViewFinancialAudit;
     public const string ManagePosts = AdminPermissions.ManagePosts;
     public const string ManageNews = AdminPermissions.ManageNews;
     public const string ManageHomepage = AdminPermissions.ManageHomepage;
@@ -69,6 +74,10 @@ public static class Sections
         new("Invoices", "/Invoices", new[] { ViewInvoices, ManageFinance }),
         new("Payments", "/Payments", new[] { ManagePayments }),
         new("Cashbox", "/Cashbox", new[] { ManageCashbox }),
+        new("Custody", "/Custody", new[] { ViewCustody }),
+        new("Refunds", "/Refunds", new[] { ManageRefunds }),
+        new("Receivables", "/Receivables", new[] { ViewReceivables }),
+        new("FinancialAudit", "/FinancialAudit", new[] { ViewFinancialAudit }),
         new("Reports", "/Reports/CourseRevenue", new[] { ViewReports }),
         new("PostsManage", "/PostsManage", new[] { ManagePosts }),
         new("NewsManage", "/NewsManage", new[] { ManageNews }),

@@ -1,0 +1,70 @@
+@{
+    ViewData["Title"] = "استرداد رسوم";
+    ViewData["PageIcon"] = "bi-arrow-counterclockwise";
+    ViewData["PageDesc"] = "تسجيل سند استرداد لرسوم مدفوعة";
+    Layout = "_AdminLayout";
+    var invoice = ViewBag.Invoice as Invoice;
+    decimal refunded = ViewBag.RefundedAmount is decimal ra ? ra : 0m;
+    decimal refundable = (invoice?.PaidAmount ?? 0m);
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-controller="Invoices" asp-action="Details" asp-route-id="@invoice?.InvoiceId" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-right"></i> العودة للفاتورة
+        </a>
+    </div>
+</div>
+
+<div class="a-card a-card--narrow">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> سند استرداد جديد</h2>
+    </div>
+    <div class="a-card__body">
+        <div class="a-note a-note--info mb-4">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            <div>
+                <strong>الفاتورة:</strong> @invoice?.InvoiceNumber — <strong>المتدرب:</strong> @(invoice?.TraineeNameArabic ?? invoice?.TraineeName)<br />
+                <strong>المدفوع حالياً:</strong> @refundable.ToString("N2") ريال — <strong>المُستردّ سابقاً:</strong> @refunded.ToString("N2") ريال
+            </div>
+        </div>
+
+        <form asp-action="Create" method="post" onsubmit="return confirm('تأكيد تسجيل سند الاسترداد؟ سيُخصم المبلغ من عهدة الموظف المنفّذ.')">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="invoiceId" value="@invoice?.InvoiceId" />
+
+            <div class="a-field">
+                <label class="a-label a-label--required">المبلغ (ريال)</label>
+                <div class="input-group">
+                    <input type="number" name="amount" min="0.01" step="0.01" max="@refundable.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required placeholder="0.00" />
+                    <span class="input-group-text">ريال</span>
+                </div>
+                <span class="a-hint">أقصى مبلغ قابل للاسترداد: <strong>@refundable.ToString("N2")</strong> ريال</span>
+            </div>
+
+            <div class="a-field">
+                <label class="a-label a-label--required">سبب الاسترداد</label>
+                <input type="text" name="reason" maxlength="500" class="form-control" required placeholder="مثلاً: انسحاب المتدرب قبل بدء الدورة" />
+            </div>
+
+            <div class="a-field">
+                <label class="a-label a-label--required">طريقة الاسترداد</label>
+                <select name="refundMethod" class="form-select">
+                    <option value="Cash">نقد</option>
+                    <option value="BankTransfer">تحويل بنكي</option>
+                    <option value="EWallet">محفظة إلكترونية</option>
+                </select>
+            </div>
+
+            <div class="a-field">
+                <label class="a-label">رقم سند الصرف (اختياري)</label>
+                <input type="text" name="receiptNumber" maxlength="80" class="form-control" placeholder="مثال: REF-1024" />
+            </div>
+
+            <div class="a-form__actions">
+                <button type="submit" class="btn btn-danger btn-lg w-100"><i class="bi bi-check-circle"></i> تسجيل الاسترداد</button>
+            </div>
+        </form>
+    </div>
+</div>
