@@ -107,6 +107,75 @@ public class CertificatePersonalisationTests
     }
 
     [Fact]
+    public async Task Partner_signatures_render_after_the_offset_slots_are_repaired()
+    {
+        // The designer used to number partner slots with one counter shared by logos and
+        // signatures, so signatures ended up at slots 2,3 while the course only has partners 0,1.
+        // After the repair compacts them to 0,1 both signatures must appear on the public page.
+        var certificate = await SeedCertificateAsync(
+            new DesignSetup { PartnerLogoSlots = 2 },
+            partners: new[]
+            {
+                new PartnerSeed("الجهة الأولى", "/uploads/partners/first-logo.png", "/uploads/partners/first-sig.png"),
+                new PartnerSeed("الجهة الثانية", "/uploads/partners/second-logo.png", "/uploads/partners/second-sig.png")
+            },
+            configureDesign: design =>
+            {
+                design.Elements.Add(Element("partner_signature", "2", 60, 660, 240, 90));
+                design.Elements.Add(Element("partner_signature", "3", 320, 660, 240, 90));
+            });
+
+        await _fixture.Factory.WithDbAsync(async db =>
+        {
+            await new CertificatePartnerSlotRepairService(db).EnsureAsync();
+            return true;
+        });
+
+        var html = await VerifyAsync(certificate.CertificateNumber);
+
+        Assert.Contains("/uploads/partners/first-sig.png", html);
+        Assert.Contains("/uploads/partners/second-sig.png", html);
+        Assert.Contains("توقيع الجهة الداعمة", html);
+    }
+
+    [Fact]
+    public async Task Repair_compacts_legacy_offset_slots_and_leaves_a_correct_design_alone()
+    {
+        // A legacy design: logos 0,1 and signatures 2,3 (the shared-counter bug).
+        var legacy = await SeedCertificateAsync(
+            new DesignSetup { PartnerLogoSlots = 2 },
+            configureDesign: design =>
+            {
+                design.Elements.Add(Element("partner_signature", "2", 60, 660, 240, 90));
+                design.Elements.Add(Element("partner_signature", "3", 320, 660, 240, 90));
+            });
+
+        // A correctly numbered design: logos 0,1 and signatures 0,1 (shared slots).
+        var correct = await SeedCertificateAsync(
+            new DesignSetup { PartnerLogoSlots = 2, PartnerSignatureSlots = 2 });
+
+        await _fixture.Factory.WithDbAsync(async db =>
+        {
+            await new CertificatePartnerSlotRepairService(db).EnsureAsync();
+            return true;
+        });
+
+        var legacySlots = await _fixture.Factory.WithDbAsync(db => db.CertificateDesignElements
+            .Where(e => e.CertificateDesignId == legacy.CertificateDesignId && e.ElementType == "partner_signature")
+            .OrderBy(e => e.SortOrder)
+            .Select(e => e.FieldKey)
+            .ToListAsync());
+        Assert.Equal(new[] { "0", "1" }, legacySlots);
+
+        var correctSlots = await _fixture.Factory.WithDbAsync(db => db.CertificateDesignElements
+            .Where(e => e.CertificateDesignId == correct.CertificateDesignId && e.ElementType == "partner_signature")
+            .OrderBy(e => e.SortOrder)
+            .Select(e => e.FieldKey)
+            .ToListAsync());
+        Assert.Equal(new[] { "0", "1" }, correctSlots);
+    }
+
+    [Fact]
     public async Task Uploading_a_signature_stores_it_against_the_instructor()
     {
         var admin = await SignInAdminAsync();
@@ -282,7 +351,7 @@ public class CertificatePersonalisationTests
 
     private sealed record PartnerSeed(string Name, string? LogoUrl, string? SignatureUrl);
 
-    private sealed record SeededCertificate(string CertificateNumber);
+    private sealed record SeededCertificate(string CertificateNumber, int CertificateDesignId);
 
     private static int CountOccurrences(string haystack, string needle)
     {
@@ -304,12 +373,13 @@ public class CertificatePersonalisationTests
         DesignSetup design,
         Action<Course>? configureCourse = null,
         Action<Instructor>? configureInstructor = null,
-        IReadOnlyList<PartnerSeed>? partners = null)
+        IReadOnlyList<PartnerSeed>? partners = null,
+        Action<CertificateDesign>? configureDesign = null)
     {
         var (categoryId, _) = await _fixture.Factory.FirstCategoryAsync();
         var certificateNumber = "PERS-" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
 
-        await _fixture.Factory.WithDbAsync(async db =>
+        var designId = await _fixture.Factory.WithDbAsync(async db =>
         {
             // A dedicated instructor keeps each test isolated from the signature other tests upload.
             var instructor = new Instructor
@@ -369,6 +439,7 @@ public class CertificatePersonalisationTests
                 visual.Elements.Add(Element("partner_signature", slot.ToString(), 60 + slot * 260, 660, 240, 90));
             if (design.IncludeSignature)
                 visual.Elements.Add(Element("instructor_signature", "", 800, 620, 240, 90));
+            configureDesign?.Invoke(visual);
             db.CertificateDesigns.Add(visual);
             await db.SaveChangesAsync();
 
@@ -407,10 +478,10 @@ public class CertificatePersonalisationTests
             });
 
             await db.SaveChangesAsync();
-            return true;
+            return visual.CertificateDesignId;
         });
 
-        return new SeededCertificate(certificateNumber);
+        return new SeededCertificate(certificateNumber, designId);
     }
 
     private static CertificateDesignElement Element(

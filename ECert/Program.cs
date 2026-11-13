@@ -64,6 +64,7 @@ builder.Services.AddScoped<FeeExemptionSchemaMigrationService>();
 builder.Services.AddScoped<CertificateDesignService>();
 builder.Services.AddScoped<LegacyCertificateImportService>();
 builder.Services.AddScoped<CertificateDesignSchemaMigrationService>();
+builder.Services.AddScoped<CertificatePartnerSlotRepairService>();
 builder.Services.AddScoped<CashboxSchemaMigrationService>();
 builder.Services.AddScoped<FinancialSchemaMigrationService>();
 builder.Services.AddScoped<ExpenseInstallmentSchemaMigrationService>();
@@ -236,6 +237,10 @@ using (var scope = app.Services.CreateScope())
         // Run this before every migration that queries Courses, because the EF model already includes CertificateDesignId.
         var certificateDesignMigration = scope.ServiceProvider.GetRequiredService<CertificateDesignSchemaMigrationService>();
         await certificateDesignMigration.EnsureAsync();
+        // Repairs designs saved before partner slots were numbered per element type; the design
+        // tables must exist first, so it runs immediately after the migration that creates them.
+        var certificatePartnerSlotRepair = scope.ServiceProvider.GetRequiredService<CertificatePartnerSlotRepairService>();
+        await certificatePartnerSlotRepair.EnsureAsync();
         // The certificate columns must exist before any migration that loads the Certificate entity
         // (CourseNameSchemaMigrationService selects every mapped column).
         var certificateMigration = scope.ServiceProvider.GetRequiredService<CertificateSchemaMigrationService>();

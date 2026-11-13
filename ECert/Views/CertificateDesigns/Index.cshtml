@@ -726,8 +726,10 @@
         const isSig = type === 'instructor_signature';
         const w = type === 'divider' ? 420 : (type === 'qr' ? 160 : (type === 'barcode' ? 320 : (isLogo ? 170 : (isPartnerSig ? 240 : (isSig ? 240 : 560)))));
         const h = type === 'divider' ? 4 : (type === 'qr' ? 160 : (type === 'barcode' ? 80 : (isLogo ? 170 : (isPartnerSig ? 90 : (isSig ? 90 : 58)))));
-        // Each new partner element targets the next free slot so a second click shows a second partner.
-        const usedSlots = elements.filter(e => isPartnerSlot(e.elementType)).map(slotOf);
+        // Partner slots are numbered per element type: logos run 0,1,… and signatures run 0,1,…
+        // independently, because both index into the same course partner list. Sharing one counter
+        // (the old behaviour) pushed signatures past the partner count, so they rendered nothing.
+        const usedSlots = elements.filter(e => e.elementType === type).map(slotOf);
         const nextSlot = isPartnerSlot(type) ? (usedSlots.length ? Math.max(...usedSlots) + 1 : 0) : 0;
         const el = {
             elementType: type,
@@ -896,7 +898,9 @@
 
     function buildPartnerSlotOptions(el) {
         const select = $('selectedPartnerSlot');
-        const count = Math.max(1, elements.filter(e => isPartnerSlot(e.elementType)).length);
+        // Slots are numbered per element type, so a logo can only target a logo slot and a
+        // signature a signature slot.
+        const count = Math.max(1, elements.filter(e => e.elementType === el.elementType).length);
         const current = slotOf(el);
         select.replaceChildren();
         for (let i = 0; i < count; i++) {
