@@ -43,11 +43,13 @@ builder.Services.AddDataProtection()
 builder.Services.AddHttpsRedirection(options => options.HttpsPort = 443);
 
 builder.Services.AddMemoryCache();
+builder.Services.AddOutputCache();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<AuditLogService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<SiteLayoutDataFilter>();
 builder.Services.AddSingleton<CertificateSecurityService>();
+builder.Services.AddSingleton<SocialCardService>();
 builder.Services.AddSingleton<CertificateQrService>();
 builder.Services.AddSingleton<CertificateBarcodeService>();
 builder.Services.AddSingleton<VerifyRequestGuardService>();
@@ -315,6 +317,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseResponseCompression();
+app.UseOutputCache();
 
 app.UseStaticFiles(new StaticFileOptions
 {

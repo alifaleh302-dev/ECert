@@ -15,5 +15,15 @@
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="9.0.0" />
     <PackageReference Include="QRCoder" Version="1.6.0" />
+    <!-- Rasterises the social share cards (Open Graph images) for chat previews. HarfBuzz
+         provides Arabic shaping; the native assets ship the Linux binaries the container needs. -->
+    <PackageReference Include="SkiaSharp" Version="2.88.9" />
+    <PackageReference Include="SkiaSharp.HarfBuzz" Version="2.88.9" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.9" />
+    <PackageReference Include="HarfBuzzSharp.NativeAssets.Linux" Version="2.8.2.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Bundled so the social cards render joined Arabic glyphs without relying on system fonts. -->
+    <EmbeddedResource Include="Assets/Fonts/*.ttf" />
   </ItemGroup>
 </Project>

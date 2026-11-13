@@ -34,13 +34,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="@GetSetting("MetaDescription")" />
     <meta name="keywords" content="@GetSetting("SeoKeywords")" />
-    <meta property="og:title" content="@ViewData["Title"] - @siteName" />
+    <meta property="og:title" content="@(ViewData["OgTitle"] ?? ViewData["Title"]) - @siteName" />
     <meta property="og:description" content="@(ViewData["OgDescription"] ?? GetSetting("MetaDescription"))" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="@Context.Request.Scheme://@Context.Request.Host@Context.Request.Path" />
-    @if (ViewData["OgImage"] is string ogImage && !string.IsNullOrWhiteSpace(ogImage)) { <meta property="og:image" content="@ogImage" /> }
+    <meta property="og:site_name" content="@siteName" />
+    @{
+        // A per-request override (e.g. a certificate link) wins; otherwise the centre's logo card
+        // is shown, so every shared link carries the centre's visual identity.
+        var shareImage = ViewData["OgImage"] as string;
+        if (string.IsNullOrWhiteSpace(shareImage))
+            shareImage = $"{Context.Request.Scheme}://{Context.Request.Host}/share/site.png";
+    }
+    <meta property="og:image" content="@shareImage" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="@siteName" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="@ViewData["Title"] - @siteName" />
+    <meta name="twitter:description" content="@(ViewData["OgDescription"] ?? GetSetting("MetaDescription"))" />
+    <meta name="twitter:image" content="@shareImage" />
     <title>@ViewData["Title"] - @siteName</title>
+    @{
+        // On a certificate page the share card doubles as the tab icon, so the browser shows the
+        // certificate thumbnail the same way a chat app would.
+        var cardFavicon = ViewData["OgImage"] as string;
+    }
+    @if (!string.IsNullOrEmpty(cardFavicon))
+    {
+        <link rel="icon" type="image/png" sizes="192x192" href="@cardFavicon" />
+        <link rel="apple-touch-icon" href="@cardFavicon" />
+        <link rel="shortcut icon" href="@cardFavicon" />
+    }
     @if (!string.IsNullOrEmpty(faviconUrl))
     {
         @if (faviconUrl.EndsWith(".ico", StringComparison.OrdinalIgnoreCase))

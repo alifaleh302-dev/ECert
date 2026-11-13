@@ -431,6 +431,8 @@ public class CertificatesController : Controller
             return View("VerifyResult", model);
         }
 
+        SetCertificateShareImage(certificate);
+
         model.CertificateFound = true;
         model.IsValid = string.Equals(certificate.Status, "Valid", StringComparison.OrdinalIgnoreCase);
         model.Message = model.IsValid
@@ -529,6 +531,25 @@ public class CertificatesController : Controller
 
     private string BuildVerificationUrl(Certificate certificate)
         => _certificateSecurity.BuildVerificationUrl(certificate.PublicId, GetPublicBaseUrl());
+
+    /// <summary>
+    /// Points the social preview at this certificate's share card and fills the description with
+    /// the trainee/course summary, so a shared certificate link previews as the certificate itself.
+    /// </summary>
+    private void SetCertificateShareImage(Certificate certificate)
+    {
+        if (string.IsNullOrWhiteSpace(certificate.PublicId)) return;
+
+        var signature = _certificateSecurity.ComputeSignature(certificate.PublicId);
+        var baseUrl = GetPublicBaseUrl().TrimEnd('/');
+        ViewData["OgImage"] = $"{baseUrl}/share/certificate/{Uri.EscapeDataString(certificate.PublicId)}.png?sig={Uri.EscapeDataString(signature)}";
+
+        var trainee = certificate.TraineeNameArabic ?? certificate.TraineeName;
+        var course = certificate.CourseNameArabic ?? certificate.CourseName;
+        ViewData["OgTitle"] = $"شهادة {trainee} - {course}";
+        if (!string.IsNullOrWhiteSpace(trainee) || !string.IsNullOrWhiteSpace(course))
+            ViewData["OgDescription"] = $"شهادة صادرة عن {course} للمتدرب {trainee} — رقم {certificate.CertificateNumber}.";
+    }
 
     /// <summary>
     /// Returns the signature image of the first active instructor assigned to the course, or null
