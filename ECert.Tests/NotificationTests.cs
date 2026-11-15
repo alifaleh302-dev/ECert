@@ -102,6 +102,18 @@ public class NotificationTests
         Assert.Contains("data-confirm-tone=\"danger\"", html);
     }
 
+    [Fact]
+    public async Task Notify_is_exposed_on_window_so_the_shared_guards_hold()
+    {
+        // Regression: notify.js declared `const Notify` at top-level, which does NOT create a
+        // window property. site.js and api.js guard with `if (window.Notify)`, so both saw
+        // undefined and fell through to their native confirm()/toast fallbacks — a click on a
+        // destructive action fired the on-brand dialog AND the browser's native confirm().
+        var admin = await SignInAdminAsync();
+        var js = await admin.GetStringAsync("/js/notify.js");
+        Assert.Contains("window.Notify = Notify", js);
+    }
+
     private async Task<AppClient> SignInAdminAsync()
     {
         var client = AppClient.Create(_fixture.Factory);
