@@ -319,6 +319,8 @@ public class PublicCertificateDesignElementViewModel
     public string TextAlign { get; set; } = "center";
     public int ZIndex { get; set; }
     public int Rotation { get; set; }
+    /// <summary>Element opacity in percent (10–100); rendered as a CSS opacity on the public page.</summary>
+    public int Opacity { get; set; } = 100;
 }
 
 public class CourseRevenueRowViewModel

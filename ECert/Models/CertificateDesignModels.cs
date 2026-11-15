@@ -69,9 +69,15 @@ public class CertificateDesignElement
     [Required, StringLength(10)]
     public string TextAlign { get; set; } = "center";
     public bool IsVisible { get; set; } = true;
+    /// <summary>A locked element stays on the canvas but cannot be moved, resized or rotated by
+    /// accident; the designer unlocks it from the layers panel to edit it again.</summary>
+    public bool IsLocked { get; set; }
     [Range(-100, 100)]
     public int ZIndex { get; set; } = 1;
     [Range(-180, 180)]
     public int Rotation { get; set; }
+    /// <summary>Element opacity in percent; the certificate renderer turns this into a CSS opacity.</summary>
+    [Range(10, 100)]
+    public int Opacity { get; set; } = 100;
     public int SortOrder { get; set; }
 }

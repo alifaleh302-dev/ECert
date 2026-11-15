@@ -157,6 +157,13 @@
     .ped-layer .ly-btn:hover { color: var(--ped-accent-2); background: #1d2942; }
     .ped-layer .ly-btn.danger:hover { color: #ffb4b6; background: rgba(224,87,91,.16); }
     .ped-layer .ly-eye.off { color: #4a5872; }
+    .ped-layer .ly-lock.on { color: var(--ped-accent-2); }
+    .ped-layer .ly-grip { color: #3c4a63; font-size: .8rem; cursor: grab; flex-shrink: 0; }
+    .ped-layer .ly-grip:active { cursor: grabbing; }
+    .ped-layer.locked .ly-name { color: var(--ped-muted); font-style: italic; }
+    .ped-layer.hidden { opacity: .55; }
+    .ped-layer.drop-target { border-color: var(--ped-accent); background: rgba(59,110,240,.12); }
+    .ped-layer .ly-rename { flex: 1; min-width: 0; background: var(--ped-panel-2); border: 1px solid var(--ped-accent); border-radius: 3px; color: var(--ped-ink); font-size: .78rem; padding: .1rem .3rem; }
     .ped-empty { text-align: center; color: var(--ped-muted); font-size: .76rem; padding: 1rem .4rem; }
 
     /* properties */
