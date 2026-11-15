@@ -53,6 +53,34 @@ public sealed class CertificateBarcodeService
         moduleWidth = Math.Clamp(moduleWidth, 1, 6);
         height = Math.Clamp(height, 20, 200);
 
+        var width = 0;
+        var builder = new StringBuilder();
+        foreach (var (span, isBar) in BuildBars(value, moduleWidth))
+        {
+            if (isBar)
+                builder.Append($"<rect x=\"{width}\" y=\"0\" width=\"{span}\" height=\"{height}\"/>");
+            width += span;
+        }
+
+        return $"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" " +
+               $"width=\"{width}\" height=\"{height}\" preserveAspectRatio=\"none\" role=\"img\">" +
+               $"<rect x=\"0\" y=\"0\" width=\"{width}\" height=\"{height}\" fill=\"#ffffff\"/>" +
+               $"<g fill=\"#000000\">{builder}</g></svg>";
+    }
+
+    /// <summary>
+    /// Returns the Code 128 bar/space run for <paramref name="content"/> as a sequence of
+    /// <c>(span, isBar)</c> pairs, where <c>span</c> is already multiplied by
+    /// <paramref name="moduleWidth"/>. Shared by the SVG output and the PDF vector drawing so both
+    /// encode identically.
+    /// </summary>
+    public static IReadOnlyList<(int Span, bool IsBar)> BuildBars(string content, int moduleWidth = 2)
+    {
+        var value = Sanitize(content);
+        if (value.Length == 0) return Array.Empty<(int, bool)>();
+
+        moduleWidth = Math.Clamp(moduleWidth, 1, 6);
+
         var codes = new List<int> { StartB };
         foreach (var ch in value) codes.Add(ch - 32);
 
@@ -62,27 +90,18 @@ public sealed class CertificateBarcodeService
         codes.Add(checksum % 103);
         codes.Add(Stop);
 
-        var width = 0;
-        var builder = new StringBuilder();
+        var bars = new List<(int, bool)>();
         foreach (var code in codes)
         {
             var pattern = Patterns[code];
             var isBar = true;
             foreach (var digit in pattern)
             {
-                var modules = digit - '0';
-                var span = modules * moduleWidth;
-                if (isBar)
-                    builder.Append($"<rect x=\"{width}\" y=\"0\" width=\"{span}\" height=\"{height}\"/>");
-                width += span;
+                bars.Add(((digit - '0') * moduleWidth, isBar));
                 isBar = !isBar;
             }
         }
-
-        return $"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" " +
-               $"width=\"{width}\" height=\"{height}\" preserveAspectRatio=\"none\" role=\"img\">" +
-               $"<rect x=\"0\" y=\"0\" width=\"{width}\" height=\"{height}\" fill=\"#ffffff\"/>" +
-               $"<g fill=\"#000000\">{builder}</g></svg>";
+        return bars;
     }
 
     /// <summary>Keeps only characters Code 128 set B can encode (ASCII 32..126).</summary>

@@ -1,0 +1,108 @@
+@model ECert.Models.CertificateExportSettings
+@{
+    ViewData["Title"] = "إعدادات تصدير الشهادات";
+    ViewData["PageIcon"] = "bi-file-earmark-pdf";
+    ViewData["PageDesc"] = "التحكم في تصدير الشهادات كملفات PDF: من يملك التحميل، والحد الأقصى لكل طلب، ومقاس الصفحة — لمدير النظام فقط";
+    Layout = "_AdminLayout";
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="a-note a-note--success mb-4" role="status"><i class="bi bi-check-circle" aria-hidden="true"></i> <div>@TempData["Success"]</div></div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="a-note a-note--danger mb-4" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> <div>@TempData["Error"]</div></div>
+}
+
+<div class="a-note a-note--info mb-4">
+    <i class="bi bi-info-circle" aria-hidden="true"></i>
+    <div>
+        تُقرأ هذه القيم ديناميكياً عند كل عملية تصدير. ارفع «الحد الأقصى» على سيرفر بموارد كبيرة،
+        واخفضه على سيرفر محدود الذاكرة، لأن التصدير يتم أثناء الطلب.
+    </div>
+</div>
+
+<form asp-action="Save" method="post">
+    @Html.AntiForgeryToken()
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="a-card h-100">
+                <div class="a-card__header">
+                    <h2 class="a-card__title"><i class="bi bi-shield-lock" aria-hidden="true"></i> من يملك التحميل</h2>
+                </div>
+                <div class="a-card__body a-form__grid">
+                    <div class="a-field a-field--full">
+                        <div class="form-check form-switch">
+                            <input asp-for="AllowPublicDownload" class="form-check-input" type="checkbox" role="switch" />
+                            <label asp-for="AllowPublicDownload" class="form-check-label"></label>
+                        </div>
+                        <p class="a-hint">عند التعطيل لا يظهر زر تحميل PDF في صفحة التحقق العامة، ويبقى التصدير مقصوراً على لوحة الإدارة.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="a-card h-100">
+                <div class="a-card__header">
+                    <h2 class="a-card__title"><i class="bi bi-speedometer2" aria-hidden="true"></i> موارد السيرفر</h2>
+                </div>
+                <div class="a-card__body a-form__grid">
+                    <div class="a-field a-field--full">
+                        <label asp-for="MaxCertificatesPerExport" class="a-field__label"></label>
+                        <input asp-for="MaxCertificatesPerExport" type="number" min="1" max="500" class="form-control" />
+                        <p class="a-hint">أقصى عدد شهادات في ملف PDF واحد (1–500). القيمة الافتراضية 100.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="a-card h-100">
+                <div class="a-card__header">
+                    <h2 class="a-card__title"><i class="bi bi-aspect-ratio" aria-hidden="true"></i> مقاس الورق والإنتاج</h2>
+                </div>
+                <div class="a-card__body a-form__grid">
+                    <div class="a-field a-field--full">
+                        <label asp-for="PageSize" class="a-field__label"></label>
+                        <select asp-for="PageSize" class="form-select"
+                                asp-items="Html.GetEnumSelectList<ECert.Models.CertificatePdfPageSize>()"></select>
+                        <p class="a-hint">«A4 أفقي» مناسب للطباعة المكتبية. «مقاس القالب» يجعل الصفحة مطابقة للتصميم تماماً.</p>
+                    </div>
+                    <div class="a-field a-field--full">
+                        <div class="form-check form-switch">
+                            <input asp-for="IncludeBleedMarks" class="form-check-input" type="checkbox" role="switch" />
+                            <label asp-for="IncludeBleedMarks" class="form-check-label"></label>
+                        </div>
+                        <p class="a-hint">يضيف هامشاً وعلامات قص حول التصميم لطباعة احترافية لدى المطبعة.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="a-card h-100">
+                <div class="a-card__header">
+                    <h2 class="a-card__title"><i class="bi bi-file-earmark-text" aria-hidden="true"></i> اسم الملف</h2>
+                </div>
+                <div class="a-card__body a-form__grid">
+                    <div class="a-field a-field--full">
+                        <label asp-for="FileNamePrefix" class="a-field__label"></label>
+                        <input asp-for="FileNamePrefix" class="form-control" placeholder="certificates" />
+                        <p class="a-hint">بادئة اختيارية تُضاف إلى اسم ملف PDF الذي ينزّله المستخدم.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mt-4">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ الإعدادات</button>
+    </div>
+</form>
