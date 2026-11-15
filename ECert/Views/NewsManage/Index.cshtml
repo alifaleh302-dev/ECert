@@ -84,7 +84,7 @@
                                             <button class="btn btn-sm btn-outline-warning"><i class="bi bi-eye-slash"></i></button>
                                         </form>
                                     }
-                                    <form asp-action="Delete" asp-route-id="@item.PostId" method="post" class="d-inline" onsubmit="return confirm('هل أنت متأكد من حذف هذا الخبر؟')">
+                                    <form asp-action="Delete" asp-route-id="@item.PostId" method="post" class="d-inline" data-confirm="هل أنت متأكد من حذف هذا الخبر؟" data-confirm-tone="danger">
                                         @Html.AntiForgeryToken()
                                         <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
                                     </form>

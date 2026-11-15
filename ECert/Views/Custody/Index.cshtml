@@ -143,13 +143,13 @@
                                 <td class="small">@h.RequestedAt.ToString("yyyy-MM-dd HH:mm")</td>
                                 <td>
                                     <div class="d-flex flex-wrap gap-2">
-                                        <form asp-action="Approve" method="post" class="d-flex gap-1" onsubmit="return confirm('اعتماد توريد المبلغ إلى الصندوق الرئيسي؟')">
+                                        <form asp-action="Approve" method="post" class="d-flex gap-1" data-confirm="اعتماد توريد المبلغ إلى الصندوق الرئيسي؟">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="id" value="@h.CustodyHandoverId" />
                                             <input type="text" name="note" class="form-control form-control-sm" placeholder="ملاحظة (اختياري)" style="max-width:160px" />
                                             <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i> اعتماد</button>
                                         </form>
-                                        <form asp-action="Reject" method="post" onsubmit="return confirm('رفض طلب التوريد؟')">
+                                        <form asp-action="Reject" method="post" data-confirm="رفض طلب التوريد؟" data-confirm-tone="danger">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="id" value="@h.CustodyHandoverId" />
                                             <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i> رفض</button>

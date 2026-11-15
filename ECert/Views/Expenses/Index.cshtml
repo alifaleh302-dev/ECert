@@ -107,11 +107,11 @@
                                         <div class="d-flex gap-1">
                                             <form asp-action="Approve" asp-route-id="@e.ExpenseId" method="post" class="d-inline">
                                                 @Html.AntiForgeryToken()
-                                                <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('اعتماد هذا المصروف؟');"><i class="bi bi-check-lg"></i> اعتماد</button>
+                                                <button type="submit" class="btn btn-sm btn-outline-success" data-confirm="اعتماد هذا المصروف؟"><i class="bi bi-check-lg"></i> اعتماد</button>
                                             </form>
                                             <form asp-action="Reject" asp-route-id="@e.ExpenseId" method="post" class="d-inline">
                                                 @Html.AntiForgeryToken()
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('رفض هذا المصروف؟');"><i class="bi bi-x-lg"></i> رفض</button>
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" data-confirm="رفض هذا المصروف؟" data-confirm-tone="danger"><i class="bi bi-x-lg"></i> رفض</button>
                                             </form>
                                         </div>
                                     }

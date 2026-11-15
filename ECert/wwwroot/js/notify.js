@@ -131,7 +131,9 @@ const Notify = (() => {
             ok.className = `btn ${danger ? 'btn-danger' : 'btn-primary'}`;
             ok.textContent = confirmLabel;
 
-            actions.append(cancel, ok);
+            // An alert has a single acknowledge button; only a confirmation offers cancel.
+            if (cancelLabel) actions.append(cancel, ok);
+            else actions.appendChild(ok);
             box.append(icon, heading, para, actions);
             backdrop.appendChild(box);
             document.body.appendChild(backdrop);
@@ -142,10 +144,9 @@ const Notify = (() => {
                 backdrop.remove();
                 resolve(answer);
             };
-            const onKey = e => {
-                if (e.key === 'Escape') close(false);
-                if (e.key === 'Enter') close(true);
-            };
+            // Enter is left to the focused button (native activation), so a focused
+            // cancel button cancels rather than confirming.
+            const onKey = e => { if (e.key === 'Escape') close(false); };
             cancel.addEventListener('click', () => close(false));
             ok.addEventListener('click', () => close(true));
             backdrop.addEventListener('click', e => { if (e.target === backdrop) close(false); });
@@ -169,11 +170,64 @@ const Notify = (() => {
         const queue = Array.isArray(window.__ecertFlash) ? window.__ecertFlash : [];
         window.__ecertFlash = [];
         if (!queue.length) return;
-        window.__ecertHadFlash = true;
         queue.forEach(item => {
             if (item && item.message) toast(item.message, item.type || 'info');
         });
     }
+
+    // --- Declarative confirmation -------------------------------------------
+    // Any element (or form) carrying data-confirm opens the shared dialog instead
+    // of the browser's native confirm(). requestSubmit() is used so the pressed
+    // button survives the round-trip: its formaction and name/value still apply.
+    function isDanger(el) {
+        return el.getAttribute('data-confirm-tone') === 'danger';
+    }
+
+    function ask(el) {
+        return confirmDialog({
+            title: el.getAttribute('data-confirm-title') || 'تأكيد العملية',
+            text: el.getAttribute('data-confirm'),
+            confirmLabel: el.getAttribute('data-confirm-ok') || 'تأكيد',
+            danger: isDanger(el)
+        });
+    }
+
+    function submitConfirmed(form, submitter) {
+        // Marks the form so the submit listener lets the second pass through.
+        form.dataset.ecertConfirmed = '1';
+        try {
+            if (typeof form.requestSubmit === 'function') form.requestSubmit(submitter || undefined);
+            else form.submit();
+        } finally {
+            delete form.dataset.ecertConfirmed;
+        }
+    }
+
+    function wireConfirm() {
+        document.addEventListener('click', async e => {
+            const el = e.target.closest('button[data-confirm], a[data-confirm], input[data-confirm]');
+            if (!el || el.disabled) return;
+            e.preventDefault();
+            if (!(await ask(el))) return;
+            if (el.tagName === 'A') {
+                if (el.target === '_blank') window.open(el.href, '_blank');
+                else window.location.href = el.href;
+                return;
+            }
+            if (el.form) submitConfirmed(el.form, el);
+        }, true);
+
+        document.addEventListener('submit', async e => {
+            const form = e.target;
+            if (!form.hasAttribute || !form.hasAttribute('data-confirm')) return;
+            if (form.dataset.ecertConfirmed === '1') return;
+            e.preventDefault();
+            if (await ask(form)) submitConfirmed(form, e.submitter);
+        }, true);
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wireConfirm);
+    else wireConfirm();
 
     return { toast, success: m => toast(m, 'success'), info: m => toast(m, 'info'),
         warning: m => toast(m, 'warning'), error: m => toast(m, 'danger'),

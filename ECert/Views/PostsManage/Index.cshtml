@@ -81,7 +81,7 @@
                                                 <button type="submit" class="btn btn-outline-warning" title="إلغاء النشر"><i class="bi bi-eye-slash"></i></button>
                                             </form>
                                         }
-                                        <form asp-action="Delete" method="post" style="display:inline" onsubmit="return confirm('هل أنت متأكد من حذف هذا المنشور؟')">
+                                        <form asp-action="Delete" method="post" style="display:inline" data-confirm="هل أنت متأكد من حذف هذا المنشور؟" data-confirm-tone="danger">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="id" value="@post.PostId" />
                                             <button type="submit" class="btn btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button>

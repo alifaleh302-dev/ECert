@@ -126,7 +126,7 @@
                                             <input type="hidden" name="id" value="@user.UserId" />
                                             @if (user.IsActive)
                                             {
-                                                <button type="submit" class="btn btn-outline-warning" title="تعطيل" onclick="return confirm('هل تريد تعطيل هذا المستخدم؟')"><i class="bi bi-pause-circle"></i></button>
+                                                <button type="submit" class="btn btn-outline-warning" title="تعطيل" data-confirm="هل تريد تعطيل هذا المستخدم؟" data-confirm-tone="danger"><i class="bi bi-pause-circle"></i></button>
                                             }
                                             else
                                             {

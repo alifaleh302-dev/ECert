@@ -136,7 +136,7 @@
                             <a asp-action="Edit" asp-route-id="@role.RoleId" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square"></i> تعديل الصلاحيات</a>
                             <form asp-action="Delete" asp-route-id="@role.RoleId" method="post" class="d-inline">
                                 @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('سيتم حذف الدور المخصص إذا لم يكن مرتبطاً بمستخدمين. هل تريد المتابعة؟')"><i class="bi bi-trash"></i> حذف</button>
+                                <button type="submit" class="btn btn-sm btn-outline-danger" data-confirm="سيتم حذف الدور المخصص إذا لم يكن مرتبطاً بمستخدمين. هل تريد المتابعة؟" data-confirm-tone="danger"><i class="bi bi-trash"></i> حذف</button>
                             </form>
                         }
                     </div>

@@ -124,7 +124,7 @@
                     <p class="a-hint mb-3">تُنشئ النسخة كاملة من قاعدة البيانات، تُضغط وتُشفّر AES-256، وتُرسل إلى قناة الأرشيف ثم تُحذف من ذاكرة السيرفر فوراً.</p>
                     <div class="d-flex flex-wrap gap-2">
                         <button type="submit" asp-action="RunBackupNow" class="btn btn-outline-primary"
-                                onclick="return confirm('إنشاء نسخة احتياطية مشفّرة الآن؟');">
+                                data-confirm="إنشاء نسخة احتياطية مشفّرة الآن؟">
                             <i class="bi bi-play-circle"></i> تشغيل نسخة الآن
                         </button>
                         <button type="submit" asp-action="PollTelegramLinks" class="btn btn-outline-secondary">

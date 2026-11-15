@@ -72,13 +72,13 @@
                                     @if (inv.Status != "Paid" && inv.Status != "Cancelled")
                                     {
                                         <a asp-controller="Payments" asp-action="Add" asp-route-invoiceId="@inv.InvoiceId" class="btn btn-sm btn-outline-success"><i class="bi bi-cash"></i> دفعة</a>
-                                        <form asp-action="Cancel" asp-route-id="@inv.InvoiceId" method="post" class="d-inline" onsubmit="return confirm('هل أنت متأكد من إلغاء الفاتورة؟')">
+                                        <form asp-action="Cancel" asp-route-id="@inv.InvoiceId" method="post" class="d-inline" data-confirm="هل أنت متأكد من إلغاء الفاتورة؟" data-confirm-tone="danger">
                                             <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i> إلغاء</button>
                                         </form>
                                     }
                                     @if (inv.Status == "Cancelled")
                                     {
-                                        <form asp-action="Restore" asp-route-id="@inv.InvoiceId" method="post" class="d-inline" onsubmit="return confirm('هل تريد استعادة هذه الفاتورة؟')">
+                                        <form asp-action="Restore" asp-route-id="@inv.InvoiceId" method="post" class="d-inline" data-confirm="هل تريد استعادة هذه الفاتورة؟">
                                             <button class="btn btn-sm btn-outline-warning"><i class="bi bi-arrow-counterclockwise"></i> استعادة</button>
                                         </form>
                                     }

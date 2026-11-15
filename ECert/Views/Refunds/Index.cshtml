@@ -38,7 +38,7 @@
                                 <td>
                                     <form asp-action="Approve" asp-route-id="@r.RefundId" method="post" class="d-inline">
                                         @Html.AntiForgeryToken()
-                                        <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('اعتماد الاسترداد وخصمه من العهدة؟');">
+                                        <button type="submit" class="btn btn-sm btn-outline-success" data-confirm="اعتماد الاسترداد وخصمه من العهدة؟">
                                             <i class="bi bi-check-lg"></i> اعتماد
                                         </button>
                                     </form>

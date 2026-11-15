@@ -76,6 +76,32 @@ public class NotificationTests
         Assert.DoesNotContain("a-note--danger", html);
     }
 
+    [Fact]
+    public async Task Destructive_actions_use_the_shared_confirm_dialog_not_native_confirm()
+    {
+        // Phase 4: inline onclick/onsubmit="return confirm(...)" were replaced by data-confirm
+        // so the on-brand Notify dialog owns every confirmation.
+        var admin = await SignInAdminAsync();
+
+        foreach (var path in new[] { "/CertificateDesigns", "/Invoices", "/Registrations", "/CategoriesManage" })
+        {
+            var html = await admin.GetStringAsync(path);
+            Assert.DoesNotContain("return confirm(", html);
+            Assert.DoesNotContain("window.confirm", html);
+        }
+    }
+
+    [Fact]
+    public async Task Data_confirm_marks_destructive_actions_with_the_danger_tone()
+    {
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/Invoices");
+
+        Assert.Contains("data-confirm=", html);
+        // Cancelling an invoice is destructive, so it must opt into the danger styling.
+        Assert.Contains("data-confirm-tone=\"danger\"", html);
+    }
+
     private async Task<AppClient> SignInAdminAsync()
     {
         var client = AppClient.Create(_fixture.Factory);

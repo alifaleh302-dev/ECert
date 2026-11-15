@@ -85,7 +85,7 @@
                                     data-slide-active="@(s.IsActive.ToString().ToLower())">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <form method="post" action="/HomepageManage/DeleteSlide" class="d-inline" onsubmit="return confirm('حذف الشريحة؟')">
+                            <form method="post" action="/HomepageManage/DeleteSlide" class="d-inline" data-confirm="حذف الشريحة؟" data-confirm-tone="danger">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="id" value="@s.HeroSlideId" />
                                 <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
