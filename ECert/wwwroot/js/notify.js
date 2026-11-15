@@ -42,22 +42,22 @@ const Notify = (() => {
         if (!text) return null;
 
         const node = document.createElement('div');
-        node.className = `toast toast--${kind}`;
+        node.className = `toast-host__item toast-host__item--${kind}`;
         // Errors are assertive so a screen reader interrupts; everything else waits.
         node.setAttribute('role', kind === 'danger' ? 'alert' : 'status');
         node.setAttribute('aria-live', kind === 'danger' ? 'assertive' : 'polite');
 
         const icon = document.createElement('i');
-        icon.className = `bi ${ICONS[kind]} toast__icon`;
+        icon.className = `bi ${ICONS[kind]} toast-host__icon`;
         icon.setAttribute('aria-hidden', 'true');
 
         const body = document.createElement('div');
-        body.className = 'toast__body';
+        body.className = 'toast-host__body';
         body.textContent = text;
 
         const close = document.createElement('button');
         close.type = 'button';
-        close.className = 'toast__close';
+        close.className = 'toast-host__close';
         close.setAttribute('aria-label', 'إغلاق');
         close.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
         close.addEventListener('click', () => dismiss(node));
@@ -67,7 +67,7 @@ const Notify = (() => {
         const ms = options.timeout ?? TIMEOUTS[kind];
         if (ms > 0) {
             const timer = document.createElement('span');
-            timer.className = 'toast__timer';
+            timer.className = 'toast-host__timer';
             timer.style.animationDuration = `${ms}ms`;
             node.appendChild(timer);
 
