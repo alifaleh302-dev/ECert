@@ -61,24 +61,28 @@
                     <div class="ped-panel-head" style="padding:.35rem .6rem;">تصاميم القوالب</div>
                     @foreach (var item in Model.Designs)
                     {
-                        <a class="ds-item @(item.CertificateDesignId == Model.Design.CertificateDesignId ? "active" : "")" asp-action="Index" asp-route-id="@item.CertificateDesignId">
-                            <i class="bi @(item.IsPublished ? "bi-broadcast ds-i-live" : "bi-file-earmark")" style="font-size:.95rem;"></i>
-                            <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@item.Name</span>
-                            <span class="ped-badge @(item.IsPublished ? "live" : "draft")">@(item.IsPublished ? "منشور" : "مسودة")</span>
-                        </a>
+                        <div class="ds-row @(item.CertificateDesignId == Model.Design.CertificateDesignId ? "active" : "")">
+                            <a class="ds-open" asp-action="Index" asp-route-id="@item.CertificateDesignId" title="فتح القالب">
+                                <i class="bi @(item.IsPublished ? "bi-broadcast ds-i-live" : "bi-file-earmark")" style="font-size:.95rem;"></i>
+                                <span class="ds-name">@item.Name</span>
+                                <span class="ped-badge @(item.IsPublished ? "live" : "draft")">@(item.IsPublished ? "منشور" : "مسودة")</span>
+                            </a>
+                            <div class="ds-actions">
+                                <button type="button" class="ds-act ds-act--rename" data-design-id="@item.CertificateDesignId" data-design-name="@item.Name" title="إعادة تسمية"><i class="bi bi-pencil"></i></button>
+                                <form asp-action="Duplicate" asp-route-id="@item.CertificateDesignId" method="post" class="ds-act-form">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="ds-act" title="تكرار القالب"><i class="bi bi-files"></i></button>
+                                </form>
+                                <form asp-action="Delete" asp-route-id="@item.CertificateDesignId" method="post" class="ds-act-form">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="ds-act ds-act--danger" title="حذف القالب"
+                                            onclick="return confirm('سيتم حذف القالب «@item.Name» نهائياً. هل تريد المتابعة؟')"><i class="bi bi-trash3"></i></button>
+                                </form>
+                            </div>
+                        </div>
                     }
                     <div class="ds-divider"></div>
                     <a class="ds-item" asp-action="New"><i class="bi bi-plus-circle ds-i-accent"></i><span style="font-weight:700;">تصميم جديد</span></a>
-                    @if (Model.Design.CertificateDesignId > 0 && !Model.Design.IsPublished)
-                    {
-                        <form asp-action="Delete" asp-route-id="@Model.Design.CertificateDesignId" method="post" class="ds-delete-form">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="ds-item ds-item--danger"
-                                    onclick="return confirm('سيتم حذف هذا التصميم نهائياً. هل تريد المتابعة؟')">
-                                <i class="bi bi-trash3"></i><span style="font-weight:700;">حذف هذا التصميم</span>
-                            </button>
-                        </form>
-                    }
                 </div>
             </div>
         </div>
@@ -2042,6 +2046,59 @@
         const w = ratio >= 1 ? maxSide : Math.round(maxSide * ratio);
         const h = ratio >= 1 ? Math.round(maxSide / ratio) : maxSide;
         addElement('image', '', null, { url, width: w, height: h });
+    });
+
+    // ---------- Template rename ----------
+    // Renaming is its own endpoint so it works on the published template too (saving the published
+    // template forks a draft instead). The rename posts in the background so the canvas is untouched.
+    const currentDesignId = () => Number(form.querySelector('input[name="CertificateDesignId"]').value) || 0;
+
+    async function postRename(id, name) {
+        const token = form.querySelector('input[name="__RequestVerificationToken"]').value;
+        const body = new URLSearchParams({ id: String(id), name, __RequestVerificationToken: token });
+        const res = await fetch('@Url.Action("Rename", "CertificateDesigns")', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body
+        });
+        return res.ok;
+    }
+
+    async function renameDesign(id, name, row) {
+        if (!(await postRename(id, name))) return false;
+        if (row) {
+            const label = row.querySelector('.ds-name');
+            if (label) label.textContent = name;
+        }
+        if (id === currentDesignId()) {
+            const toggle = document.querySelector('#designsToggle .txt');
+            if (toggle) toggle.textContent = name;
+        }
+        return true;
+    }
+
+    const nameInput = $('templateName');
+    if (nameInput) {
+        nameInput.addEventListener('change', async () => {
+            const next = nameInput.value.trim();
+            const id = currentDesignId();
+            // A brand-new design has no id yet; its name is applied when it is first saved.
+            if (!next || id <= 0) return;
+            await renameDesign(id, next, document.querySelector('#designsMenu .ds-row.active'));
+        });
+    }
+
+    document.querySelectorAll('.ds-act--rename').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const id = Number(btn.dataset.designId) || 0;
+            const previous = btn.dataset.designName || '';
+            const answer = window.prompt('اسم القالب الجديد:', previous);
+            if (answer === null) return;
+            const next = answer.trim();
+            if (!next || next === previous) return;
+            if (id === currentDesignId() && nameInput) nameInput.value = next;
+            await renameDesign(id, next, btn.closest('.ds-row'));
+        });
     });
 
     // ---------- Rulers ----------

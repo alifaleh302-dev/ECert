@@ -80,6 +80,7 @@ public sealed class CertificatePdfService
         var scaleY = pageHeight / model.CanvasHeight;
 
         DrawPaperBackground(canvas, model, pageWidth, pageHeight, settings);
+        DrawBackgroundImage(canvas, model, pageWidth, pageHeight);
         DrawElements(canvas, model, scaleX, scaleY, margin);
 
         if (settings.IncludeBleedMarks)
@@ -131,6 +132,23 @@ public sealed class CertificatePdfService
             };
             canvas.DrawRect(border, stroke);
         }
+    }
+
+    /// <summary>
+    /// Draws the design's uploaded background artwork stretched to the full page, mirroring the
+    /// <c>object-fit: fill</c> used by the on-screen certificate. The page geometry already matches
+    /// the canvas aspect ratio, so filling the page keeps the artwork proportional.
+    /// </summary>
+    private void DrawBackgroundImage(SKCanvas canvas, CertificateRenderModel model, float pageWidth, float pageHeight)
+    {
+        if (string.IsNullOrWhiteSpace(model.BackgroundImageUrl)) return;
+
+        using var bitmap = LoadImage(model.BackgroundImageUrl);
+        if (bitmap == null) return;
+
+        var target = new SKRect(0, 0, pageWidth, pageHeight);
+        using var paint = new SKPaint { IsAntialias = true };
+        canvas.DrawBitmap(bitmap, target, paint);
     }
 
     private void DrawElements(SKCanvas canvas, CertificateRenderModel model, float scaleX, float scaleY, float margin)

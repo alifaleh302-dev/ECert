@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using ECert.Models;
 using ECert.Services;
 using ECert.Tests.Infrastructure;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -49,6 +50,42 @@ public class CertificatePdfExportTests
         Assert.True(box.Success, "the PDF must declare a MediaBox");
         Assert.True(double.Parse(box.Groups[1].Value) > double.Parse(box.Groups[2].Value),
             "A4 landscape pages are wider than they are tall");
+    }
+
+    [Fact]
+    public async Task Export_draws_the_template_background_image()
+    {
+        // Regression: the exported PDF only painted the background colour and border; the uploaded
+        // template artwork shown on screen was never drawn, so the printed certificate looked bare.
+        // The page must now embed the background image (the PDF then carries an XObject image).
+        var imagePath = "/uploads/designs/pdf-bg-" + Guid.NewGuid().ToString("N") + ".png";
+        var webRoot = _fixture.Factory.Services.GetRequiredService<IWebHostEnvironment>().WebRootPath;
+        var absolute = Path.Combine(webRoot, imagePath.TrimStart('/'));
+        Directory.CreateDirectory(Path.GetDirectoryName(absolute)!);
+        // A 2x2 PNG so the decoder produces a real bitmap rather than a degenerate 1x1.
+        var png = Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP4z8AARAwQCgAf7gP9i18U1AAAAABJRU5ErkJggg==");
+        await File.WriteAllBytesAsync(absolute, png);
+
+        try
+        {
+            var seeded = await SeedCertificateAsync(imagePath);
+            var admin = await SignInAdminAsync();
+
+            var response = await admin.PostFormAsync("/Certificates", "/Certificates/ExportSelectedPdf", new[]
+            {
+                new KeyValuePair<string, string>("certificateIds", seeded.CertificateId.ToString())
+            });
+            response.EnsureSuccessStatusCode();
+
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            var content = System.Text.Encoding.Latin1.GetString(bytes);
+            Assert.Contains("/Subtype /Image", content);
+        }
+        finally
+        {
+            if (File.Exists(absolute)) File.Delete(absolute);
+        }
     }
 
     [Fact]
@@ -151,7 +188,7 @@ public class CertificatePdfExportTests
     /// Creates a course with an assigned design (trainee name, QR and barcode) plus a valid
     /// certificate, so the export renders real elements rather than an empty page.
     /// </summary>
-    private async Task<SeededCertificate> SeedCertificateAsync()
+    private async Task<SeededCertificate> SeedCertificateAsync(string? backgroundImageUrl = null)
     {
         var (categoryId, _) = await _fixture.Factory.FirstCategoryAsync();
         var certificateNumber = "PDF-" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
@@ -178,6 +215,7 @@ public class CertificatePdfExportTests
             var design = CertificateDesignService.CreateDefault("export");
             design.DesignKey = "export-" + Guid.NewGuid().ToString("N");
             design.IsPublished = false;
+            design.BackgroundImageUrl = backgroundImageUrl;
             design.Elements.Clear();
             design.Elements.Add(Element("field", "trainee_name", 120, 260, 860, 70, 34));
             design.Elements.Add(Element("qr", "", 860, 560, 160, 160));
