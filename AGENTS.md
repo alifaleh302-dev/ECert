@@ -51,7 +51,17 @@ Consequences:
 
 Designer work is organised in phases, one branch + PR each:
 Phase 1 nav/snapping (PR #19), Phase 2 multi-select (PR #20),
-Phase 3 align/distribute/order/layers (PR #21).
+Phase 3 align/distribute/order/layers (PR #21),
+Phase 4 speed/access — clipboard, inline edit, context menu, palette, rulers (PR #22),
+Phase 5 pro polish — grouping, typography, presets, drag-to-place, safe area (PR #24).
+
+Phases stack: #22 targets `main`, #24 targets the Phase 4 branch. Open each new
+phase's PR against the previous phase's branch so the diff stays scoped, and say
+in the body that the earlier PR must merge first.
+
+A fresh phase's server-rendered markup only appears after a **Release rebuild
+plus a process restart** — the running `dotnet run --no-build` keeps the old
+`ECert.Views.dll` loaded, so a live browser check can silently show stale HTML.
 
 ### Validating designer JS
 

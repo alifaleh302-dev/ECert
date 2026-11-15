@@ -199,6 +199,25 @@
     /* floating cursor coordinate read-out while dragging */
     .ped-cursor { position: absolute; z-index: 90; pointer-events: none; background: #101828; border: 1px solid var(--ped-line); color: #fff; font-size: .68rem; font-weight: 700; padding: .12rem .45rem; border-radius: 3px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
+    /* style presets */
+    .ped-preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .35rem; }
+    .ped-preset { border: 1px solid var(--ped-line); background: var(--ped-panel-2); color: var(--ped-ink); border-radius: var(--ped-r); padding: .45rem .35rem; cursor: pointer; display: flex; align-items: center; justify-content: center; min-height: 38px; transition: .12s ease; }
+    .ped-preset:hover { background: #1d2942; border-color: rgba(59,110,240,.5); color: #fff; }
+    .ped-preset:active { transform: translateY(1px); }
+
+    /* library drag-to-place */
+    .ped-add-btn[draggable="true"], .ped-field-chip[draggable="true"] { cursor: grab; }
+    .ped-add-btn[draggable="true"]:active, .ped-field-chip[draggable="true"]:active { cursor: grabbing; }
+    .ped-canvas.drag-over { box-shadow: inset 0 0 0 2px var(--ped-accent); }
+
+    /* group membership badge in the layers panel */
+    .ped-layer .ly-group { color: var(--ped-accent-2); font-size: .78rem; flex-shrink: 0; }
+
+    /* print safe area */
+    .ped-safe-area { position: absolute; inset: 4.2%; border: 1px dashed rgba(59,110,240,.6); border-radius: 2px; pointer-events: none; display: none; z-index: 3; }
+    .ped-app.safe-on .ped-safe-area { display: block; }
+    .ped-safe-area-label { position: absolute; top: -1.35rem; inset-inline-start: 0; font-size: .6rem; font-weight: 700; color: var(--ped-accent-2); background: rgba(6,11,20,.7); padding: .05rem .35rem; border-radius: 3px; white-space: nowrap; }
+
     /* library */
     .ped-field-chip { display: flex; align-items: center; gap: .5rem; width: 100%; text-align: start; border: 1px solid var(--ped-line); background: var(--ped-panel-2); border-radius: var(--ped-r); padding: .42rem .6rem; font-size: .78rem; color: var(--ped-ink); cursor: pointer; margin-bottom: .35rem; transition: .12s ease; }
     .ped-field-chip:hover { background: #1d2942; border-color: rgba(59,110,240,.5); color: #fff; }

@@ -345,6 +345,11 @@ public class CertificateDesignsController : Controller
                 FontColor = CertificateDesignService.NormalizeColor(payload.FontColor, "#172033"),
                 FontWeight = CertificateDesignService.NormalizeFontWeight(payload.FontWeight),
                 TextAlign = CertificateDesignService.NormalizeTextAlign(payload.TextAlign),
+                IsItalic = payload.IsItalic,
+                IsUnderline = payload.IsUnderline,
+                LineHeight = Math.Clamp(payload.LineHeight <= 0 ? 130 : payload.LineHeight, 80, 300),
+                LetterSpacing = Math.Clamp(payload.LetterSpacing, -10, 40),
+                GroupId = NormalizeGroupId(payload.GroupId),
                 IsVisible = payload.IsVisible,
                 IsLocked = payload.IsLocked,
                 ZIndex = Math.Clamp(payload.ZIndex, -100, 100),
@@ -368,6 +373,16 @@ public class CertificateDesignsController : Controller
         return string.IsNullOrWhiteSpace(trimmed) ? fallback : trimmed[..Math.Min(trimmed.Length, maxLength)];
     }
 
+    // A group id is an opaque token the designer assigns; keep it short and safe, and treat an
+    // empty value as "ungrouped" so a stray empty string does not read as a real group.
+    private static string? NormalizeGroupId(string? value)
+    {
+        var trimmed = (value ?? string.Empty).Trim();
+        if (trimmed.Length == 0) return null;
+        var safe = new string(trimmed.Where(ch => char.IsLetterOrDigit(ch) || ch == '-' || ch == '_').ToArray());
+        return safe.Length == 0 ? null : safe[..Math.Min(safe.Length, 40)];
+    }
+
     private sealed class DesignElementPayload
     {
         public string? ElementType { get; set; }
@@ -382,6 +397,11 @@ public class CertificateDesignsController : Controller
         public string? FontColor { get; set; }
         public string? FontWeight { get; set; }
         public string? TextAlign { get; set; }
+        public bool IsItalic { get; set; }
+        public bool IsUnderline { get; set; }
+        public int LineHeight { get; set; } = 130;
+        public int LetterSpacing { get; set; }
+        public string? GroupId { get; set; }
         public bool IsVisible { get; set; } = true;
         public bool IsLocked { get; set; }
         public int ZIndex { get; set; }

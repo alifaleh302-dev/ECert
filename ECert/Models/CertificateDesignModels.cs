@@ -68,6 +68,20 @@ public class CertificateDesignElement
     public string FontWeight { get; set; } = "600";
     [Required, StringLength(10)]
     public string TextAlign { get; set; } = "center";
+    /// <summary>Italic text, toggled from the typography controls.</summary>
+    public bool IsItalic { get; set; }
+    /// <summary>Underlined text, toggled from the typography controls.</summary>
+    public bool IsUnderline { get; set; }
+    /// <summary>Line height as a percentage of the font size (100 = single spacing).</summary>
+    [Range(80, 300)]
+    public int LineHeight { get; set; } = 130;
+    /// <summary>Letter spacing in pixels; negative values tighten the text.</summary>
+    [Range(-10, 40)]
+    public int LetterSpacing { get; set; }
+    /// <summary>Elements that share a non-null group id move, resize and delete together. The value
+    /// is a designer-local identifier, not a foreign key — it is only meaningful within one design.</summary>
+    [StringLength(40)]
+    public string? GroupId { get; set; }
     public bool IsVisible { get; set; } = true;
     /// <summary>A locked element stays on the canvas but cannot be moved, resized or rotated by
     /// accident; the designer unlocks it from the layers panel to edit it again.</summary>
