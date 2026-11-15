@@ -73,19 +73,11 @@
 > ⚠️ **قاعدة معمارية:** أي Controller بلا مدخل في `SectionAccess` يُعتبر **SuperAdmin-only** تلقائياً، فلا
 > تصبح صفحة جديدة عامة بالخطأ.
 
-#### 0.2.3 قوالب الأدوار الجاهزة (Presets)
+#### 0.2.3 مصفوفة الصلاحيات (لا قوالب جاهزة)
 
-لتسريع إنشاء الأدوار، يوفّر النظام قوالب جاهزة تُملأ بضغطة واحدة ثم تُعدّل:
-
-| القالب | الاسم | الصلاحيات الممنوحة |
-|--------|-------|--------------------|
-| `finance` | محاسب | manage-finance، view-invoices، manage-payments، view-reports، view-custody، manage-refunds، view-receivables، view-financial-audit، manage-expenses، manage-installments، view-finance-dashboard |
-| `collections` | محصّل رسوم | view-invoices، manage-payments، view-custody |
-| `registrations` | مشرف التسجيلات | manage-registrations |
-| `trainer` | مشرف تدريب | manage-registrations، manage-courses، manage-instructors، manage-categories |
-| `certificates` | مسؤول الشهادات | issue-certificates، manage-certificate-designs |
-| `content` | محرر المحتوى | manage-posts، manage-news، manage-homepage |
-| `auditor` | مدقق أمني | view-security-audit، view-audit-log، view-reports، view-financial-audit، view-finance-dashboard |
+النظام **لا يوفّر قوالب أدوار جاهزة**؛ يُحدّد المدير كل صلاحية بنفسه من **مصفوفة الصلاحيات**
+(صفوف = ميزات، أعمدة = مشاهدة/إدارة/اعتماد)، فيبقى كل دور مخصّصاً بالكامل ومقروءاً. راجع
+القسم «إدارة النظام ← الأدوار» لتفاصيل المحرّر.
 
 > **الأدوار والصلاحيات — `/Roles`**
 >
@@ -126,6 +118,7 @@
 | | المدربون | Instructors | manage-instructors |
 | | الشهادات | Certificates | issue-certificates |
 | | تصاميم الشهادات | CertificateDesigns | manage-certificate-designs |
+| | إعدادات تصدير الشهادات | CertificateExportSettings | manage-certificate-export-settings (SuperAdmin فقط) |
 | **الإدارة المالية** | لوحة المؤشرات المالية | Finance | view-finance-dashboard |
 | | الفواتير | Invoices | view-invoices أو manage-finance |
 | | الدفعات | Payments | manage-payments |
@@ -134,7 +127,7 @@
 | | المتأخرات | Receivables | view-receivables |
 | | استرداد الرسوم | Refunds | manage-refunds |
 | | المصروفات | Expenses | manage-expenses |
-| | الصندوق | Cashbox | **SuperAdmin فقط** |
+| | الصندوق | Cashbox | view-cashbox أو manage-cashbox |
 | | تقارير الإيرادات | Reports | view-reports |
 | | سجل التدقيق المالي | FinancialAudit | view-financial-audit |
 | | إعدادات النظام المالية | FinanceSettings | manage-finance-settings |
@@ -168,6 +161,7 @@
 | `/SecuritySettings/VerifyIntegrity` | فحص سلامة سلسلة التدقيق | manage-security-settings |
 | `/r/{publicId}` | التحقق العام من سند | عام (مجهول) |
 | `/v/{publicId}` | التحقق العام من شهادة | عام (مجهول) |
+| `/Certificates/PublicPdf` | تحميل شهادة PDF (اختياري، عند تفعيله) | عام + توقيع HMAC |
 | `/health` | فحص صحة النظام | عام |
 
 ### 0.5 المستخدم الافتراضي (Bootstrap)
@@ -659,13 +653,33 @@ InProgress (جارية)، Completed (مكتملة)، Archived (مؤرشفة).
 | **الدورة** | select |
 | **تاريخ الإصدار من / إلى** | date |
 | زر **تصفية** | تطبيق |
-| زر **تصدير المحدد** | تصدير الشهادات المحددة (checkboxes) |
+| زر **تصدير المحدد** | تصدير بيانات الشهادات المحددة (checkboxes) إلى Excel |
+| زر **تصدير المحدد PDF** | توليد ملف PDF جاهز للطباعة (صفحة لكل شهادة) للشهادات المحددة |
 | **إصدار شهادات** | → `/Certificates/Issue` |
 | **استيراد شهادات قديمة** | → `/CertificatesImport/Import` |
-| **تصدير النتائج الحالية** | تصدير مفلتر |
+| **تصدير النتائج الحالية** | تصدير مفلتر إلى Excel |
+| **تصدير النتائج PDF** | تصدير مفلتر (يحترم البحث والفلاتر) إلى PDF |
 | **مسح الفلاتر** | إعادة تعيين |
 | **تحديد الكل** / **إلغاء التحديد** | تحديد جماعي |
 | **نسخ الرابط** / **فتح الرابط** (لكل شهادة) | رابط التحقق العام |
+
+> **تصدير PDF:** يطابق التصميم المعروض على الشاشة (نصوص، QR، باركود، شعارات، توقيعات) عبر
+> SkiaSharp. يخضع لـ **الحد الأقصى للشهادات في الطلب** المضبوط في `/CertificateExportSettings`؛
+> تجاوزه يُظهر رسالة خطأ ولا يولّد الملف. كل عملية تصدير تُقيَّد في سجل التدقيق.
+
+### 4.11.1 إعدادات تصدير الشهادات — `/CertificateExportSettings`
+
+**الصلاحيات:** `manage-certificate-export-settings` (حصرية لمدير النظام).
+
+| الحقل | الوصف |
+|-------|-------|
+| **السماح للعامة بتحميل الشهادات PDF** | عند التفعيل يظهر زر «تحميل الشهادة PDF» في صفحة التحقق العامة |
+| **الحد الأقصى للشهادات في الطلب الواحد** | 1–500 (افتراضي 100) — حماية موارد السيرفر |
+| **مقاس صفحة PDF** | A4 أفقي / A4 عمودي / مقاس القالب |
+| **علامات القص والحدود (Bleed)** | هامش وعلامات قص لطباعة احترافية |
+| **بادئة اسم ملف PDF** | نص اختياري يُسبق اسم الملف المنزَّل |
+
+> تُقرأ هذه القيم ديناميكياً عند كل عملية تصدير (بلا إعادة نشر).
 
 #### الأعمدة
 رقم الشهادة، اسم المتدرب، الدورة، تاريخ الإصدار، المصدر، الحالة، رابط QR.
@@ -1478,8 +1492,8 @@ Icon)**، **الرابط**). أزرار **حفظ الروابط**، **إضافة
 
 #### نموذج الدور (`_RoleForm`)
 - **اسم الدور** (max 50)، **الوصف** (max 250).
-- **قالب جاهز** (select) — يملأ الصلاحيات.
-- شبكة الصلاحيات **مجمّعة حسب القسم**، كلٌّ مع **تحديد الكل** وعدّاد.
+- **مصفوفة الصلاحيات**: صفوف = ميزات، أعمدة = مشاهدة/إدارة/اعتماد، مع **تحديد الكل** لكل مجموعة،
+  وبحث فوري، وملخّص للأقسام التي سيفتحها الدور.
 - الأزرار: **إنشاء الدور** / **حفظ التعديلات**، **العودة للأدوار**، **إلغاء**.
 
 **القواعد:** لا يمكن تعديل/حذف أدوار النظام المحمية (`IsSystem`). لا يمكن حذف دور مرتبط بمستخدمين. تغيير
@@ -1681,13 +1695,15 @@ Icon)**، **الرابط**). أزرار **حفظ الروابط**، **إضافة
 
 **الخطوة 7.** أدخل **اسم الدور:** `محاسب`.
 
-**الخطوة 8.** من **قالب جاهز** اختر «محاسب» — ستُملأ الصلاحيات المالية تلقائياً (11 صلاحية).
-> **نموذج الدور بعد تطبيق القالب الجاهز — `/Roles/Create`**
+**الخطوة 8.** من **مصفوفة الصلاحيات** حدّد المستوى المطلوب لكل ميزة (مثلاً: «الفواتير» = مشاهدة،
+«الدفعات» = إدارة، «المصروفات» = إدارة)، أو استخدم **تحديد الكل** للمجموعة المالية ثم عدّل.
+> **نموذج الدور (مصفوفة الصلاحيات) — `/Roles/Create`**
 >
-> ![نموذج الدور بعد تطبيق القالب الجاهز](https://raw.githubusercontent.com/alifaleh302-dev/ECert/main/docs/screenshots/84-role-create.png)
+> ![نموذج الدور (مصفوفة الصلاحيات)](https://raw.githubusercontent.com/alifaleh302-dev/ECert/main/docs/screenshots/84-role-create.png)
 
 **الخطوة 9.** لاحظ أن صلاحيات `manage-roles` و`manage-finance-settings` و`manage-security-settings`
-**لا تظهر** ضمن الصلاحيات القابلة للمنح لأدوار مخصصة (حصرية لمدير النظام).
+و`manage-certificate-export-settings` **لا تظهر** ضمن الصلاحيات القابلة للمنح لأدوار مخصصة
+(حصرية لمدير النظام).
 
 **الخطوة 10.** اضغط **إنشاء الدور**.
 > **الأدوار والصلاحيات — `/Roles`**
@@ -2815,9 +2831,9 @@ UPDATE/DELETE مباشرةً على جداول التدقيق (تُرفض بخط
 
 <sub>الملف: `docs/screenshots/83-roles.png` — المسار: `/Roles`</sub>
 
-### 82. إنشاء دور (شبكة الصلاحيات + القوالب) — `/Roles/Create`
+### 82. إنشاء دور (مصفوفة الصلاحيات) — `/Roles/Create`
 
-![إنشاء دور (شبكة الصلاحيات + القوالب)](https://raw.githubusercontent.com/alifaleh302-dev/ECert/main/docs/screenshots/84-role-create.png)
+![إنشاء دور (مصفوفة الصلاحيات)](https://raw.githubusercontent.com/alifaleh302-dev/ECert/main/docs/screenshots/84-role-create.png)
 
 <sub>الملف: `docs/screenshots/84-role-create.png` — المسار: `/Roles/Create`</sub>
 
