@@ -204,6 +204,41 @@ public class CertificateDesignerTests
         Assert.Matches(@"clamp\(nextZoom, 0\.25, 3\)", html);
     }
 
+    [Fact]
+    public async Task Editor_supports_multi_selection_and_group_editing()
+    {
+        // Phase 2: the editor must select more than one element at a time — shift-click, a
+        // rubber-band marquee, Ctrl+A — and move/resize/rotate the whole selection together.
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/CertificateDesigns");
+
+        Assert.Contains("id=\"marqueeBox\"", html);
+        Assert.Contains("function selectAll(", html);
+        Assert.Contains("function marqueeSelect(", html);
+        Assert.Contains("function startGroupResize(", html);
+        Assert.Contains("function selectionBounds(", html);
+        // Shift-click must extend the selection rather than replace it.
+        Assert.Contains("select(i, e.shiftKey)", html);
+        Assert.Contains("const additive = e.shiftKey;", html);
+        // Ctrl+A selects everything.
+        Assert.Contains("selectAll(); return;", html);
+
+        var css = await admin.GetStringAsync("/css/certificate-design-editor.css");
+        Assert.Contains(".ped-marquee", css);
+        Assert.Contains(".ped-group-box", css);
+    }
+
+    [Fact]
+    public async Task Group_move_keeps_every_element_inside_the_canvas()
+    {
+        // A group drag must not push any member off-canvas; the bounds clamp the whole cluster.
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/CertificateDesigns");
+
+        Assert.Contains("if (maxX > canvasW) ddx -= (maxX - canvasW);", html);
+        Assert.Contains("if (maxY > canvasH) ddy -= (maxY - canvasH);", html);
+    }
+
     private async Task<int> CreateDesignAsync(string name)
     {
         var id = await _fixture.Factory.WithDbAsync(async db =>
