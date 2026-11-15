@@ -127,7 +127,7 @@
 │  Middleware: ForwardedHeaders → HSTS/CSP → StaticFiles → RateLimiter │
 │              → Authentication → MustChangePassword → Authorization  │
 │                                                                     │
-│  Controllers (37 MVC + 9 REST API)  ⇄  Services (71)  ⇄  EF Core    │
+│  Controllers (37 MVC + 9 REST API)  ⇄  Services (78)  ⇄  EF Core    │
 │                                                                     │
 │  BackgroundService: النسخ الاحتياطي المشفّر اليومي                    │
 │  Startup: EnsureCreated + *SchemaMigrationService (ترقيات idempotent)│
@@ -171,13 +171,13 @@ ECert/
 │   ├── Data/
 │   │   ├── ECertDbContext.cs   # سياق EF Core (48 مجموعة)
 │   │   └── DbSeeder.cs         # البيانات الأساسية (SuperAdmin، فئات، دورات، ...)
-│   ├── Services/               # 71 خدمة (مالية، أمان، شهادات، تصدير PDF، ترقيات، Excel، ...)
+│   ├── Services/               # 78 خدمة (مالية، أمان، شهادات، تصدير PDF، ترقيات، Excel، ...)
 │   │   └── Excel/              # قراءة/كتابة/تطبيع الأعمدة العربية
 │   ├── ViewModels/             # نماذج العرض
-│   ├── Views/                  # 111 ملف Razor (.cshtml)
+│   ├── Views/                  # 112 ملف Razor (.cshtml)
 │   ├── wwwroot/                # CSS/JS/الصور والمكتبات (uploads/ runtime)
 │   └── appsettings*.json       # إعدادات (القيم الحساسة عبر متغيرات البيئة)
-├── ECert.Tests/                # 18 ملف اختبار تكامل (209 حالة) عبر WebApplicationFactory
+├── ECert.Tests/                # 19 ملف اختبار تكامل (215 حالة) عبر WebApplicationFactory
 ├── docs/
 │   ├── DEPLOYMENT-AR.md        # ★ التقرير التقني لتنصيب المشروع على سيرفر خاص
 │   ├── DATABASE_RECOVERY.md    # تبديل/استعادة قاعدة البيانات
@@ -433,7 +433,7 @@ docker run -d --name ecert -p 10000:10000 \
 
 ## 13. الاختبارات
 
-المشروع يحتوي **209 حالة اختبار** في 18 ملفاً (تكامل كامل عبر `WebApplicationFactory` — يبني
+المشروع يحتوي **215 حالة اختبار** في 19 ملفاً (تكامل كامل عبر `WebApplicationFactory` — يبني
 التطبيق الحقيقي وقاعدة بيانات مؤقتة، بلا محاكاة/Mocks للطبقات الأساسية):
 
 - `RolePermissionFlowTests` — تدفّق الأدوار والصلاحيات.
@@ -444,6 +444,8 @@ docker run -d --name ecert -p 10000:10000 \
 - `CertificatePdfExportTests` — تصدير PDF (الملف المدمج، خلفية القالب، حدّ الدفعة، التحميل العام، التوقيع).
 - `LegacyCertificateImportTests` — استيراد الشهادات القديمة.
 - `SecurityHardeningTests` / `SafeUrlTests` — التصلّب الأمني وXSS/CSRF.
+- `NotificationTests` — قناة الإشعارات الموحّدة (النجاح/الفشل) وحوارات التأكيد.
+- `PublicRegistrationFormTests` — نموذج التسجيل العام والتحقق من الحقول.
 - `SchemaUpgradeOrderTests` — ترتيب ترقيات المخطط (حماية من كسر قواعد البيانات القائمة).
 - `AdminPermissionsCatalogTests` / `QaRegressionTests` / `SocialCardServiceTests` / `LinkPreviewTests`.
 
