@@ -72,6 +72,27 @@ public class RolePermissionFlowTests
     }
 
     [Fact]
+    public async Task Roles_list_summarises_each_role_by_level_and_sections()
+    {
+        // The list used to print every permission as a badge; it now summarises by level and shows
+        // the sections a role opens.
+        var granted = new[]
+        {
+            AdminPermissions.ViewInvoices, AdminPermissions.ManagePayments, AdminPermissions.ApproveExpenses
+        };
+        await CreateUserWithRoleAsync(granted);
+
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/Roles");
+
+        Assert.Contains("rp-level--view", html);
+        Assert.Contains("rp-level--manage", html);
+        Assert.Contains("rp-level--approve", html);
+        Assert.Contains("rp-section-chip", html);
+        Assert.Contains("الأقسام المتاحة", html);
+    }
+
+    [Fact]
     public async Task A_role_granting_three_permissions_opens_exactly_three_sections()
     {
         // Regression: this used to show two menus because manage-finance mapped to no section.

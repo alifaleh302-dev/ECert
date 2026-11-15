@@ -5,7 +5,8 @@
    the RTL layout and the reduced-motion preference automatically.
    ========================================================================== */
 
-.rp {
+.rp,
+:root {
     /* One accent per permission level, reused by badges, bars and counters. */
     --rp-view: var(--a-info);
     --rp-view-soft: var(--a-info-soft);
