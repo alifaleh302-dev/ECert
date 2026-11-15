@@ -130,6 +130,7 @@
         <div class="tb-group">
             <button type="button" class="ped-tbtn" id="cmdkBtn" title="لوحة الأوامر (Ctrl+K)"><i class="bi bi-command"></i></button>
             <button type="button" class="ped-tbtn" id="shortcutsBtn" title="الاختصارات (؟)"><i class="bi bi-question-lg"></i></button>
+            <button type="button" class="ped-tbtn" id="fullscreenBtn" title="ملء الشاشة (F)"><i class="bi bi-arrows-fullscreen"></i></button>
         </div>
 
         <div class="tb-group">
@@ -158,6 +159,7 @@
                     <button type="button" class="ped-add-btn" id="addDividerBtn"><i class="bi bi-dash-lg"></i> فاصل</button>
                     <button type="button" class="ped-add-btn" id="addQrBtn"><i class="bi bi-qr-code"></i> رمز QR</button>
                     <button type="button" class="ped-add-btn" id="addBarcodeBtn"><i class="bi bi-upc-scan"></i> باركود</button>
+                    <button type="button" class="ped-add-btn" id="addImageBtn"><i class="bi bi-image"></i> صورة / شعار</button>
                     <button type="button" class="ped-add-btn" id="addPartnerLogoBtn"><i class="bi bi-building"></i> شعار الشريك</button>
                     <button type="button" class="ped-add-btn" id="addPartnerSignatureBtn"><i class="bi bi-vector-pen"></i> توقيع الشريك</button>
                     <button type="button" class="ped-add-btn" id="addSignatureBtn"><i class="bi bi-person-check"></i> توقيع المدرب</button>
@@ -296,6 +298,14 @@
                     <select class="ped-select" id="selectedPartnerSlot"></select>
                     <div class="ped-help mt-1">يربط هذا العنصر بجهة داعمة محددة حسب ترتيبها في صفحة الدورة. أضف عنصراً لكل جهة لعرض عدة جهات.</div>
                 </div>
+                <div class="ped-prop d-none" id="imageWrap">
+                    <label>الصورة المرفوعة</label>
+                    <div class="ped-seg" style="gap:6px;">
+                        <button type="button" class="ped-btn-ghost" id="replaceImageBtn" style="flex:1;justify-content:center;"><i class="bi bi-arrow-repeat"></i><span class="txt">استبدال</span></button>
+                        <button type="button" class="ped-btn-ghost" id="clearImageBtn" style="flex:1;justify-content:center;"><i class="bi bi-x-circle"></i><span class="txt">تفريغ</span></button>
+                    </div>
+                    <div class="ped-help mt-1">استبدل الصورة بملف آخر أو أفرغها لتبقى إطاراً فارغاً. الصيغ: PNG أو JPG أو WEBP أو GIF وبحد أقصى 5 ميغابايت.</div>
+                </div>
                 <div class="ped-prop d-none" id="barcodeWrap">
                     <label for="selectedBarcodeSource">محتوى الباركود</label>
                     <select class="ped-select" id="selectedBarcodeSource">
@@ -411,6 +421,9 @@
         <input type="hidden" name="Publish" id="publishInput" value="false" />
         <input type="hidden" name="ElementsJson" id="elementsJson" />
     </form>
+
+    <!-- Static-image upload: the file is posted first, then its URL is placed on a new image element. -->
+    <input type="file" id="imageUploadInput" accept="image/png,image/jpeg,image/webp,image/gif" class="d-none" />
 </div>
 
 @if (TempData["Success"] is string success) { <div class="alert alert-success mt-3 mb-0 border-0 shadow-sm">@success</div> }
@@ -543,6 +556,14 @@
         return Number.isFinite(n) && n >= 0 ? n : 0;
     }
     function scale() { const r = canvasEl.getBoundingClientRect(); return r.width / canvasW; }
+    // Reading the canvas rect forces a layout, so drag/resize loops must not call scale() per
+    // pointermove. The value only changes on zoom or resize, so cache it and invalidate there.
+    let scaleCache = null;
+    function cachedScale() {
+        if (scaleCache === null) scaleCache = scale();
+        return scaleCache;
+    }
+    function invalidateScale() { scaleCache = null; }
     function contentFor(el) {
         if (el.elementType === 'field') return sampleValues[el.fieldKey] || 'بيان ديناميكي';
         if (el.elementType === 'divider') return '';
@@ -551,6 +572,7 @@
         if (el.elementType === 'partner_logo') return '';
         if (el.elementType === 'partner_signature') return '';
         if (el.elementType === 'instructor_signature') return '';
+        if (el.elementType === 'image') return '';
         if (el.elementType === 'barcode') return sampleValues[el.fieldKey] || 'EC-2026-0042';
         return el.content || 'نص جديد';
     }
@@ -558,6 +580,7 @@
         if (el.elementType === 'field') return FIELD_LABELS[el.fieldKey] || el.fieldKey || 'بيان';
         if (el.elementType === 'divider') return 'فاصل بصري';
         if (el.elementType === 'qr') return 'رمز QR للتحقق';
+        if (el.elementType === 'image') return 'صورة ثابتة';
         if (el.elementType === 'partner_logo') return 'شعار الجهة الداعمة #' + (slotOf(el) + 1);
         if (el.elementType === 'partner_signature') return 'توقيع الجهة الداعمة #' + (slotOf(el) + 1);
         if (el.elementType === 'instructor_signature') return 'توقيع المدرب';
@@ -585,6 +608,10 @@
             s.justifyContent = 'center';
             s.fontFamily = "'Courier New', monospace";
             s.letterSpacing = '2px';
+        } else if (el.elementType === 'image') {
+            s.justifyContent = 'center';
+            s.fontSize = '0px';
+            s.padding = '0';
         } else if (el.elementType === 'partner_logo' || el.elementType === 'partner_signature' || el.elementType === 'instructor_signature') {
             s.justifyContent = 'center';
             s.fontSize = Math.max(20, Math.min(el.width, el.height) * 0.5) + 'px';
@@ -624,7 +651,7 @@
         return out;
     }
     function renderGuides(gx, gy) {
-        const s = scale();
+        const s = cachedScale();
         guideX.style.display = gx !== null ? 'block' : 'none';
         guideY.style.display = gy !== null ? 'block' : 'none';
         if (gx !== null) guideX.style.left = (gx * s) + 'px';
@@ -671,7 +698,7 @@
     function renderMeasures(x, y, w, h) {
         clearMeasures();
         if (!snapOn) return;
-        const s = scale();
+        const s = cachedScale();
         const nb = nearestEdges(x, y, w, h);
         const addBadge = (bx, by, text) => {
             const d = document.createElement('div');
@@ -754,6 +781,7 @@
 
     // ---------- Render ----------
     function render() {
+        invalidateScale();
         canvasEl.innerHTML = '';
         canvasEl.style.width = canvasW + 'px';
         canvasEl.style.height = canvasH + 'px';
@@ -795,10 +823,19 @@
         const ordered = elements.map((el, i) => ({ el, i })).filter(o => o.el.isVisible);
         for (const o of ordered) {
             const node = document.createElement('div');
-            node.className = 'ped-el' + (o.el.elementType === 'divider' ? ' el-divider' : '') + (o.el.elementType === 'qr' ? ' el-qr' : '') + (o.el.elementType === 'barcode' ? ' el-barcode' : '') + (o.el.elementType === 'partner_logo' ? ' el-partner-logo' : '') + (o.el.elementType === 'partner_signature' ? ' el-partner-signature' : '') + (o.el.elementType === 'instructor_signature' ? ' el-signature' : '');
+            node.className = 'ped-el' + elementClassSuffix(o.el);
             node.dataset.index = o.i;
             Object.assign(node.style, styleFor(o.el));
             node.textContent = contentFor(o.el);
+            if (o.el.elementType === 'image') {
+                node.classList.toggle('is-empty', !o.el.content);
+                if (o.el.content) {
+                    const img = document.createElement('img');
+                    img.src = o.el.content;
+                    img.alt = '';
+                    node.appendChild(img);
+                }
+            }
             node.addEventListener('pointerdown', e => startDrag(e, o.i));
             node.addEventListener('dblclick', e => { e.preventDefault(); select(o.i); beginInlineEdit(o.i); });
             canvasEl.appendChild(node);
@@ -870,9 +907,17 @@
         pushHistory();
         const startX = e.clientX, startY = e.clientY;
         const origins = group.map(i => ({ i, x: elements[i].x, y: elements[i].y }));
-        const s = () => scale();
+        const s = () => cachedScale();
         let snapNow = snapOn && !e.ctrlKey && !e.metaKey;
-        const move = ev => {
+        // The pointer fires far more often than the screen refreshes. Apply every move to the model
+        // (so nothing is lost when the drag ends) but repaint at most once per frame; a dropped
+        // pointermove can therefore never leave the element behind.
+        let rafPending = false;
+        let lastEv = null;
+        const paint = () => {
+            rafPending = false;
+            const ev = lastEv;
+            if (!ev) return;
             const snapping = snapNow && !ev.ctrlKey && !ev.metaKey;
             const dx = (ev.clientX - startX) / s();
             const dy = (ev.clientY - startY) / s();
@@ -884,6 +929,8 @@
                     : { x: nx, y: ny, gx: null, gy: null };
                 el.x = clamp(Math.round(r.x), 0, canvasW - 10);
                 el.y = clamp(Math.round(r.y), 0, canvasH - 10);
+                // Move the element node itself; updating only the overlay left the artwork behind.
+                moveNode(el, group[0]);
                 renderGuides(snapping ? r.gx : null, snapping ? r.gy : null);
                 renderMeasures(el.x, el.y, el.width, el.height);
             } else {
@@ -901,23 +948,62 @@
                 if (maxX > canvasW) ddx -= (maxX - canvasW);
                 if (maxY > canvasH) ddy -= (maxY - canvasH);
                 origins.forEach(o => { elements[o.i].x = o.x + ddx; elements[o.i].y = o.y + ddy; });
-                renderSelectionNodes(group);
+                group.forEach(i => moveNode(elements[i], i));
                 clearGuides();
             }
             renderSelectionOverlays();
             showCursorTag(ev, elements[group[0]].x, elements[group[0]].y);
         };
+        const move = ev => {
+            lastEv = ev;
+            if (rafPending) return;
+            rafPending = true;
+            requestAnimationFrame(paint);
+        };
         const up = () => {
+            // Flush any move that arrived after the last frame so the final position is applied.
+            if (rafPending) { cancelAnimationFrame(rafPending); paint(); }
             window.removeEventListener('pointermove', move);
             window.removeEventListener('pointerup', up);
+            window.removeEventListener('pointercancel', up);
+            document.getElementById('pedApp').classList.remove('is-dragging');
             clearGuides();
             clearMeasures();
             hideCursorTag();
             refreshLayers();
+            refreshPropsPanel();
             updateToolbarState();
         };
+        document.getElementById('pedApp').classList.add('is-dragging');
         window.addEventListener('pointermove', move);
         window.addEventListener('pointerup', up);
+        // A cancelled pointer (touch interrupted, context menu, browser gesture) must end the drag
+        // cleanly instead of leaving the element stuck to the cursor.
+        window.addEventListener('pointercancel', up);
+    }
+
+    // Maps an element type to its CSS class suffix, shared by render() and updateNode().
+    function elementClassSuffix(el) {
+        switch (el.elementType) {
+            case 'divider': return ' el-divider';
+            case 'qr': return ' el-qr';
+            case 'barcode': return ' el-barcode';
+            case 'partner_logo': return ' el-partner-logo';
+            case 'partner_signature': return ' el-partner-signature';
+            case 'instructor_signature': return ' el-signature';
+            case 'image': return ' el-image';
+            default: return '';
+        }
+    }
+
+    // Repositions one already-rendered element node without rebuilding its contents.
+    function moveNode(el, index) {
+        const node = canvasEl.querySelector('.ped-el[data-index="' + index + '"]');
+        if (!node) return;
+        node.style.left = el.x + 'px';
+        node.style.top = el.y + 'px';
+        node.style.width = el.width + 'px';
+        node.style.height = (el.elementType === 'divider' ? 0 : el.height) + 'px';
     }
 
     function renderSelectionNodes(group) {
@@ -946,7 +1032,7 @@
         const orig = selection.filter(i => elements[i] && !elements[i].isLocked)
             .map(i => ({ i, x: elements[i].x, y: elements[i].y, w: elements[i].width, h: elements[i].height }));
         if (!orig.length) return;
-        const s = () => scale();
+        const s = () => cachedScale();
         const MIN = 24;
         const move = ev => {
             const dx = (ev.clientX - startX) / s();
@@ -988,7 +1074,7 @@
         const el = elements[selected];
         const startX = e.clientX, startY = e.clientY;
         const orig = { x: el.x, y: el.y, w: el.width, h: el.height };
-        const s = () => scale();
+        const s = () => cachedScale();
         const MIN = 18;
         const move = ev => {
             const dx = (ev.clientX - startX) / s();
@@ -1043,7 +1129,7 @@
         pushHistory();
         const el = elements[selected];
         const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
-        const s = () => scale();
+        const s = () => cachedScale();
         const fromPoint = ev => {
             const r = canvasEl.getBoundingClientRect();
             const px = (ev.clientX - r.left) / s() + canvasEl.getBoundingClientRect().left / s() * 0;
@@ -1070,8 +1156,18 @@
     function updateNode(el, index) {
         const nodes = canvasEl.querySelectorAll('.ped-el[data-index="' + index + '"]');
         nodes.forEach(n => {
+            n.className = 'ped-el' + elementClassSuffix(el);
             Object.assign(n.style, styleFor(el));
             n.textContent = contentFor(el);
+            if (el.elementType === 'image') {
+                n.classList.toggle('is-empty', !el.content);
+                if (el.content) {
+                    const img = document.createElement('img');
+                    img.src = el.content;
+                    img.alt = '';
+                    n.appendChild(img);
+                }
+            }
         });
         canvasEl.querySelectorAll('.ped-overlay').forEach(o => o.remove());
         if (selection.length > 1) renderSelectionOverlays();
@@ -1240,14 +1336,15 @@
     // ---------- Add / Remove / Order ----------
     // `dropPoint` (canvas coordinates) is supplied when the user drags an item from the library
     // onto the canvas, so the element lands under the pointer instead of at a default slot.
-    function addElement(type, fieldKey, dropPoint) {
+    function addElement(type, fieldKey, dropPoint, extra) {
         pushHistory();
         const count = elements.length;
         const isLogo = type === 'partner_logo';
         const isPartnerSig = type === 'partner_signature';
         const isSig = type === 'instructor_signature';
-        const w = type === 'divider' ? 420 : (type === 'qr' ? 160 : (type === 'barcode' ? 320 : (isLogo ? 170 : (isPartnerSig ? 240 : (isSig ? 240 : 560)))));
-        const h = type === 'divider' ? 4 : (type === 'qr' ? 160 : (type === 'barcode' ? 80 : (isLogo ? 170 : (isPartnerSig ? 90 : (isSig ? 90 : 58)))));
+        const isImage = type === 'image';
+        const w = type === 'divider' ? 420 : (type === 'qr' ? 160 : (type === 'barcode' ? 320 : (isLogo ? 170 : (isImage ? (extra?.width || 220) : (isPartnerSig ? 240 : (isSig ? 240 : 560))))));
+        const h = type === 'divider' ? 4 : (type === 'qr' ? 160 : (type === 'barcode' ? 80 : (isLogo ? 170 : (isImage ? (extra?.height || 140) : (isPartnerSig ? 90 : (isSig ? 90 : 58))))));
         // Partner slots are numbered per element type: logos run 0,1,… and signatures run 0,1,…
         // independently, because both index into the same course partner list. Sharing one counter
         // (the old behaviour) pushed signatures past the partner count, so they rendered nothing.
@@ -1258,7 +1355,7 @@
             fieldKey: type === 'field' ? (fieldKey || 'trainee_name')
                 : (type === 'barcode' ? 'certificate_number'
                     : (isPartnerSlot(type) ? String(nextSlot) : '')),
-            content: type === 'text' ? 'نص جديد' : '',
+            content: type === 'text' ? 'نص جديد' : (isImage ? (extra?.url || '') : ''),
             x: dropPoint ? clamp(Math.round(dropPoint.x - w / 2), 0, canvasW - 20) : clamp(Math.round((canvasW - w) / 2), 0, canvasW - 20),
             y: dropPoint ? clamp(Math.round(dropPoint.y - h / 2), 0, canvasH - 20) : clamp(100 + (count % 6) * 82, 0, canvasH - 20),
             width: w, height: h,
@@ -1552,7 +1649,7 @@
             row.className = 'ped-layer' + (selection.indexOf(i) >= 0 ? ' active' : '') + (el.isLocked ? ' locked' : '') + (el.isVisible === false ? ' hidden' : '');
             row.draggable = true;
             row.dataset.index = String(i);
-            const icon = el.elementType === 'field' ? '<i class="bi bi-link-45deg"></i>' : el.elementType === 'divider' ? '<i class="bi bi-dash-lg"></i>' : el.elementType === 'qr' ? '<i class="bi bi-qr-code"></i>' : el.elementType === 'barcode' ? '<i class="bi bi-upc-scan"></i>' : el.elementType === 'partner_logo' ? '<i class="bi bi-building"></i>' : el.elementType === 'partner_signature' ? '<i class="bi bi-vector-pen"></i>' : el.elementType === 'instructor_signature' ? '<i class="bi bi-person-check"></i>' : '<i class="bi bi-type"></i>';
+            const icon = el.elementType === 'field' ? '<i class="bi bi-link-45deg"></i>' : el.elementType === 'divider' ? '<i class="bi bi-dash-lg"></i>' : el.elementType === 'qr' ? '<i class="bi bi-qr-code"></i>' : el.elementType === 'barcode' ? '<i class="bi bi-upc-scan"></i>' : el.elementType === 'partner_logo' ? '<i class="bi bi-building"></i>' : el.elementType === 'partner_signature' ? '<i class="bi bi-vector-pen"></i>' : el.elementType === 'instructor_signature' ? '<i class="bi bi-person-check"></i>' : el.elementType === 'image' ? '<i class="bi bi-image"></i>' : '<i class="bi bi-type"></i>';
             row.innerHTML =
                 '<i class="bi bi-grip-vertical ly-grip" aria-hidden="true"></i>' +
                 '<div class="ly-icon">' + icon + '</div>' +
@@ -1715,13 +1812,14 @@
             : '<i class="bi bi-sliders2"></i> إعدادات القالب';
         syncCanvasInputs();
         if (!el) return;
-        $('elTypeBadge').textContent = el.elementType === 'field' ? 'بيان ديناميكي' : el.elementType === 'divider' ? 'فاصل بصري' : el.elementType === 'qr' ? 'رمز QR' : el.elementType === 'barcode' ? 'باركود' : el.elementType === 'partner_logo' ? 'شعار الشريك' : el.elementType === 'partner_signature' ? 'توقيع الشريك' : el.elementType === 'instructor_signature' ? 'توقيع المدرب' : 'نص ثابت';
+        $('elTypeBadge').textContent = el.elementType === 'field' ? 'بيان ديناميكي' : el.elementType === 'divider' ? 'فاصل بصري' : el.elementType === 'qr' ? 'رمز QR' : el.elementType === 'barcode' ? 'باركود' : el.elementType === 'partner_logo' ? 'شعار الشريك' : el.elementType === 'partner_signature' ? 'توقيع الشريك' : el.elementType === 'instructor_signature' ? 'توقيع المدرب' : el.elementType === 'image' ? 'صورة ثابتة' : 'نص ثابت';
         $('elIndexLabel').textContent = 'العنصر #' + (selected + 1) + ' من ' + elements.length;
         $('contentWrap').classList.toggle('d-none', el.elementType !== 'text');
         $('fieldWrap').classList.toggle('d-none', el.elementType !== 'field');
         $('barcodeWrap').classList.toggle('d-none', el.elementType !== 'barcode');
         $('partnerSlotWrap').classList.toggle('d-none', !isPartnerSlot(el.elementType));
         if (isPartnerSlot(el.elementType)) buildPartnerSlotOptions(el);
+        $('imageWrap').classList.toggle('d-none', el.elementType !== 'image');
         if (el.elementType === 'text') $('selectedContent').value = el.content || '';
         if (el.elementType === 'field') $('selectedFieldKey').value = el.fieldKey || 'trainee_name';
         if (el.elementType === 'barcode') $('selectedBarcodeSource').value = el.fieldKey || 'certificate_number';
@@ -1885,6 +1983,67 @@
         pushHistory();
     });
 
+    // ---------- Static image element ----------
+    // Upload the bitmap first (so it is validated and stored server-side), then place the returned
+    // URL on an `image` element. Nothing here depends on course data.
+    const imageUploadInput = $('imageUploadInput');
+    let imageUploadTarget = null; // null => add a new element, otherwise replace this element's bitmap
+    function pickStaticImage(target) { imageUploadTarget = target; imageUploadInput.value = ''; imageUploadInput.click(); }
+    $('addImageBtn').addEventListener('click', () => pickStaticImage(null));
+    $('replaceImageBtn').addEventListener('click', () => { if (selected >= 0 && elements[selected].elementType === 'image') pickStaticImage(selected); });
+    $('clearImageBtn').addEventListener('click', () => {
+        if (selected < 0 || elements[selected].elementType !== 'image') return;
+        pushHistory();
+        elements[selected].content = '';
+        updateNode(elements[selected], selected);
+        refreshLayers();
+    });
+    imageUploadInput.addEventListener('change', async () => {
+        const file = imageUploadInput.files && imageUploadInput.files[0];
+        if (!file) return;
+        const target = imageUploadTarget;
+        imageUploadTarget = null;
+        const token = document.querySelector('#templateForm input[name="__RequestVerificationToken"]')?.value || '';
+        const body = new FormData();
+        body.append('file', file);
+        let url;
+        try {
+            const res = await fetch('@Url.Action("UploadImage", "CertificateDesigns")', {
+                method: 'POST',
+                headers: { 'RequestVerificationToken': token },
+                body
+            });
+            if (!res.ok) {
+                const info = await res.json().catch(() => null);
+                throw new Error(info && info.error ? info.error : 'تعذر رفع الصورة.');
+            }
+            url = (await res.json()).url;
+        } catch (err) {
+            window.alert(err && err.message ? err.message : 'تعذر رفع الصورة.');
+            return;
+        }
+        if (target !== null && elements[target] && elements[target].elementType === 'image') {
+            pushHistory();
+            elements[target].content = url;
+            updateNode(elements[target], target);
+            refreshLayers();
+            refreshPropsPanel();
+            return;
+        }
+        // Keep the bitmap's aspect ratio so the placed image is not distorted by default.
+        const dims = await new Promise(resolve => {
+            const probe = new Image();
+            probe.onload = () => resolve({ width: probe.naturalWidth, height: probe.naturalHeight });
+            probe.onerror = () => resolve({ width: 220, height: 140 });
+            probe.src = url;
+        });
+        const maxSide = 260;
+        const ratio = dims.height > 0 ? dims.width / dims.height : 1.6;
+        const w = ratio >= 1 ? maxSide : Math.round(maxSide * ratio);
+        const h = ratio >= 1 ? Math.round(maxSide / ratio) : maxSide;
+        addElement('image', '', null, { url, width: w, height: h });
+    });
+
     // ---------- Rulers ----------
     // Ticks are drawn in canvas units but positioned in screen space so they stay put while the
     // stage is scrolled; the selection band mirrors the element's span, like Figma's rulers.
@@ -2041,6 +2200,8 @@
         { id: 'safe-area', label: 'إظهار/إخفاء منطقة الأمان', icon: 'bi-border-inner', run: () => $('safeAreaToggle').click() },
         { id: 'hide', label: 'إظهار/إخفاء العنصر', icon: 'bi-eye-slash', run: () => { if (selected >= 0) toggleVisibility(selected); } },
         { id: 'zoom-fit', label: 'ملاءمة العرض', kbd: 'Shift+1', icon: 'bi-arrows-fullscreen', run: zoomFit },
+        { id: 'fullscreen', label: 'ملء الشاشة', kbd: 'F', icon: 'bi-arrows-fullscreen', run: () => setFullscreen(!document.getElementById('pedApp').classList.contains('ped-fullscreen')) },
+        { id: 'add-image', label: 'إضافة صورة / شعار', icon: 'bi-image', run: () => pickStaticImage(null) },
         { id: 'zoom-sel', label: 'تكبير على التحديد', kbd: 'Shift+2', icon: 'bi-bounding-box-circles', run: zoomToSelection },
         { id: 'zoom-100', label: 'إعادة التكبير إلى 100%', kbd: 'Ctrl+0', icon: 'bi-zoom-in', run: resetZoom },
         { id: 'grid', label: 'إظهار/إخفاء الشبكة', icon: 'bi-grid-3x3-gap', run: () => { gridOn = !gridOn; $('pedApp').classList.toggle('grid-on', gridOn); $('gridToggle').classList.toggle('on', gridOn); $('optGrid').checked = gridOn; } },
@@ -2099,6 +2260,7 @@
             ['مسافة + سحب', 'تحريك اللوحة'],
             ['Shift+1 / Shift+2', 'ملاءمة / تكبير على التحديد'],
             ['Ctrl+0', 'تكبير 100%'],
+            ['F / Esc', 'ملء الشاشة / إنهاء ملء الشاشة'],
             ['Ctrl+L', 'قفل/فتح العنصر'],
             ['أسهم', 'تحريك دقيق (Shift = 10px)']
         ]]
@@ -2179,6 +2341,30 @@
     $('zoomSelection').addEventListener('click', zoomToSelection);
     $('zoomLabel').addEventListener('click', resetZoom);
     $('previewToggle').addEventListener('click', () => setPreview(!previewMode));
+
+    // The cached canvas scale is only valid for the current layout box; a viewport change or a
+    // fullscreen toggle invalidates it.
+    window.addEventListener('resize', () => { invalidateScale(); if (rulersOn) renderRulers(); });
+
+    // ---------- Fullscreen workspace ----------
+    // Promotes the editor to a fixed overlay so the canvas fills the whole viewport. The preference
+    // is remembered per browser, and Escape leaves it (unless a dialog is open).
+    const FS_KEY = 'ped.fullscreen';
+    function setFullscreen(on) {
+        document.getElementById('pedApp').classList.toggle('ped-fullscreen', on);
+        document.body.classList.toggle('ped-fullscreen-open', on);
+        const btn = $('fullscreenBtn');
+        btn.classList.toggle('on', on);
+        btn.innerHTML = on
+            ? '<i class="bi bi-fullscreen-exit"></i>'
+            : '<i class="bi bi-arrows-fullscreen"></i>';
+        btn.title = on ? 'إنهاء ملء الشاشة (Esc)' : 'ملء الشاشة (F)';
+        try { localStorage.setItem(FS_KEY, on ? '1' : '0'); } catch (_) { /* private mode */ }
+        invalidateScale();
+        render();
+    }
+    $('fullscreenBtn').addEventListener('click', () => setFullscreen(!document.getElementById('pedApp').classList.contains('ped-fullscreen')));
+    if (localStorage.getItem(FS_KEY) === '1') setFullscreen(true);
 
     // Ctrl/Cmd + wheel zooms around the pointer; a bare wheel pans (native scroll).
     areaEl.addEventListener('wheel', e => {
@@ -2380,6 +2566,12 @@
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') { e.preventDefault(); $('italicBtn').click(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') { e.preventDefault(); $('underlineBtn').click(); return; }
         if (e.key === 'F2') { e.preventDefault(); if (selected >= 0) beginInlineEdit(selected); return; }
+        if (e.key === 'f' || e.key === 'F') { e.preventDefault(); setFullscreen(!document.getElementById('pedApp').classList.contains('ped-fullscreen')); return; }
+        if (e.key === 'Escape') {
+            if (document.getElementById('pedApp').classList.contains('ped-fullscreen')) {
+                e.preventDefault(); setFullscreen(false); return;
+            }
+        }
         if (e.key === '?' || (e.shiftKey && e.key === '/')) { e.preventDefault(); showShortcuts(); return; }
         // Bracket keys send the element to the back/front, matching the layers toolbar.
         if (e.key === '[') { e.preventDefault(); toExtreme(false); return; }

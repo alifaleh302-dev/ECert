@@ -160,6 +160,7 @@ public sealed class CertificatePdfService
                 case "partner_logo":
                 case "partner_signature":
                 case "instructor_signature":
+                case "image":
                     DrawImageContained(canvas, element.ImageSrc, new SKRect(left, top, left + width, top + height));
                     break;
                 case "divider":
