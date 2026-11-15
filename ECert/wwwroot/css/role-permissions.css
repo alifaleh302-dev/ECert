@@ -1,27 +1,31 @@
 /* ==========================================================================
    ECert — Role permission matrix
    A strict, enterprise-grade editor used by Views/Roles/_RoleForm.
-   The matrix is a self-contained flat dark panel (rows = features, columns =
-   access levels) that reads like an IAM policy table. Corner radius is capped
-   at 4px and colour is reserved for state, never decoration.
+   The matrix is a flat policy table (rows = features, columns = access levels)
+   that reads like an IAM policy table. Corner radius is capped at 4px and
+   colour is reserved for state, never decoration.
+
+   Every colour is derived from the admin design-system tokens (--a-*), so the
+   editor follows the active light/dark theme automatically — there is no
+   hard-coded palette here.
    ========================================================================== */
 
-.rp,
-:root {
-    --rp-bg: #0e1014;
-    --rp-panel: #14171e;
-    --rp-panel-2: #191d26;
-    --rp-header: #101319;
-    --rp-border: #2d2d3b;
-    --rp-border-strong: #3b3b4d;
-    --rp-row-hover: #1a1f2a;
-    --rp-text: #d8dee9;
-    --rp-text-2: #97a1b0;
-    --rp-text-3: #6a7383;
-    --rp-accent: #3b82f6;
-    --rp-accent-strong: #60a5fa;
-    --rp-accent-soft: rgba(59, 130, 246, 0.14);
+.rp {
+    --rp-surface: var(--a-surface);
+    --rp-surface-2: var(--a-surface-2);
+    --rp-surface-3: var(--a-surface-3);
+    --rp-border: var(--a-border);
+    --rp-border-strong: var(--a-border-strong);
+    --rp-text: var(--a-text);
+    --rp-text-2: var(--a-text-2);
+    --rp-text-3: var(--a-text-3);
+    --rp-accent: var(--a-brand);
+    --rp-accent-strong: var(--a-brand-strong);
+    --rp-accent-soft: var(--a-brand-soft);
+    --rp-accent-ring: var(--a-brand-ring);
     --rp-r: 4px;
+    --rp-head-h: 42px;
+    --rp-group-h: 36px;
 }
 
 /* --------------------------------------------------------------------------
@@ -33,8 +37,10 @@
     align-items: start;
 }
 
+/* Two columns once there is room; the table keeps the lion's share of the
+   width on large monitors while the summary rides along on the side. */
 @media (min-width: 1100px) {
-    .rp__layout { grid-template-columns: minmax(0, 1fr) 300px; }
+    .rp__layout { grid-template-columns: minmax(0, 1fr) minmax(260px, 300px); }
 }
 
 .rp__main { min-width: 0; display: grid; gap: 12px; }
@@ -54,7 +60,7 @@
     align-items: center;
     gap: 12px;
     padding: 10px 12px;
-    background: var(--rp-panel);
+    background: var(--rp-surface);
     border: 1px solid var(--rp-border);
     border-radius: var(--rp-r);
 }
@@ -81,7 +87,7 @@
     padding-inline-start: 32px;
     font-size: 0.85rem;
     color: var(--rp-text);
-    background: var(--rp-bg);
+    background: var(--rp-surface);
     border: 1px solid var(--rp-border);
     border-radius: var(--rp-r);
 }
@@ -91,7 +97,7 @@
 .rp-search input:focus {
     outline: none;
     border-color: var(--rp-accent);
-    box-shadow: 0 0 0 3px var(--rp-accent-soft);
+    box-shadow: 0 0 0 3px var(--rp-accent-ring);
 }
 
 .rp-toolbar__actions {
@@ -105,7 +111,7 @@
     font-size: 0.8rem;
     font-weight: 600;
     color: var(--rp-text);
-    background: var(--rp-panel-2);
+    background: var(--rp-surface-2);
     border: 1px solid var(--rp-border-strong);
     border-radius: var(--rp-r);
     cursor: pointer;
@@ -113,7 +119,8 @@
 }
 
 .rp-btn:hover {
-    color: #fff;
+    color: var(--rp-accent-strong);
+    background: var(--rp-accent-soft);
     border-color: var(--rp-accent);
 }
 
@@ -126,44 +133,60 @@
 
 /* --------------------------------------------------------------------------
    3. Matrix table
+   The wrapper is the scroll container for both axes, which is what lets the
+   header row stay pinned while the feature list scrolls underneath it. A
+   border-collapse:separate model keeps the sticky borders crisp.
    -------------------------------------------------------------------------- */
 .rp-matrix {
-    overflow-x: auto;
-    background: var(--rp-panel);
+    overflow: auto;
+    max-height: min(70vh, 720px);
+    background: var(--rp-surface);
     border: 1px solid var(--rp-border);
     border-radius: var(--rp-r);
+    overscroll-behavior: contain;
 }
 
 .rp-table {
     width: 100%;
-    border-collapse: collapse;
+    min-width: 640px;               /* below this the wrapper scrolls sideways */
+    border-collapse: separate;
+    border-spacing: 0;
     font-size: 0.85rem;
 }
 
 .rp-col--feature { width: auto; }
-.rp-col--level { width: 112px; }
+.rp-col--level { width: clamp(96px, 12vw, 150px); }
 
 .rp-table thead th {
-    padding: 10px 12px;
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 3;
+    height: var(--rp-head-h);
+    padding: 0 12px;
     font-size: 0.78rem;
     font-weight: 600;
     color: var(--rp-text-2);
     text-align: center;
-    background: var(--rp-header);
-    border-bottom: 1px solid var(--rp-border);
+    vertical-align: middle;
     white-space: nowrap;
+    background: var(--rp-surface-2);
+    border-bottom: 1px solid var(--rp-border);
 }
 
-.rp-table thead th.rp-th--feature {
-    text-align: start;
-}
+.rp-table thead th.rp-th--feature { text-align: start; }
 
-/* Group header — a full-width band that separates feature groups. */
+/* Group header — a full-width band that separates feature groups. It sticks
+   just under the column header so the group name stays readable while its
+   rows scroll. */
 .rp-group-row th {
-    padding: 8px 12px;
+    position: sticky;
+    inset-block-start: var(--rp-head-h);
+    z-index: 2;
+    height: var(--rp-group-h);
+    padding: 0 12px;
     text-align: start;
-    background: var(--rp-panel-2);
-    border-top: 1px solid var(--rp-border);
+    vertical-align: middle;
+    background: var(--rp-surface-3);
     border-bottom: 1px solid var(--rp-border);
 }
 
@@ -181,10 +204,9 @@
     color: var(--rp-text);
 }
 
-.rp-row { border-bottom: 1px solid var(--rp-border); }
-.rp-row:last-child { border-bottom: none; }
-.rp-row:hover { background: var(--rp-row-hover); }
 .rp-row[hidden] { display: none; }
+.rp-row:hover .rp-cell--feature,
+.rp-row:hover .rp-cell--level { background: var(--rp-surface-2); }
 
 .rp-cell--feature {
     padding: 9px 12px;
@@ -192,12 +214,20 @@
     font-weight: 500;
     color: var(--rp-text);
     text-align: start;
+    background: var(--rp-surface);
+    border-bottom: 1px solid var(--rp-border);
 }
 
 .rp-cell--level {
     padding: 9px 12px;
     text-align: center;
+    background: var(--rp-surface);
+    border-bottom: 1px solid var(--rp-border);
 }
+
+/* Drop the trailing border on the last row of each group for a cleaner edge. */
+.rp-row:last-child .rp-cell--feature,
+.rp-row:last-child .rp-cell--level { border-bottom: none; }
 
 .rp-cell {
     display: inline-flex;
@@ -225,7 +255,7 @@
     padding: 0;
     appearance: none;
     -webkit-appearance: none;
-    background: transparent;
+    background: var(--rp-surface);
     border: 1px solid var(--rp-border-strong);
     border-radius: 3px;
     cursor: pointer;
@@ -280,7 +310,7 @@
     padding: 32px 16px;
     text-align: center;
     color: var(--rp-text-3);
-    background: var(--rp-panel);
+    background: var(--rp-surface);
     border: 1px dashed var(--rp-border-strong);
     border-radius: var(--rp-r);
 }
@@ -295,7 +325,7 @@
     display: grid;
     gap: 14px;
     padding: 14px;
-    background: var(--rp-panel);
+    background: var(--rp-surface);
     border: 1px solid var(--rp-border);
     border-radius: var(--rp-r);
 }
