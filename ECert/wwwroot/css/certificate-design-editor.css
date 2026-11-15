@@ -34,6 +34,8 @@
     .ped-name-input { background: var(--ped-panel-2); border: 1px solid var(--ped-line); color: var(--ped-ink); border-radius: var(--ped-r); padding: .34rem .7rem; font-size: .85rem; width: 240px; }
     .ped-name-input:focus { outline: none; border-color: var(--ped-accent); box-shadow: 0 0 0 3px rgba(59, 110, 240, .16); }
     .ped-zoom-label { min-width: 44px; text-align: center; font-size: .75rem; color: var(--ped-muted); font-variant-numeric: tabular-nums; }
+    button.ped-zoom-label { background: transparent; border: 1px solid transparent; border-radius: var(--ped-r); padding: .3rem .35rem; cursor: pointer; }
+    button.ped-zoom-label:hover { background: #1d2942; border-color: var(--ped-line); color: var(--ped-ink); }
     .ped-btn-primary, .ped-btn-success, .ped-btn-ghost { border: 1px solid transparent; border-radius: var(--ped-r); padding: .42rem .85rem; font-weight: 600; font-size: .82rem; display: inline-flex; align-items: center; gap: .4rem; cursor: pointer; transition: .12s ease; }
     .ped-btn-primary { background: var(--ped-accent); color: #fff; }
     .ped-btn-primary:hover { background: #2f5fd8; }
@@ -78,6 +80,9 @@
     .ped-panel::-webkit-scrollbar-thumb:hover, .ped-designs-menu::-webkit-scrollbar-thumb:hover { background: var(--ped-accent); }
 
     .ped-canvas-area { flex: 1; overflow: auto; position: relative; background: #0b1220; background-image: radial-gradient(#1e2b45 1px, transparent 1px); background-size: 22px 22px; }
+    .ped-canvas-area.pan-ready { cursor: grab; }
+    .ped-canvas-area.panning { cursor: grabbing; }
+    .ped-canvas-area.panning * { cursor: grabbing !important; }
     .ped-canvas-area.ped-preview { background: #0e1524; }
     .ped-stage { position: relative; margin: 46px auto 70px; width: 1px; height: 1px; }
     .ped-canvas { position: absolute; top: 0; left: 0; transform-origin: top left; direction: rtl; overflow: hidden; background: #fffdf7; box-shadow: 0 24px 60px rgba(0, 0, 0, .55); border-radius: 2px; }
@@ -120,6 +125,13 @@
     .ped-guide { position: absolute; pointer-events: none; z-index: 9998; display: none; }
     .ped-guide.g-x { top: 0; bottom: 0; width: 1px; background: #e0575b; box-shadow: 0 0 0 1px rgba(0,0,0,.4); }
     .ped-guide.g-y { left: 0; right: 0; height: 1px; background: #e0575b; box-shadow: 0 0 0 1px rgba(0,0,0,.4); }
+
+    /* measurement guides (distance read-outs while dragging) */
+    .ped-measure { position: absolute; inset: 0; pointer-events: none; z-index: 9997; }
+    .ped-measure-line { position: absolute; background: #e0575b; }
+    .ped-measure-line.h { height: 1px; }
+    .ped-measure-line.v { width: 1px; }
+    .ped-measure-badge { position: absolute; transform: translate(-50%, -50%); background: #e0575b; color: #fff; font-size: .64rem; font-weight: 700; line-height: 1; padding: .16rem .34rem; border-radius: 2px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
     /* library */
     .ped-field-chip { display: flex; align-items: center; gap: .5rem; width: 100%; text-align: start; border: 1px solid var(--ped-line); background: var(--ped-panel-2); border-radius: var(--ped-r); padding: .42rem .6rem; font-size: .78rem; color: var(--ped-ink); cursor: pointer; margin-bottom: .35rem; transition: .12s ease; }
@@ -167,7 +179,7 @@
     .ped-app.preview-mode .ped-panel { display: none; }
     .ped-app.preview-mode .ped-canvas-area { background: #0b1220; background-image: none; }
     .ped-app.preview-mode .ped-el { cursor: default; }
-    .ped-app.preview-mode .ped-overlay, .ped-app.preview-mode .ped-guide, .ped-app.preview-mode .ped-grid { display: none; }
+    .ped-app.preview-mode .ped-overlay, .ped-app.preview-mode .ped-guide, .ped-app.preview-mode .ped-grid, .ped-app.preview-mode .ped-measure { display: none; }
 
     /* toolbar responsive */
     @media (max-width: 1199.98px) {

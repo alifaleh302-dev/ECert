@@ -105,10 +105,11 @@
         </div>
 
         <div class="tb-group">
-            <button type="button" class="ped-tbtn" id="zoomOut" title="تصغير"><i class="bi bi-dash-lg"></i></button>
-            <span class="ped-zoom-label" id="zoomLabel">70%</span>
-            <button type="button" class="ped-tbtn" id="zoomIn" title="تكبير"><i class="bi bi-plus-lg"></i></button>
-            <button type="button" class="ped-tbtn" id="zoomFit" title="ملاءمة العرض"><i class="bi bi-arrows-fullscreen"></i></button>
+            <button type="button" class="ped-tbtn" id="zoomOut" title="تصغير (Ctrl + عجلة الفأرة)"><i class="bi bi-dash-lg"></i></button>
+            <button type="button" class="ped-zoom-label" id="zoomLabel" title="إعادة إلى 100%">70%</button>
+            <button type="button" class="ped-tbtn" id="zoomIn" title="تكبير (Ctrl + عجلة الفأرة)"><i class="bi bi-plus-lg"></i></button>
+            <button type="button" class="ped-tbtn" id="zoomFit" title="ملاءمة العرض (Shift+1)"><i class="bi bi-arrows-fullscreen"></i></button>
+            <button type="button" class="ped-tbtn" id="zoomSelection" title="تكبير على التحديد (Shift+2)"><i class="bi bi-bounding-box-circles"></i></button>
         </div>
 
         <div class="tb-group" style="margin-inline-start:auto;">
@@ -154,6 +155,7 @@
             <div class="ped-stage" id="canvasStage">
                 <div class="ped-canvas" id="certificateCanvas">
                     <div class="ped-grid" id="gridOverlay"></div>
+                    <div class="ped-measure" id="measureLayer"></div>
                     <div class="ped-guide g-x" id="guideX"></div>
                     <div class="ped-guide g-y" id="guideY"></div>
                 </div>
@@ -336,6 +338,7 @@
     const publishInput = document.getElementById('publishInput');
     const guideX = document.getElementById('guideX');
     const guideY = document.getElementById('guideY');
+    const measureLayer = document.getElementById('measureLayer');
 
     let canvasW = @Model.Design.CanvasWidth;
     let canvasH = @Model.Design.CanvasHeight;
@@ -350,6 +353,7 @@
     let gridOn = true;
     let snapOn = true;
     let previewMode = false;
+    let panning = false;
     let backgroundImageUrl = @Html.Raw(JsonSerializer.Serialize(Model.Design.BackgroundImageUrl));
     let elements = @Html.Raw(templateJson);
     if (!Array.isArray(elements)) elements = [];
@@ -412,6 +416,11 @@
     // ---------- Helpers ----------
     const $ = id => document.getElementById(id);
     const clamp = (n, min, max) => Math.max(min, Math.min(max, Number(n) || 0));
+    function isTypingTarget(t) {
+        if (!t || !t.tagName) return false;
+        const tag = t.tagName.toUpperCase();
+        return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t.isContentEditable;
+    }
     const isPartnerSlot = type => type === 'partner_logo' || type === 'partner_signature';
     function slotOf(el) {
         if (el.elementType === 'instructor_signature') return -1;
@@ -503,6 +512,114 @@
     }
     function clearGuides() { guideX.style.display = 'none'; guideY.style.display = 'none'; }
 
+    // ---------- Smart measurement ----------
+    // Distance read-outs to the nearest sibling edges, mirroring the red measurement
+    // guides professional editors show while you drag (Figma: "Measure distances between layers").
+    function nearestEdges(x, y, w, h) {
+        const cx = x + w / 2, cy = y + h / 2;
+        let left = null, right = null, top = null, bottom = null;
+        elements.forEach((el, i) => {
+            if (i === selected || !el.isVisible) return;
+            // Horizontal neighbours share vertical space with the dragged element.
+            if (el.y < y + h && el.y + el.height > y) {
+                const elRight = el.x + el.width;
+                if (elRight <= cx && (!left || elRight > left.x + left.width)) left = el;
+                if (el.x >= cx && (!right || el.x < right.x)) right = el;
+            }
+            // Vertical neighbours share horizontal space.
+            if (el.x < x + w && el.x + el.width > x) {
+                const elBottom = el.y + el.height;
+                if (elBottom <= cy && (!top || elBottom > top.y + top.height)) top = el;
+                if (el.y >= cy && (!bottom || el.y < bottom.y)) bottom = el;
+            }
+        });
+        return { left, right, top, bottom };
+    }
+    function clearMeasures() { measureLayer.replaceChildren(); }
+    function renderMeasures(x, y, w, h) {
+        clearMeasures();
+        if (!snapOn) return;
+        const s = scale();
+        const nb = nearestEdges(x, y, w, h);
+        const addBadge = (bx, by, text) => {
+            const d = document.createElement('div');
+            d.className = 'ped-measure-badge';
+            d.style.left = (bx * s) + 'px';
+            d.style.top = (by * s) + 'px';
+            d.textContent = Math.round(text);
+            measureLayer.appendChild(d);
+        };
+        const addLine = (x1, y1, x2, y2) => {
+            const horizontal = Math.abs(y2 - y1) < Math.abs(x2 - x1);
+            const d = document.createElement('div');
+            d.className = 'ped-measure-line' + (horizontal ? ' h' : ' v');
+            d.style.left = (Math.min(x1, x2) * s) + 'px';
+            d.style.top = (Math.min(y1, y2) * s) + 'px';
+            if (horizontal) d.style.width = (Math.abs(x2 - x1) * s) + 'px';
+            else d.style.height = (Math.abs(y2 - y1) * s) + 'px';
+            measureLayer.appendChild(d);
+        };
+        // Horizontal gaps, drawn along the element's vertical centre.
+        const my = y + h / 2;
+        if (nb.left) {
+            const gap = x - (nb.left.x + nb.left.width);
+            addLine(nb.left.x + nb.left.width, my, x, my);
+            addBadge((nb.left.x + nb.left.width + x) / 2, my, gap);
+        }
+        if (nb.right) {
+            const gap = nb.right.x - (x + w);
+            addLine(x + w, my, nb.right.x, my);
+            addBadge((x + w + nb.right.x) / 2, my, gap);
+        }
+        // Vertical gaps, drawn along the element's horizontal centre.
+        const mx = x + w / 2;
+        if (nb.top) {
+            const gap = y - (nb.top.y + nb.top.height);
+            addLine(mx, nb.top.y + nb.top.height, mx, y);
+            addBadge(mx, (nb.top.y + nb.top.height + y) / 2, gap);
+        }
+        if (nb.bottom) {
+            const gap = nb.bottom.y - (y + h);
+            addLine(mx, y + h, mx, nb.bottom.y);
+            addBadge(mx, (y + h + nb.bottom.y) / 2, gap);
+        }
+    }
+
+    // ---------- Viewport (zoom & pan) ----------
+    function zoomAround(nextZoom, clientX, clientY) {
+        const before = areaEl.getBoundingClientRect();
+        const px = clientX - before.left + areaEl.scrollLeft;
+        const py = clientY - before.top + areaEl.scrollTop;
+        const z0 = zoom;
+        zoom = clamp(nextZoom, 0.25, 3);
+        render();
+        const ratio = zoom / z0;
+        areaEl.scrollLeft = px * ratio - (clientX - before.left);
+        areaEl.scrollTop = py * ratio - (clientY - before.top);
+    }
+    function resetZoom() { zoom = 1; render(); }
+    function zoomToSelection() {
+        const el = elements[selected];
+        if (!el) return zoomFit();
+        const availW = areaEl.clientWidth - 120;
+        const availH = areaEl.clientHeight - 120;
+        zoom = clamp(Math.min(availW / el.width, availH / el.height), 0.25, 3);
+        render();
+        centerOn(el.x + el.width / 2, el.y + el.height / 2);
+    }
+    function zoomFit() {
+        const availW = areaEl.clientWidth - 80;
+        const availH = areaEl.clientHeight - 110;
+        zoom = clamp(Math.min(availW / canvasW, availH / canvasH), 0.25, 3);
+        render();
+        areaEl.scrollLeft = 0;
+        areaEl.scrollTop = 0;
+    }
+    function centerOn(cx, cy) {
+        areaEl.scrollLeft = cx * zoom - areaEl.clientWidth / 2;
+        areaEl.scrollTop = cy * zoom - areaEl.clientHeight / 2;
+    }
+
     // ---------- Render ----------
     function render() {
         canvasEl.innerHTML = '';
@@ -538,6 +655,8 @@
         guideY.style.display = 'none';
         canvasEl.appendChild(guideX);
         canvasEl.appendChild(guideY);
+        clearMeasures();
+        canvasEl.appendChild(measureLayer);
 
         // order by array position (zIndex normalized)
         const ordered = elements.map((el, i) => ({ el, i })).filter(o => o.el.isVisible);
@@ -596,23 +715,35 @@
     // ---------- Interactions ----------
     function startDrag(e, index) {
         if (previewMode || e.button !== 0) return;
+        // Space-drag pans the viewport, so it must not also move the element underneath.
+        if (spaceDown || panning) return;
         e.preventDefault();
         select(index);
         const el = elements[index];
         pushHistory();
         const startX = e.clientX, startY = e.clientY, origX = el.x, origY = el.y;
         const s = () => scale();
+        // Holding Ctrl temporarily suspends snapping, the same escape hatch professional
+        // editors provide (Figma: "click and hold ... to temporarily disable snapping").
+        let snapNow = snapOn && !e.ctrlKey && !e.metaKey;
         const move = ev => {
-            const r = computeSnap(origX + (ev.clientX - startX) / s(), origY + (ev.clientY - startY) / s(), el.width, el.height);
+            const snapping = snapNow && !ev.ctrlKey && !ev.metaKey;
+            const nx = origX + (ev.clientX - startX) / s();
+            const ny = origY + (ev.clientY - startY) / s();
+            const r = snapping
+                ? computeSnap(nx, ny, el.width, el.height)
+                : { x: nx, y: ny, gx: null, gy: null };
             el.x = clamp(Math.round(r.x), 0, canvasW - 10);
             el.y = clamp(Math.round(r.y), 0, canvasH - 10);
             updateNode(el, index);
-            renderGuides(snapOn ? r.gx : null, snapOn ? r.gy : null);
+            renderGuides(snapping ? r.gx : null, snapping ? r.gy : null);
+            renderMeasures(el.x, el.y, el.width, el.height);
         };
         const up = () => {
             window.removeEventListener('pointermove', move);
             window.removeEventListener('pointerup', up);
             clearGuides();
+            clearMeasures();
             refreshLayers();
             updateToolbarState();
         };
@@ -640,8 +771,16 @@
             if (pos.includes('n')) { nh = orig.h - dy; ny = orig.y + dy; }
             if (nw < MIN) { if (pos.includes('w')) nx = orig.x + orig.w - MIN; nw = MIN; }
             if (nh < MIN) { if (pos.includes('n')) ny = orig.y + orig.h - MIN; nh = MIN; }
+            // Holding Shift keeps the original aspect ratio, the convention every design
+            // tool shares for corner handles.
+            if (ev.shiftKey && orig.h > 0 && (pos === 'nw' || pos === 'ne' || pos === 'se' || pos === 'sw')) {
+                const ratio = orig.w / orig.h;
+                nh = nw / ratio;
+                if (pos.includes('n')) ny = orig.y + orig.h - nh;
+            }
+            const snapping = snapOn && !ev.ctrlKey && !ev.metaKey;
             let r = { x: nx, y: ny, w: nw, h: nh, gx: null, gy: null };
-            if (snapOn) {
+            if (snapping) {
                 const sx = computeSnap(nx, ny, nw, nh);
                 if (sx.x !== nx || sx.w !== nw) { nx = sx.x; nw = sx.w; }
                 if (sx.y !== ny || sx.h !== nh) { ny = sx.y; nh = sx.h; }
@@ -653,7 +792,7 @@
             el.height = clamp(Math.round(nh), MIN, canvasH);
             if (el.elementType === 'divider') el.height = 4;
             updateNode(el, selected);
-            renderGuides(r.gx, r.gy);
+            renderGuides(snapping ? r.gx : null, snapping ? r.gy : null);
         };
         const up = () => {
             window.removeEventListener('pointermove', move);
@@ -1052,11 +1191,53 @@
     $('snapToggle').addEventListener('click', () => { snapOn = !snapOn; $('snapToggle').classList.toggle('on', snapOn); $('optSnap').checked = snapOn; });
     $('zoomIn').addEventListener('click', () => applyZoom(zoom + 0.1));
     $('zoomOut').addEventListener('click', () => applyZoom(zoom - 0.1));
-    $('zoomFit').addEventListener('click', () => {
-        const avail = areaEl.clientWidth - 80;
-        applyZoom(Math.min(Math.max(avail / canvasW, 0.25), 1));
-    });
+    $('zoomFit').addEventListener('click', zoomFit);
+    $('zoomSelection').addEventListener('click', zoomToSelection);
+    $('zoomLabel').addEventListener('click', resetZoom);
     $('previewToggle').addEventListener('click', () => setPreview(!previewMode));
+
+    // Ctrl/Cmd + wheel zooms around the pointer; a bare wheel pans (native scroll).
+    areaEl.addEventListener('wheel', e => {
+        if (!(e.ctrlKey || e.metaKey)) return;
+        e.preventDefault();
+        const factor = Math.exp(-e.deltaY * 0.0015);
+        zoomAround(zoom * factor, e.clientX, e.clientY);
+    }, { passive: false });
+
+    // Space-drag or middle-mouse drag pans the viewport, the standard navigation gesture.
+    let spaceDown = false;
+    let panStart = null;
+    document.addEventListener('keydown', e => {
+        if (e.code === 'Space' && !isTypingTarget(e.target) && (!e.target || e.target.tagName !== 'BUTTON')) {
+            spaceDown = true;
+            areaEl.classList.add('pan-ready');
+            e.preventDefault();
+        }
+    });
+    document.addEventListener('keyup', e => {
+        if (e.code === 'Space') { spaceDown = false; areaEl.classList.remove('pan-ready', 'panning'); }
+    });
+    areaEl.addEventListener('pointerdown', e => {
+        const wantsPan = e.button === 1 || (e.button === 0 && spaceDown);
+        if (!wantsPan) return;
+        e.preventDefault();
+        panning = true;
+        areaEl.classList.add('panning');
+        panStart = { x: e.clientX, y: e.clientY, left: areaEl.scrollLeft, top: areaEl.scrollTop };
+        const move = ev => {
+            areaEl.scrollLeft = panStart.left - (ev.clientX - panStart.x);
+            areaEl.scrollTop = panStart.top - (ev.clientY - panStart.y);
+        };
+        const up = () => {
+            panning = false;
+            areaEl.classList.remove('panning');
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+    });
+    areaEl.addEventListener('auxclick', e => { if (e.button === 1) e.preventDefault(); });
 
     $('addTextBtn').addEventListener('click', () => addElement('text'));
     $('addDividerBtn').addEventListener('click', () => addElement('divider'));
@@ -1114,14 +1295,18 @@
 
     // keyboard shortcuts
     document.addEventListener('keydown', e => {
-        const tag = (document.activeElement && document.activeElement.tagName) || '';
-        const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+        const typing = isTypingTarget(document.activeElement);
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
         if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelected(); return; }
+        if ((e.ctrlKey || e.metaKey) && e.key === '0') { e.preventDefault(); resetZoom(); return; }
         if (typing) return;
+        // Shift+1 fits the canvas, Shift+2 zooms to the selection — the familiar viewport keys.
+        if (e.shiftKey && e.key === '!') { e.preventDefault(); zoomFit(); return; }
+        if (e.shiftKey && e.key === '@@') { e.preventDefault(); zoomToSelection(); return; }
         if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); return; }
         if (e.key === 'Escape') { deselect(); return; }
+        if (panning) return;
         if (selected >= 0 && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
             e.preventDefault();
             pushHistory();
