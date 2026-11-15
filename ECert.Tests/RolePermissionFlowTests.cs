@@ -41,34 +41,60 @@ public class RolePermissionFlowTests
     }
 
     [Fact]
-    public async Task Role_editor_renders_the_structured_picker()
+    public async Task Role_editor_renders_the_permission_matrix()
     {
-        // The redesigned editor ships search, per-group toggles and a live summary. These hooks are
-        // what the role-permissions.js script binds to; a rename here silently breaks the UI.
+        // The editor is a feature x level matrix. These hooks are what role-permissions.js binds to;
+        // a rename here silently breaks the UI.
         var admin = await SignInAdminAsync();
         var html = await admin.GetStringAsync("/Roles/Create");
 
         Assert.Contains("data-perm-editor", html);
         Assert.Contains("data-perm-search", html);
         Assert.Contains("data-perm-group-toggle", html);
-        Assert.Contains("data-perm-level=", html);
+        Assert.Contains("data-perm-level=\"view\"", html);
+        Assert.Contains("data-perm-level=\"manage\"", html);
+        Assert.Contains("data-perm-level=\"approve\"", html);
         Assert.Contains("data-summary-total", html);
         Assert.Contains("data-summary-sections", html);
-        Assert.Contains("__rpPresets", html);
 
-        // Each permission carries a level badge so an administrator can tell read from write.
-        Assert.Contains("rp-badge--view", html);
-        Assert.Contains("rp-badge--approve", html);
+        // The three access levels are rendered as table columns.
+        Assert.Contains("rp-th--level", html);
+        Assert.Contains(">مشاهدة<", html);
+        Assert.Contains(">إدارة<", html);
+        Assert.Contains(">اعتماد<", html);
     }
 
     [Fact]
-    public async Task Role_editor_lists_a_preset_for_every_bundle()
+    public async Task Role_editor_shows_no_preset_templates_and_no_english_keys()
     {
+        // Preset templates were removed by design, and the raw permission keys must never leak into
+        // the UI — the matrix columns already explain each level.
         var admin = await SignInAdminAsync();
         var html = await admin.GetStringAsync("/Roles/Create");
 
-        foreach (var preset in AdminPermissions.Presets)
-            Assert.Contains($"data-perm-preset=\"{preset.Key}\"", html);
+        Assert.DoesNotContain("data-perm-preset", html);
+        Assert.DoesNotContain("__rpPresets", html);
+        Assert.DoesNotContain("ابدأ من قالب جاهز", html);
+        Assert.DoesNotContain("view-registrations", html);
+        Assert.DoesNotContain("manage-courses", html);
+        Assert.DoesNotContain("rp-badge", html);
+    }
+
+    [Fact]
+    public async Task Role_editor_offers_one_cell_per_matrix_permission()
+    {
+        // Every grantable permission appears as exactly one checkbox, and the matrix groups render.
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/Roles/Create");
+
+        var cells = Regex.Matches(html, "name=\"PermissionIds\"").Count;
+        var expected = AdminPermissions.MatrixPermissions.Distinct(StringComparer.Ordinal).Count();
+        Assert.Equal(expected, cells);
+
+        // Razor entity-encodes non-ASCII C# expressions, so decode before matching the group titles.
+        var decoded = System.Net.WebUtility.HtmlDecode(html);
+        foreach (var group in AdminPermissions.Matrix)
+            Assert.Contains(group.Title, decoded);
     }
 
     [Fact]

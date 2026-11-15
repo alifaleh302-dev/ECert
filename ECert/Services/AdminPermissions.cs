@@ -212,61 +212,71 @@ public static class AdminPermissions
         new HashSet<string>(StringComparer.Ordinal) { ManageRoles, ManageFinanceSettings, ManageSecuritySettings };
 
     /// <summary>
-    /// Ready-made permission bundles for the common staff roles. A preset is only a starting
-    /// point: the administrator still ticks or clears individual permissions afterwards, which
-    /// is what makes the "simplified custom permissions" workflow quick without being rigid.
+    /// One row of the permission matrix: a feature (resource) and the permission that governs each
+    /// access level. A null cell means the feature has no permission at that level, and the editor
+    /// renders an inert placeholder so the grid stays aligned.
     /// </summary>
-    public sealed record RolePreset(string Key, string Name, string Description, IReadOnlyList<string> Permissions);
+    public sealed record PermissionRow(string Label, string? View, string? Manage, string? Approve);
 
-    public static readonly IReadOnlyList<RolePreset> Presets = new List<RolePreset>
+    /// <summary>A titled band of matrix rows, rendered under one header that spans every column.</summary>
+    public sealed record PermissionGroup(string Title, IReadOnlyList<PermissionRow> Rows);
+
+    /// <summary>
+    /// The permission matrix the role editor renders: rows are features, columns are the three access
+    /// levels (view / manage / approve). It is the single source of truth for the editor layout — the
+    /// completeness tests assert it exposes every grantable permission exactly once, and that each
+    /// permission sits in the column matching <see cref="LevelOf"/>.
+    /// </summary>
+    public static readonly IReadOnlyList<PermissionGroup> Matrix = new List<PermissionGroup>
     {
-        new("cashier", "أمين الصندوق", "إدارة الصندوق الرئيسي والسحب منه، واعتماد المصروفات وتوريد العهد والاستردادات.", new[]
+        new("إدارة التدريب", new[]
         {
-            ManageFinance, ViewInvoices, ManagePayments, ViewReports,
-            ViewCustody, ApproveCustody, ManageRefunds, ApproveRefunds, ViewReceivables,
-            ViewFinancialAudit, ManageExpenses, ApproveExpenses, ViewExpenses,
-            ManageInstallments, ViewFinanceDashboard, ViewCashbox, ManageCashbox
+            new PermissionRow("التسجيلات", ViewRegistrations, ManageRegistrations, null),
+            new PermissionRow("الدورات", ViewCourses, ManageCourses, null),
+            new PermissionRow("المدربون", ViewInstructors, ManageInstructors, null),
+            new PermissionRow("الفئات", ViewCategories, ManageCategories, null),
         }),
-        new("finance", "محاسب", "تسجيل الدفعات ومتابعة الفواتير والعهدة دون إدارة النظام.", new[]
+        new("الشهادات", new[]
         {
-            ManageFinance, ViewInvoices, ManagePayments, ViewReports,
-            ViewCustody, ManageRefunds, ViewReceivables, ViewFinancialAudit,
-            ManageExpenses, ManageInstallments, ViewFinanceDashboard
+            new PermissionRow("الشهادات", ViewCertificates, IssueCertificates, null),
+            new PermissionRow("تصاميم الشهادات", null, ManageCertificateDesigns, null),
         }),
-        new("finance_readonly", "مراجع مالي (قراءة فقط)", "مشاهدة الفواتير والدفعات والعهد والصندوق والتقارير دون أي إضافة أو اعتماد.", new[]
+        new("الإدارة المالية", new[]
         {
-            ViewInvoices, ViewPayments, ViewCustody, ViewCashbox, ViewReceivables,
-            ViewExpenses, ViewInstallments, ViewReports, ViewFinancialAudit, ViewFinanceDashboard
+            new PermissionRow("الفواتير", ViewInvoices, ManageFinance, null),
+            new PermissionRow("الدفعات", ViewPayments, ManagePayments, null),
+            new PermissionRow("الأقساط والخطط", ViewInstallments, ManageInstallments, null),
+            new PermissionRow("عهدة الموظف والتوريد", ViewCustody, null, ApproveCustody),
+            new PermissionRow("الصندوق الرئيسي", ViewCashbox, ManageCashbox, null),
+            new PermissionRow("استرداد الرسوم", null, ManageRefunds, ApproveRefunds),
+            new PermissionRow("المصروفات", ViewExpenses, ManageExpenses, ApproveExpenses),
+            new PermissionRow("المتأخرات وكشف الحساب", ViewReceivables, null, null),
+            new PermissionRow("سجل التدقيق المالي", ViewFinancialAudit, null, null),
+            new PermissionRow("لوحة المؤشرات المالية", ViewFinanceDashboard, null, null),
+            new PermissionRow("تقارير الإيرادات", ViewReports, null, null),
         }),
-        new("hr_readonly", "الموارد البشرية (قراءة فقط)", "مشاهدة التسجيلات والدورات والمدربين والشهادات دون أي تعديل.", new[]
+        new("المحتوى", new[]
         {
-            ViewRegistrations, ViewCourses, ViewInstructors, ViewCategories, ViewCertificates
+            new PermissionRow("المنشورات", null, ManagePosts, null),
+            new PermissionRow("الأخبار", null, ManageNews, null),
+            new PermissionRow("الصفحة الرئيسية", null, ManageHomepage, null),
         }),
-        new("collections", "محصّل رسوم", "تسجيل الدفعات ومتابعة الفواتير وعهدته فقط.", new[]
+        new("النظام", new[]
         {
-            ViewInvoices, ManagePayments, ViewCustody
-        }),
-        new("registrations", "مشرف التسجيلات", "مراجعة طلبات التسجيل وقبولها أو رفضها.", new[]
-        {
-            ManageRegistrations
-        }),
-        new("trainer", "مشرف تدريب", "إدارة الدورات والمدربين والفئات والتسجيلات.", new[]
-        {
-            ManageRegistrations, ManageCourses, ManageInstructors, ManageCategories
-        }),
-        new("certificates", "مسؤول الشهادات", "إصدار الشهادات وإدارة تصاميمها.", new[]
-        {
-            IssueCertificates, ManageCertificateDesigns
-        }),
-        new("content", "محرر المحتوى", "إدارة المنشورات والأخبار والصفحة الرئيسية.", new[]
-        {
-            ManagePosts, ManageNews, ManageHomepage
-        }),
-        new("auditor", "مدقق أمني", "مراجعة سجلات العمليات والتدقيق والتقارير المالية (قراءة فقط).", new[]
-        {
-            ViewSecurityAudit, ViewAuditLog, ViewReports, ViewFinancialAudit, ViewFinanceDashboard
+            new PermissionRow("المستخدمون", null, ManageUsers, null),
+            new PermissionRow("سجل العمليات", ViewAuditLog, null, null),
+            new PermissionRow("مراجعة سجلات التدقيق", ViewSecurityAudit, null, null),
+            new PermissionRow("البيانات الجامعية", null, ManageAcademicCatalog, null),
+            new PermissionRow("مفاتيح الهواتف", null, ManagePhoneCountries, null),
         }),
     };
+
+    /// <summary>Every permission the matrix places in a cell, in row-major order.</summary>
+    public static IEnumerable<string> MatrixPermissions =>
+        Matrix.SelectMany(group => group.Rows)
+              .SelectMany(row => new[] { row.View, row.Manage, row.Approve })
+              .Where(name => name is not null)
+              .Select(name => name!);
 }
 
 public static class AdminPrincipalExtensions
