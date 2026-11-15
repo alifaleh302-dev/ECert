@@ -198,6 +198,51 @@ public class AdminPermissionsCatalogTests
         Assert.Equal(keys.Count, keys.Distinct(StringComparer.Ordinal).Count());
     }
 
+    [Fact]
+    public void Every_section_has_a_human_readable_label()
+    {
+        // The role editor explains which pages a permission opens, so a missing label would leak a
+        // raw controller name into the UI.
+        var unlabelled = AdminPermissions.SectionAccess.Keys
+            .Where(section => !AdminPermissions.SectionLabels.ContainsKey(section))
+            .ToList();
+
+        Assert.True(unlabelled.Count == 0,
+            "These sections have no Arabic label and would show as a controller name: " + string.Join(", ", unlabelled));
+    }
+
+    [Fact]
+    public void Permission_level_follows_the_name_prefix()
+    {
+        Assert.Equal("view", AdminPermissions.LevelOf(AdminPermissions.ViewCashbox));
+        Assert.Equal("approve", AdminPermissions.LevelOf(AdminPermissions.ApproveRefunds));
+        Assert.Equal("manage", AdminPermissions.LevelOf(AdminPermissions.ManagePayments));
+        Assert.Equal("manage", AdminPermissions.LevelOf(AdminPermissions.IssueCertificates));
+    }
+
+    [Fact]
+    public void Every_permission_level_is_one_of_the_three_known_values()
+    {
+        var unexpected = AdminPermissions.Catalog
+            .Select(definition => AdminPermissions.LevelOf(definition.Name))
+            .Distinct()
+            .Where(level => level is not ("view" or "manage" or "approve"))
+            .ToList();
+
+        Assert.True(unexpected.Count == 0,
+            "The role editor colours permissions by level; unexpected levels: " + string.Join(", ", unexpected));
+    }
+
+    [Fact]
+    public void Section_labels_for_a_permission_match_its_sections()
+    {
+        var labels = AdminPermissions.SectionLabelsFor(AdminPermissions.ViewCashbox).ToList();
+        Assert.Contains("الصندوق", labels);
+
+        var approveLabels = AdminPermissions.SectionLabelsFor(AdminPermissions.ApproveRefunds).ToList();
+        Assert.Contains("استرداد الرسوم", approveLabels);
+    }
+
     private static ClaimsPrincipal Principal(string type, string value) =>
         new(new ClaimsIdentity(new[] { new Claim(type, value) }, "Test"));
 }
