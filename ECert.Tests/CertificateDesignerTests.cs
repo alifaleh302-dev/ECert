@@ -33,6 +33,26 @@ public class CertificateDesignerTests
     }
 
     [Fact]
+    public async Task Editor_uses_the_enterprise_palette_without_leaking_bootstrap_colours()
+    {
+        // The designer must look like the rest of the enterprise console: one accent colour, no
+        // Bootstrap colour utilities (text-success/text-primary) bleeding non-theme colours in, and
+        // status rendered as quiet text rather than coloured chips.
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/CertificateDesigns");
+
+        Assert.DoesNotContain("text-success", html);
+        Assert.DoesNotContain("text-primary", html);
+        Assert.Contains("ds-i-accent", html);
+        Assert.Contains("ped-badge", html);
+        Assert.DoesNotContain("background:#e7edff", html);
+
+        var css = await admin.GetStringAsync("/css/certificate-design-editor.css");
+        Assert.Contains("--ped-accent", css);
+        Assert.DoesNotContain("--ped-ok", css);
+    }
+
+    [Fact]
     public async Task Saving_a_new_name_persists_it()
     {
         var admin = await SignInAdminAsync();

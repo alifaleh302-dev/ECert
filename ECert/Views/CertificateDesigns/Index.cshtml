@@ -55,19 +55,20 @@
                     @foreach (var item in Model.Designs)
                     {
                         <a class="ds-item @(item.CertificateDesignId == Model.Design.CertificateDesignId ? "active" : "")" asp-action="Index" asp-route-id="@item.CertificateDesignId">
-                            <i class="bi @(item.IsPublished ? "bi-broadcast text-success" : "bi-file-earmark")" style="font-size:.95rem;"></i>
+                            <i class="bi @(item.IsPublished ? "bi-broadcast ds-i-live" : "bi-file-earmark")" style="font-size:.95rem;"></i>
                             <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@item.Name</span>
                             <span class="ped-badge @(item.IsPublished ? "live" : "draft")">@(item.IsPublished ? "منشور" : "مسودة")</span>
                         </a>
                     }
                     <div class="ds-divider"></div>
-                    <a class="ds-item" asp-action="New"><i class="bi bi-plus-circle text-primary"></i><span style="font-weight:700;">تصميم جديد</span></a>
-                    @if (!Model.Design.IsPublished)
+                    <a class="ds-item" asp-action="New"><i class="bi bi-plus-circle ds-i-accent"></i><span style="font-weight:700;">تصميم جديد</span></a>
+                    @if (Model.Design.CertificateDesignId > 0 && !Model.Design.IsPublished)
                     {
-                        <form method="post" asp-action="Delete" asp-route-id="@Model.Design.CertificateDesignId" class="ds-delete-form">
+                        <form asp-action="Delete" asp-route-id="@Model.Design.CertificateDesignId" method="post" class="ds-delete-form">
+                            @Html.AntiForgeryToken()
                             <button type="submit" class="ds-item ds-item--danger"
-                                    onclick="return confirm('حذف هذا التصميم نهائيًا؟');">
-                                <i class="bi bi-trash"></i><span>حذف التصميم الحالي</span>
+                                    onclick="return confirm('سيتم حذف هذا التصميم نهائياً. هل تريد المتابعة؟')">
+                                <i class="bi bi-trash3"></i><span style="font-weight:700;">حذف هذا التصميم</span>
                             </button>
                         </form>
                     }
@@ -219,7 +220,7 @@
 
             <div class="ped-panel-section d-none" id="elementProps">
                 <div style="display:flex;align-items:center;gap:.45rem;margin-bottom:.6rem;">
-                    <span class="ped-badge" style="background:#e7edff;color:var(--ped-accent);" id="elTypeBadge">نص</span>
+                    <span class="ped-badge" id="elTypeBadge">نص</span>
                     <span class="small text-muted" id="elIndexLabel"></span>
                 </div>
                 <div class="ped-prop d-none" id="contentWrap">
