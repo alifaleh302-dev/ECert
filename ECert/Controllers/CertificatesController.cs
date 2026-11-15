@@ -496,6 +496,10 @@ public class CertificatesController : Controller
                     FontColor = e.FontColor,
                     FontWeight = e.FontWeight,
                     TextAlign = e.TextAlign,
+                    IsItalic = e.IsItalic,
+                    IsUnderline = e.IsUnderline,
+                    LineHeight = e.LineHeight,
+                    LetterSpacing = e.LetterSpacing,
                     ZIndex = e.ZIndex,
                     Rotation = e.Rotation,
                     Opacity = e.Opacity

@@ -75,6 +75,13 @@ CREATE TABLE IF NOT EXISTS `CertificateDesignElements` (
         await EnsureColumnAsync("CertificateDesignElements", "IsLocked", "TINYINT(1) NOT NULL DEFAULT 0");
         await EnsureColumnAsync("CertificateDesignElements", "Opacity", "INT NOT NULL DEFAULT 100");
 
+        // Phase 5: typography detail and element grouping are additive columns too.
+        await EnsureColumnAsync("CertificateDesignElements", "IsItalic", "TINYINT(1) NOT NULL DEFAULT 0");
+        await EnsureColumnAsync("CertificateDesignElements", "IsUnderline", "TINYINT(1) NOT NULL DEFAULT 0");
+        await EnsureColumnAsync("CertificateDesignElements", "LineHeight", "INT NOT NULL DEFAULT 130");
+        await EnsureColumnAsync("CertificateDesignElements", "LetterSpacing", "INT NOT NULL DEFAULT 0");
+        await EnsureColumnAsync("CertificateDesignElements", "GroupId", "VARCHAR(40) NULL");
+
         var backgroundImageColumnExists = await _db.Database
             .SqlQueryRaw<int>("SELECT COUNT(*) AS `Value` FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'CertificateDesigns' AND COLUMN_NAME = 'BackgroundImageUrl'")
             .SingleAsync() > 0;

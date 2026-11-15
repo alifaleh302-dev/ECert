@@ -23,6 +23,11 @@
             e.FontColor,
             e.FontWeight,
             e.TextAlign,
+            e.IsItalic,
+            e.IsUnderline,
+            e.LineHeight,
+            e.LetterSpacing,
+            e.GroupId,
             e.IsVisible,
             e.IsLocked,
             e.ZIndex,
@@ -111,9 +116,15 @@
         </div>
 
         <div class="tb-group">
+            <button type="button" class="ped-tbtn" id="groupBtn" title="تجميع (Ctrl+G)" disabled><i class="bi bi-bounding-box-circles"></i></button>
+            <button type="button" class="ped-tbtn" id="ungroupBtn" title="فك التجميع (Ctrl+Shift+G)" disabled><i class="bi bi-bounding-box"></i></button>
+        </div>
+
+        <div class="tb-group">
             <button type="button" class="ped-tbtn" id="gridToggle" title="إظهار الشبكة"><i class="bi bi-grid-3x3-gap"></i></button>
             <button type="button" class="ped-tbtn on" id="snapToggle" title="الالتقاط الذكي"><i class="bi bi-magnet"></i></button>
             <button type="button" class="ped-tbtn on" id="rulerToggle" title="إظهار المساطر"><i class="bi bi-rulers"></i></button>
+            <button type="button" class="ped-tbtn" id="safeAreaToggle" title="منطقة الأمان للطباعة"><i class="bi bi-border-inner"></i></button>
         </div>
 
         <div class="tb-group">
@@ -161,6 +172,17 @@
                     }
                 }
             </div>
+            <div class="ped-panel-section">
+                <div class="ped-group-title">أنماط جاهزة للنص</div>
+                <div class="ped-preset-grid" id="presetGrid">
+                    <button type="button" class="ped-preset" data-preset="title"><span style="font-size:1rem;font-weight:800;">عنوان</span></button>
+                    <button type="button" class="ped-preset" data-preset="subtitle"><span style="font-size:.85rem;font-weight:600;">عنوان فرعي</span></button>
+                    <button type="button" class="ped-preset" data-preset="name"><span style="font-size:.95rem;font-weight:800;">اسم المتدرب</span></button>
+                    <button type="button" class="ped-preset" data-preset="body"><span style="font-size:.78rem;font-weight:400;">نص عادي</span></button>
+                    <button type="button" class="ped-preset" data-preset="caption"><span style="font-size:.68rem;font-weight:400;letter-spacing:.08em;">تسمية</span></button>
+                    <button type="button" class="ped-preset" data-preset="quote"><span style="font-size:.8rem;font-style:italic;">اقتباس</span></button>
+                </div>
+            </div>
             <div class="ped-panel-head"><i class="bi bi-stack"></i> الطبقات <span class="float-start small text-muted fw-normal" id="layerCount"></span></div>
             <div class="ped-panel-section" style="flex:1;">
                 <div id="layersList"></div>
@@ -175,6 +197,7 @@
             <div class="ped-stage" id="canvasStage">
                 <div class="ped-canvas" id="certificateCanvas">
                     <div class="ped-grid" id="gridOverlay"></div>
+                    <div class="ped-safe-area" id="safeArea"><span class="ped-safe-area-label">منطقة الأمان</span></div>
                     <div class="ped-measure" id="measureLayer"></div>
                     <div class="ped-marquee" id="marqueeBox"></div>
                     <div class="ped-guide g-x" id="guideX"></div>
@@ -298,6 +321,17 @@
                     <div class="ped-prop"><label>الوزن</label><select class="ped-select" id="selectedWeight"><option value="400">عادي</option><option value="500">متوسط</option><option value="600">نصف عريض</option><option value="700">عريض</option><option value="800">ثقيل</option></select></div>
                 </div>
                 <div class="ped-prop">
+                    <label>النمط</label>
+                    <div class="ped-seg" id="styleSeg">
+                        <button type="button" id="italicBtn" title="مائل (Ctrl+I)"><i class="bi bi-type-italic"></i></button>
+                        <button type="button" id="underlineBtn" title="تسطير (Ctrl+U)"><i class="bi bi-type-underline"></i></button>
+                    </div>
+                </div>
+                <div class="ped-grid-2">
+                    <div class="ped-prop"><label>تباعد الأسطر <span class="pv" id="lineHeightLabel">130%</span></label><input class="ped-input" type="range" id="selectedLineHeight" min="80" max="300" step="5" style="padding:0;" /></div>
+                    <div class="ped-prop"><label>تباعد الحروف <span class="pv" id="letterSpacingLabel">0px</span></label><input class="ped-input" type="range" id="selectedLetterSpacing" min="-10" max="40" step="1" style="padding:0;" /></div>
+                </div>
+                <div class="ped-prop">
                     <label for="selectedColor">لون النص</label>
                     <div class="ped-color-row">
                         <input type="color" class="ped-color-input" id="selectedColor" />
@@ -417,7 +451,9 @@
     let gridOn = true;
     let snapOn = true;
     let rulersOn = true;
+    let safeAreaOn = false;
     let clipboard = [];
+    let dirty = false;
     let previewMode = false;
     let panning = false;
     let backgroundImageUrl = @Html.Raw(JsonSerializer.Serialize(Model.Design.BackgroundImageUrl));
@@ -451,6 +487,7 @@
     const MAX_HISTORY = 60;
     function snapshot() { return JSON.stringify({ canvasW, canvasH, cProps, elements, backgroundImageUrl }); }
     function pushHistory() {
+        dirty = true;
         const snap = snapshot();
         history = history.slice(0, historyIndex + 1);
         history.push(snap);
@@ -458,8 +495,8 @@
         historyIndex = history.length - 1;
         updateToolbarState();
     }
-    function undo() { if (historyIndex <= 0) return; historyIndex--; restore(history[historyIndex]); }
-    function redo() { if (historyIndex >= history.length - 1) return; historyIndex++; restore(history[historyIndex]); }
+    function undo() { if (historyIndex <= 0) return; historyIndex--; dirty = true; restore(history[historyIndex]); }
+    function redo() { if (historyIndex >= history.length - 1) return; historyIndex++; dirty = true; restore(history[historyIndex]); }
     function restore(snap) {
         const s = JSON.parse(snap);
         canvasW = s.canvasW; canvasH = s.canvasH; cProps = s.cProps; elements = s.elements;
@@ -485,6 +522,10 @@
         ['distributeH', 'distributeV'].forEach(id => {
             document.getElementById(id).disabled = selection.length < 3;
         });
+        // Grouping needs two movable elements; ungrouping needs at least one grouped member.
+        const movableCount = selection.filter(i => elements[i] && !elements[i].isLocked).length;
+        document.getElementById('groupBtn').disabled = movableCount < 2;
+        document.getElementById('ungroupBtn').disabled = !selection.some(i => elements[i] && elements[i].groupId);
     }
 
     // ---------- Helpers ----------
@@ -530,7 +571,11 @@
             fontFamily: '"' + (el.fontFamily || 'Tajawal') + '", Arial, sans-serif',
             fontWeight: el.fontWeight || '600', zIndex: el.zIndex || 1,
             opacity: (el.opacity === undefined ? 100 : el.opacity) / 100,
-            transform: 'rotate(' + (el.rotation || 0) + 'deg)'
+            transform: 'rotate(' + (el.rotation || 0) + 'deg)',
+            fontStyle: el.isItalic ? 'italic' : 'normal',
+            textDecoration: el.isUnderline ? 'underline' : 'none',
+            lineHeight: ((el.lineHeight === undefined || el.lineHeight <= 0) ? 130 : el.lineHeight) / 100,
+            letterSpacing: (el.letterSpacing || 0) + 'px'
         };
         if (el.elementType === 'divider') {
             s.borderTop = '2px solid ' + (el.fontColor || '#172033');
@@ -1061,23 +1106,25 @@
         updateToolbarState();
     }
     function select(index, additive) {
+        // Picking one member of a group selects the whole group (unless additive toggling removes it).
         if (additive) {
+            const members = elements[index] && elements[index].groupId ? groupMembers(elements[index].groupId) : [index];
             const at = selection.indexOf(index);
             if (at >= 0) {
-                selection.splice(at, 1);
+                selection = selection.filter(i => members.indexOf(i) < 0);
                 selected = selection.length ? selection[selection.length - 1] : -1;
             } else {
-                selection.push(index);
+                members.forEach(m => { if (selection.indexOf(m) < 0) selection.push(m); });
                 selected = index;
             }
         } else {
-            selection = [index];
+            selection = elements[index] && elements[index].groupId ? groupMembers(elements[index].groupId) : [index];
             selected = index;
         }
         renderSelection();
     }
     function selectMany(indices) {
-        selection = indices.slice();
+        selection = expandSelectionToGroups(indices);
         selected = selection.length ? selection[selection.length - 1] : -1;
         renderSelection();
     }
@@ -1191,7 +1238,9 @@
     }
 
     // ---------- Add / Remove / Order ----------
-    function addElement(type, fieldKey) {
+    // `dropPoint` (canvas coordinates) is supplied when the user drags an item from the library
+    // onto the canvas, so the element lands under the pointer instead of at a default slot.
+    function addElement(type, fieldKey, dropPoint) {
         pushHistory();
         const count = elements.length;
         const isLogo = type === 'partner_logo';
@@ -1210,12 +1259,13 @@
                 : (type === 'barcode' ? 'certificate_number'
                     : (isPartnerSlot(type) ? String(nextSlot) : '')),
             content: type === 'text' ? 'نص جديد' : '',
-            x: clamp(Math.round((canvasW - w) / 2), 0, canvasW - 20),
-            y: clamp(100 + (count % 6) * 82, 0, canvasH - 20),
+            x: dropPoint ? clamp(Math.round(dropPoint.x - w / 2), 0, canvasW - 20) : clamp(Math.round((canvasW - w) / 2), 0, canvasW - 20),
+            y: dropPoint ? clamp(Math.round(dropPoint.y - h / 2), 0, canvasH - 20) : clamp(100 + (count % 6) * 82, 0, canvasH - 20),
             width: w, height: h,
             fontSize: type === 'text' ? 22 : 28,
             fontFamily: 'Tajawal', fontColor: '#172033', fontWeight: '600',
-            textAlign: 'center', isVisible: true, zIndex: count, rotation: 0, opacity: 100, isLocked: false
+            textAlign: 'center', isVisible: true, zIndex: count, rotation: 0, opacity: 100, isLocked: false,
+            isItalic: false, isUnderline: false, lineHeight: 130, letterSpacing: 0, groupId: null
         };
         elements.push(el);
         selected = elements.length - 1;
@@ -1225,8 +1275,10 @@
         updateToolbarState();
     }
     function deleteSelected() {
-        // Locked elements survive a delete; unlock them from the layers panel first.
-        const removable = selection.filter(i => elements[i] && !elements[i].isLocked);
+        // Locked elements survive a delete; unlock them from the layers panel first. Deleting any
+        // member of a group removes the whole group, matching how selection works.
+        const expanded = expandSelectionToGroups(selection);
+        const removable = expanded.filter(i => elements[i] && !elements[i].isLocked);
         if (!removable.length) return;
         pushHistory();
         // Delete from the highest index down so earlier splices do not shift later ones.
@@ -1315,6 +1367,58 @@
         refreshLayers();
         refreshPropsPanel();
         updateToolbarState();
+    }
+    // ---------- Grouping ----------
+    // A group is a shared token on the elements themselves, so it survives save/load without a
+    // separate table. Clicking one member selects the whole group, and moves/resizes act on all.
+    function groupMembers(groupId) {
+        return elements.map((el, i) => i).filter(i => elements[i].groupId && elements[i].groupId === groupId);
+    }
+    function expandSelectionToGroups(indices) {
+        const out = new Set();
+        indices.forEach(i => {
+            const el = elements[i];
+            if (!el) return;
+            if (el.groupId) groupMembers(el.groupId).forEach(m => out.add(m));
+            else out.add(i);
+        });
+        return Array.from(out).sort((a, b) => a - b);
+    }
+    function groupSelected() {
+        const indices = selection.filter(i => elements[i] && !elements[i].isLocked);
+        if (indices.length < 2) return;
+        pushHistory();
+        const id = 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        indices.forEach(i => { elements[i].groupId = id; });
+        refreshLayers();
+        updateToolbarState();
+    }
+    function ungroupSelected() {
+        const hasGroup = selection.some(i => elements[i] && elements[i].groupId);
+        if (!hasGroup) return;
+        pushHistory();
+        selection.forEach(i => { if (elements[i]) elements[i].groupId = null; });
+        refreshLayers();
+        updateToolbarState();
+    }
+    // ---------- Style presets ----------
+    // One-click typography so a designer does not hand-tune size/weight/spacing for every label.
+    const STYLE_PRESETS = {
+        title: { fontSize: 40, fontWeight: '800', letterSpacing: 0, lineHeight: 130, isItalic: false, isUnderline: false, textAlign: 'center' },
+        subtitle: { fontSize: 26, fontWeight: '600', letterSpacing: 0, lineHeight: 140, isItalic: false, isUnderline: false, textAlign: 'center' },
+        name: { fontSize: 34, fontWeight: '800', letterSpacing: 0, lineHeight: 130, isItalic: false, isUnderline: false, textAlign: 'center' },
+        body: { fontSize: 18, fontWeight: '400', letterSpacing: 0, lineHeight: 160, isItalic: false, isUnderline: false, textAlign: 'center' },
+        caption: { fontSize: 13, fontWeight: '400', letterSpacing: 2, lineHeight: 140, isItalic: false, isUnderline: false, textAlign: 'center' },
+        quote: { fontSize: 20, fontWeight: '500', letterSpacing: 0, lineHeight: 160, isItalic: true, isUnderline: false, textAlign: 'center' }
+    };
+    function applyPreset(name) {
+        const preset = STYLE_PRESETS[name];
+        const targets = selection.filter(i => elements[i] && !elements[i].isLocked && elements[i].elementType !== 'divider');
+        if (!preset || !targets.length) return;
+        pushHistory();
+        targets.forEach(i => Object.assign(elements[i], preset));
+        render();
+        renderSelection();
     }
     // ---------- Align / Distribute / Tidy ----------
     // Align to the canvas for a single element; align the group's bounds to the canvas when several
@@ -1453,6 +1557,7 @@
                 '<i class="bi bi-grip-vertical ly-grip" aria-hidden="true"></i>' +
                 '<div class="ly-icon">' + icon + '</div>' +
                 '<div class="ly-name"></div>' +
+                (el.groupId ? '<i class="bi bi-bounding-box-circles ly-group" title="ضمن مجموعة" aria-hidden="true"></i>' : '') +
                 '<button type="button" class="ly-btn ly-lock' + (el.isLocked ? ' on' : '') + '" title="قفل/فتح"><i class="bi ' + (el.isLocked ? 'bi-lock-fill' : 'bi-unlock') + '"></i></button>' +
                 '<button type="button" class="ly-btn ly-eye' + (el.isVisible ? '' : ' off') + '" title="إظهار/إخفاء"><i class="bi ' + (el.isVisible ? 'bi-eye' : 'bi-eye-slash') + '"></i></button>' +
                 '<button type="button" class="ly-btn danger" title="حذف"><i class="bi bi-x-lg"></i></button>';
@@ -1631,6 +1736,14 @@
         $('rotationLabel').textContent = (el.rotation || 0) + '°';
         $('selectedOpacity').value = el.opacity === undefined ? 100 : el.opacity;
         $('opacityLabel').textContent = (el.opacity === undefined ? 100 : el.opacity) + '%';
+        $('italicBtn').classList.toggle('on', !!el.isItalic);
+        $('underlineBtn').classList.toggle('on', !!el.isUnderline);
+        const lh = (el.lineHeight === undefined || el.lineHeight <= 0) ? 130 : el.lineHeight;
+        $('selectedLineHeight').value = lh;
+        $('lineHeightLabel').textContent = lh + '%';
+        const ls = el.letterSpacing || 0;
+        $('selectedLetterSpacing').value = ls;
+        $('letterSpacingLabel').textContent = ls + 'px';
         $('selectedLocked').checked = !!el.isLocked;
         $('selectedX').value = el.x; $('selectedY').value = el.y;
         $('selectedWidth').value = el.width; $('selectedHeight').value = el.height;
@@ -1698,6 +1811,8 @@
         if (prop === 'fontSize') el.fontSize = clamp(el.fontSize, 8, 96);
         if (prop === 'rotation') el.rotation = clamp(el.rotation, -180, 180);
         if (prop === 'opacity') el.opacity = clamp(el.opacity, 10, 100);
+        if (prop === 'lineHeight') el.lineHeight = clamp(el.lineHeight, 80, 300);
+        if (prop === 'letterSpacing') el.letterSpacing = clamp(el.letterSpacing, -10, 40);
         if (el.elementType === 'divider') el.height = 4;
         updateNode(el, selected);
         refreshLayers();
@@ -1740,8 +1855,16 @@
         });
         publishInput.value = publish ? 'true' : 'false';
         elementsInput.value = JSON.stringify(elements.map((el, i) => ({ ...el, sortOrder: i })));
+        dirty = false;
         form.submit();
     }
+
+    // Warn before the tab is closed or the page is left with unsaved designer changes.
+    window.addEventListener('beforeunload', e => {
+        if (!dirty) return;
+        e.preventDefault();
+        e.returnValue = '';
+    });
 
     // ---------- Background image ----------
     $('backgroundImageInput').addEventListener('change', e => {
@@ -1905,6 +2028,17 @@
         { id: 'forward', label: 'تقديم للأمام', icon: 'bi-arrow-up-short', run: () => moveOrder(1) },
         { id: 'backward', label: 'إرجاع للخلف', icon: 'bi-arrow-down-short', run: () => moveOrder(-1) },
         { id: 'lock', label: 'قفل/فتح العنصر', kbd: 'Ctrl+L', icon: 'bi-lock', run: () => { if (selected >= 0) toggleLock(selected); } },
+        { id: 'group', label: 'تجميع التحديد', kbd: 'Ctrl+G', icon: 'bi-bounding-box-circles', run: groupSelected },
+        { id: 'ungroup', label: 'فك التجميع', kbd: 'Ctrl+Shift+G', icon: 'bi-bounding-box', run: ungroupSelected },
+        { id: 'italic', label: 'نص مائل', kbd: 'Ctrl+I', icon: 'bi-type-italic', run: () => $('italicBtn').click() },
+        { id: 'underline', label: 'نص مسطّر', kbd: 'Ctrl+U', icon: 'bi-type-underline', run: () => $('underlineBtn').click() },
+        { id: 'preset-title', label: 'نمط: عنوان', icon: 'bi-type-h1', run: () => applyPreset('title') },
+        { id: 'preset-subtitle', label: 'نمط: عنوان فرعي', icon: 'bi-type-h2', run: () => applyPreset('subtitle') },
+        { id: 'preset-name', label: 'نمط: اسم المتدرب', icon: 'bi-person-badge', run: () => applyPreset('name') },
+        { id: 'preset-body', label: 'نمط: نص عادي', icon: 'bi-text-paragraph', run: () => applyPreset('body') },
+        { id: 'preset-caption', label: 'نمط: تسمية', icon: 'bi-fonts', run: () => applyPreset('caption') },
+        { id: 'preset-quote', label: 'نمط: اقتباس', icon: 'bi-quote', run: () => applyPreset('quote') },
+        { id: 'safe-area', label: 'إظهار/إخفاء منطقة الأمان', icon: 'bi-border-inner', run: () => $('safeAreaToggle').click() },
         { id: 'hide', label: 'إظهار/إخفاء العنصر', icon: 'bi-eye-slash', run: () => { if (selected >= 0) toggleVisibility(selected); } },
         { id: 'zoom-fit', label: 'ملاءمة العرض', kbd: 'Shift+1', icon: 'bi-arrows-fullscreen', run: zoomFit },
         { id: 'zoom-sel', label: 'تكبير على التحديد', kbd: 'Shift+2', icon: 'bi-bounding-box-circles', run: zoomToSelection },
@@ -1952,6 +2086,7 @@
             ['F2', 'إعادة تسمية النص']
         ]],
         ['ترتيب ومحاذاة', [
+            ['Ctrl+G / Ctrl+Shift+G', 'تجميع / فك التجميع'],
             ['Alt+Shift+أسهم', 'محاذاة لبعضها'],
             ['Alt+Ctrl+H / V', 'توزيع أفقي / عمودي'],
             ['Alt+T', 'ترتيب أنيق'],
@@ -1959,6 +2094,7 @@
         ]],
         ['عرض وتحكم', [
             ['Ctrl+K', 'لوحة الأوامر'],
+            ['Ctrl+I / Ctrl+U', 'مائل / مسطّر'],
             ['Ctrl+عجلة', 'تكبير حول المؤشر'],
             ['مسافة + سحب', 'تحريك اللوحة'],
             ['Shift+1 / Shift+2', 'ملاءمة / تكبير على التحديد'],
@@ -2004,6 +2140,11 @@
     $('gridToggle').addEventListener('click', () => { gridOn = !gridOn; document.getElementById('pedApp').classList.toggle('grid-on', gridOn); $('gridToggle').classList.toggle('on', gridOn); $('optGrid').checked = gridOn; });
     $('snapToggle').addEventListener('click', () => { snapOn = !snapOn; $('snapToggle').classList.toggle('on', snapOn); $('optSnap').checked = snapOn; });
     $('rulerToggle').addEventListener('click', () => { rulersOn = !rulersOn; $('rulerToggle').classList.toggle('on', rulersOn); renderRulers(); });
+    $('safeAreaToggle').addEventListener('click', () => {
+        safeAreaOn = !safeAreaOn;
+        $('safeAreaToggle').classList.toggle('on', safeAreaOn);
+        $('pedApp').classList.toggle('safe-on', safeAreaOn);
+    });
     $('cmdkBtn').addEventListener('click', openCommandPalette);
     $('shortcutsBtn').addEventListener('click', showShortcuts);
     $('shortcutsClose').addEventListener('click', hideShortcuts);
@@ -2091,6 +2232,52 @@
     $('addSignatureBtn').addEventListener('click', () => addElement('instructor_signature'));
     document.querySelectorAll('.quick-field').forEach(b => b.addEventListener('click', () => addElement('field', b.dataset.field)));
 
+    // ---------- Drag from library onto the canvas ----------
+    // The library items stay click-to-add (they drop at a default slot); dragging one places it
+    // exactly where the pointer lands, which is how designers expect a palette to behave.
+    function canvasPointFromEvent(ev) {
+        const r = canvasEl.getBoundingClientRect();
+        const s = scale();
+        return { x: (ev.clientX - r.left) / s, y: (ev.clientY - r.top) / s };
+    }
+    function makeLibraryDraggable(node, payload) {
+        if (!node) return;
+        node.setAttribute('draggable', 'true');
+        node.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('application/x-ecert-element', JSON.stringify(payload));
+            e.dataTransfer.effectAllowed = 'copy';
+        });
+    }
+    [
+        ['addTextBtn', { type: 'text' }],
+        ['addDividerBtn', { type: 'divider' }],
+        ['addQrBtn', { type: 'qr' }],
+        ['addBarcodeBtn', { type: 'barcode' }],
+        ['addPartnerLogoBtn', { type: 'partner_logo' }],
+        ['addPartnerSignatureBtn', { type: 'partner_signature' }],
+        ['addSignatureBtn', { type: 'instructor_signature' }]
+    ].forEach(([id, payload]) => makeLibraryDraggable($(id), payload));
+    document.querySelectorAll('.quick-field').forEach(b => makeLibraryDraggable(b, { type: 'field', fieldKey: b.dataset.field }));
+    canvasEl.addEventListener('dragover', e => {
+        if (!e.dataTransfer.types.includes('application/x-ecert-element')) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        canvasEl.classList.add('drag-over');
+    });
+    canvasEl.addEventListener('dragleave', e => {
+        if (!canvasEl.contains(e.relatedTarget)) canvasEl.classList.remove('drag-over');
+    });
+    canvasEl.addEventListener('drop', e => {
+        canvasEl.classList.remove('drag-over');
+        const raw = e.dataTransfer.getData('application/x-ecert-element');
+        if (!raw) return;
+        e.preventDefault();
+        let payload;
+        try { payload = JSON.parse(raw); } catch { return; }
+        const point = canvasPointFromEvent(e);
+        addElement(payload.type, payload.fieldKey, point);
+    });
+
     $('saveDraftBtn').addEventListener('click', () => submitForm(false));
     $('publishBtn').addEventListener('click', () => submitForm(true));
 
@@ -2115,6 +2302,29 @@
     $('selectedRotation').addEventListener('change', e => updateSelected('rotation', e.target.value, true));
     $('selectedOpacity').addEventListener('input', e => { updateSelected('opacity', e.target.value, false); $('opacityLabel').textContent = (Number(e.target.value) || 100) + '%'; });
     $('selectedOpacity').addEventListener('change', e => updateSelected('opacity', e.target.value, true));
+    $('italicBtn').addEventListener('click', () => {
+        const el = elements[selected];
+        if (!el) return;
+        pushHistory();
+        el.isItalic = !el.isItalic;
+        $('italicBtn').classList.toggle('on', el.isItalic);
+        updateNode(el, selected);
+    });
+    $('underlineBtn').addEventListener('click', () => {
+        const el = elements[selected];
+        if (!el) return;
+        pushHistory();
+        el.isUnderline = !el.isUnderline;
+        $('underlineBtn').classList.toggle('on', el.isUnderline);
+        updateNode(el, selected);
+    });
+    $('selectedLineHeight').addEventListener('input', e => { updateSelected('lineHeight', e.target.value, false); $('lineHeightLabel').textContent = (Number(e.target.value) || 130) + '%'; });
+    $('selectedLineHeight').addEventListener('change', e => updateSelected('lineHeight', e.target.value, true));
+    $('selectedLetterSpacing').addEventListener('input', e => { updateSelected('letterSpacing', e.target.value, false); $('letterSpacingLabel').textContent = (Number(e.target.value) || 0) + 'px'; });
+    $('selectedLetterSpacing').addEventListener('change', e => updateSelected('letterSpacing', e.target.value, true));
+    document.querySelectorAll('#presetGrid .ped-preset').forEach(b => b.addEventListener('click', () => applyPreset(b.dataset.preset)));
+    $('groupBtn').addEventListener('click', groupSelected);
+    $('ungroupBtn').addEventListener('click', ungroupSelected);
     $('selectedLocked').addEventListener('change', e => {
         const el = elements[selected];
         if (!el) return;
@@ -2165,6 +2375,10 @@
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x') { e.preventDefault(); cutSelected(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') { e.preventDefault(); pasteClipboard(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') { e.preventDefault(); if (selected >= 0) toggleLock(selected); return; }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g' && e.shiftKey) { e.preventDefault(); ungroupSelected(); return; }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') { e.preventDefault(); groupSelected(); return; }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') { e.preventDefault(); $('italicBtn').click(); return; }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') { e.preventDefault(); $('underlineBtn').click(); return; }
         if (e.key === 'F2') { e.preventDefault(); if (selected >= 0) beginInlineEdit(selected); return; }
         if (e.key === '?' || (e.shiftKey && e.key === '/')) { e.preventDefault(); showShortcuts(); return; }
         // Bracket keys send the element to the back/front, matching the layers toolbar.
@@ -2245,5 +2459,7 @@
     document.getElementById('pedApp').classList.toggle('grid-on', gridOn);
     document.getElementById('pedApp').classList.toggle('rulers-on', rulersOn);
     renderRulers();
+    // The initial pushHistory above is the baseline, not a user edit.
+    dirty = false;
 })();
 </script>

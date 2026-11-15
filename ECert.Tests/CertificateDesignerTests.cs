@@ -304,6 +304,52 @@ public class CertificateDesignerTests
     }
 
     [Fact]
+    public async Task Saving_persists_typography_detail_and_grouping()
+    {
+        // Phase 5 fields are additive: italic/underline, line height, letter spacing and the group
+        // token must round-trip through save and reappear in the editor payload, and the group id
+        // must be sanitised (only letters, digits, dash and underscore survive).
+        var admin = await SignInAdminAsync();
+        var designId = await CreateDesignAsync("مسودة أنماط وتجميع");
+
+        var elementsJson =
+            "[{\"elementType\":\"text\",\"content\":\"عنوان\",\"x\":40,\"y\":60,\"width\":300,\"height\":50," +
+            "\"fontSize\":24,\"fontFamily\":\"Tajawal\",\"fontColor\":\"#172033\",\"fontWeight\":\"700\"," +
+            "\"textAlign\":\"center\",\"isItalic\":true,\"isUnderline\":true,\"lineHeight\":160," +
+            "\"letterSpacing\":3,\"groupId\":\"g-abc 123!\",\"isVisible\":true,\"isLocked\":false," +
+            "\"zIndex\":1,\"rotation\":0,\"opacity\":100}]";
+
+        var response = await admin.PostFormAsync("/CertificateDesigns", "/CertificateDesigns/Save", new Dictionary<string, string>
+        {
+            ["CertificateDesignId"] = designId.ToString(),
+            ["Name"] = "مسودة أنماط وتجميع",
+            ["CanvasWidth"] = "1120",
+            ["CanvasHeight"] = "792",
+            ["BackgroundColor"] = "#fffdf7",
+            ["BorderColor"] = "#c9a227",
+            ["BorderWidth"] = "12",
+            ["BorderRadius"] = "8",
+            ["ElementsJson"] = elementsJson,
+            ["Publish"] = "false"
+        });
+        response.EnsureSuccessStatusCode();
+
+        var saved = await _fixture.Factory.WithDbAsync(db =>
+            Task.FromResult(db.CertificateDesignElements.Single(e => e.CertificateDesignId == designId)));
+        Assert.True(saved.IsItalic);
+        Assert.True(saved.IsUnderline);
+        Assert.Equal(160, saved.LineHeight);
+        Assert.Equal(3, saved.LetterSpacing);
+        Assert.Equal("g-abc123", saved.GroupId);
+
+        var html = await admin.GetStringAsync($"/CertificateDesigns?id={designId}");
+        Assert.Contains("\"isItalic\":true", html);
+        Assert.Contains("\"lineHeight\":160", html);
+        Assert.Contains("\"letterSpacing\":3", html);
+        Assert.Contains("\"groupId\":\"g-abc123\"", html);
+    }
+
+    [Fact]
     public async Task Editor_exposes_speed_and_access_affordances()
     {
         // Phase 4: clipboard, inline text editing, a right-click menu, a command palette, a
@@ -339,6 +385,50 @@ public class CertificateDesignerTests
         Assert.Contains(".ped-menu-item", css);
         Assert.Contains(".ped-cmdk-item", css);
         Assert.Contains(".ped-sheet-row", css);
+    }
+
+    // Phase 5 — the pro-polish pass: grouping, typography detail, style presets, drag-to-place and
+    // the print safe area. These are contract checks against the rendered designer and its assets.
+    [Fact]
+    public async Task Editor_exposes_pro_polish_affordances()
+    {
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/CertificateDesigns");
+
+        // Grouping: shared group token plus the two toolbar actions.
+        Assert.Contains("id=\"groupBtn\"", html);
+        Assert.Contains("id=\"ungroupBtn\"", html);
+        Assert.Contains("function groupSelected(", html);
+        Assert.Contains("function ungroupSelected(", html);
+        Assert.Contains("function expandSelectionToGroups(", html);
+        // Typography detail: italic, underline, line height and letter spacing.
+        Assert.Contains("id=\"italicBtn\"", html);
+        Assert.Contains("id=\"underlineBtn\"", html);
+        Assert.Contains("id=\"selectedLineHeight\"", html);
+        Assert.Contains("id=\"selectedLetterSpacing\"", html);
+        Assert.Contains("isItalic", html);
+        Assert.Contains("isUnderline", html);
+        Assert.Contains("lineHeight", html);
+        Assert.Contains("letterSpacing", html);
+        // Style presets.
+        Assert.Contains("id=\"presetGrid\"", html);
+        Assert.Contains("const STYLE_PRESETS", html);
+        Assert.Contains("function applyPreset(", html);
+        // Drag from the library onto the canvas.
+        Assert.Contains("application/x-ecert-element", html);
+        Assert.Contains("function makeLibraryDraggable(", html);
+        // Print safe area.
+        Assert.Contains("id=\"safeAreaToggle\"", html);
+        Assert.Contains("id=\"safeArea\"", html);
+        // Keyboard bindings for the new actions.
+        Assert.Contains("e.key.toLowerCase() === 'g'", html);
+        Assert.Contains("e.key.toLowerCase() === 'i'", html);
+        Assert.Contains("e.key.toLowerCase() === 'u'", html);
+
+        var css = await admin.GetStringAsync("/css/certificate-design-editor.css");
+        Assert.Contains(".ped-preset", css);
+        Assert.Contains(".ped-safe-area", css);
+        Assert.Contains(".ly-group", css);
     }
 
     private async Task<int> CreateDesignAsync(string name)

@@ -317,6 +317,12 @@ public class PublicCertificateDesignElementViewModel
     public string FontColor { get; set; } = "#172033";
     public string FontWeight { get; set; } = "600";
     public string TextAlign { get; set; } = "center";
+    public bool IsItalic { get; set; }
+    public bool IsUnderline { get; set; }
+    /// <summary>Line height as a percentage of the font size (100 = single spacing).</summary>
+    public int LineHeight { get; set; } = 130;
+    /// <summary>Letter spacing in pixels.</summary>
+    public int LetterSpacing { get; set; }
     public int ZIndex { get; set; }
     public int Rotation { get; set; }
     /// <summary>Element opacity in percent (10–100); rendered as a CSS opacity on the public page.</summary>
