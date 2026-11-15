@@ -49,19 +49,30 @@ Consequences:
 - Contract tests: `ECert.Tests/CertificateDesignerTests.cs` (assert on the real
   rendered HTTP surface, so keep test strings in sync with the view).
 
-Designer work is organised in phases, one branch + PR each:
-Phase 1 nav/snapping (PR #19), Phase 2 multi-select (PR #20),
-Phase 3 align/distribute/order/layers (PR #21),
-Phase 4 speed/access — clipboard, inline edit, context menu, palette, rulers (PR #22),
-Phase 5 pro polish — grouping, typography, presets, drag-to-place, safe area (PR #24).
+Designer work was organised in phases, one branch each:
+Phase 1 nav/snapping (#19), Phase 2 multi-select (#20),
+Phase 3 align/distribute/order/layers (#21),
+Phase 4 speed/access — clipboard, inline edit, context menu, palette, rulers (#22),
+Phase 5 pro polish — grouping, typography, presets, drag-to-place, safe area (#24).
+All five are merged into `main` (integration merge `cc80d84`); the phase branches
+are spent.
 
-Phases stack: #22 targets `main`, #24 targets the Phase 4 branch. Open each new
-phase's PR against the previous phase's branch so the diff stays scoped, and say
-in the body that the earlier PR must merge first.
+The phases stacked linearly (each built on the previous), so merging them into
+`main` needed one manual conflict resolution: `main` had since moved the public
+element projection out of `CertificatesController.Verify` into
+`CertificateRenderService`. Keep that service as the single mapping point and
+copy new element fields there — the controller just does
+`model.DesignElements = design.Elements.ToList()`.
 
 A fresh phase's server-rendered markup only appears after a **Release rebuild
 plus a process restart** — the running `dotnet run --no-build` keeps the old
 `ECert.Views.dll` loaded, so a live browser check can silently show stale HTML.
+
+Pushing straight to `main` (via `GITHUB_PERSONAL_ACCESS_TOKEN`, which is the repo
+owner) does not auto-close a PR whose base was another branch, and the MCP
+`default_create_pr` / `gh pr create` tools fail with "must be a collaborator"
+because the integration `GITHUB_TOKEN` is a read-only fine-grained token — create
+and close PRs with the REST API instead.
 
 ### Validating designer JS
 
