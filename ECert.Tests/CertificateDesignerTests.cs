@@ -431,6 +431,158 @@ public class CertificateDesignerTests
         Assert.Contains(".ly-group", css);
     }
 
+    // The usability pass: drag responsiveness, arbitrary image upload, and a fullscreen workspace.
+    [Fact]
+    public async Task Editor_moves_the_element_node_during_a_drag()
+    {
+        // Regression: a single-element drag only moved the selection overlay, so the artwork itself
+        // stayed put and the move appeared to fail. The move loop must reposition the element node.
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/CertificateDesigns");
+
+        Assert.Contains("function moveNode(", html);
+        // The drag paints through the element node, and the render loop is frame-throttled.
+        Assert.Contains("moveNode(el, group[0]);", html);
+        Assert.Contains("requestAnimationFrame(paint)", html);
+        // Reading the canvas rect per pointermove forced a layout on every frame; the drag uses a
+        // cached scale instead.
+        Assert.Contains("function cachedScale(", html);
+        Assert.Contains("const s = () => cachedScale();", html);
+        // A cancelled pointer must end the drag rather than stranding the element under the cursor.
+        Assert.Contains("'pointercancel'", html);
+
+        var css = await admin.GetStringAsync("/css/certificate-design-editor.css");
+        Assert.Contains(".ped-app.is-dragging", css);
+        Assert.Contains("touch-action: none", css);
+    }
+
+    [Fact]
+    public async Task Editor_can_add_a_static_image_element()
+    {
+        // Any bitmap the admin uploads — not just the dynamic partner logos — must be placeable.
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/CertificateDesigns");
+
+        Assert.Contains("id=\"addImageBtn\"", html);
+        Assert.Contains("id=\"imageUploadInput\"", html);
+        Assert.Contains("function pickStaticImage(", html);
+        Assert.Contains("el-image", html);
+
+        var css = await admin.GetStringAsync("/css/certificate-design-editor.css");
+        Assert.Contains(".ped-el.el-image", css);
+    }
+
+    [Fact]
+    public async Task Saving_persists_a_static_image_element()
+    {
+        // The image element stores an uploaded path in Content; it must round-trip through save and
+        // come back into the editor payload so the bitmap is drawn again on reload.
+        var admin = await SignInAdminAsync();
+        var designId = await CreateDesignAsync("مسودة صورة ثابتة");
+
+        var elementsJson =
+            "[{\"elementType\":\"image\",\"content\":\"/uploads/designs/abc123.png\",\"x\":40,\"y\":60," +
+            "\"width\":220,\"height\":140,\"fontSize\":24,\"fontFamily\":\"Tajawal\",\"fontColor\":\"#172033\"," +
+            "\"fontWeight\":\"600\",\"textAlign\":\"center\",\"isVisible\":true,\"isLocked\":false," +
+            "\"zIndex\":1,\"rotation\":0,\"opacity\":100}]";
+
+        var response = await admin.PostFormAsync("/CertificateDesigns", "/CertificateDesigns/Save", new Dictionary<string, string>
+        {
+            ["CertificateDesignId"] = designId.ToString(),
+            ["Name"] = "مسودة صورة ثابتة",
+            ["CanvasWidth"] = "1120",
+            ["CanvasHeight"] = "792",
+            ["BackgroundColor"] = "#fffdf7",
+            ["BorderColor"] = "#c9a227",
+            ["BorderWidth"] = "12",
+            ["BorderRadius"] = "8",
+            ["ElementsJson"] = elementsJson,
+            ["Publish"] = "false"
+        });
+        response.EnsureSuccessStatusCode();
+
+        var saved = await _fixture.Factory.WithDbAsync(db =>
+            Task.FromResult(db.CertificateDesignElements.Single(e => e.CertificateDesignId == designId)));
+        Assert.Equal("image", saved.ElementType);
+        Assert.Equal("/uploads/designs/abc123.png", saved.Content);
+    }
+
+    [Fact]
+    public async Task Saving_rejects_a_static_image_with_a_foreign_path()
+    {
+        // Content is re-validated server-side: a path outside our own upload directory must be
+        // refused rather than stored and later rendered.
+        var admin = await SignInAdminAsync();
+        var designId = await CreateDesignAsync("مسودة مسار صورة غير صالح");
+
+        var elementsJson =
+            "[{\"elementType\":\"image\",\"content\":\"https://evil.example/x.png\",\"x\":40,\"y\":60," +
+            "\"width\":220,\"height\":140,\"isVisible\":true,\"zIndex\":1,\"rotation\":0,\"opacity\":100}]";
+
+        var response = await admin.PostFormAsync("/CertificateDesigns", "/CertificateDesigns/Save", new Dictionary<string, string>
+        {
+            ["CertificateDesignId"] = designId.ToString(),
+            ["Name"] = "مسودة مسار صورة غير صالح",
+            ["CanvasWidth"] = "1120",
+            ["CanvasHeight"] = "792",
+            ["BackgroundColor"] = "#fffdf7",
+            ["BorderColor"] = "#c9a227",
+            ["BorderWidth"] = "12",
+            ["BorderRadius"] = "8",
+            ["ElementsJson"] = elementsJson,
+            ["Publish"] = "false"
+        });
+        response.EnsureSuccessStatusCode();
+
+        var stored = await _fixture.Factory.WithDbAsync(db =>
+            Task.FromResult(db.CertificateDesignElements.Count(e => e.CertificateDesignId == designId)));
+        Assert.Equal(0, stored);
+    }
+
+    [Fact]
+    public async Task Upload_endpoint_stores_a_valid_image_and_rejects_a_fake_one()
+    {
+        var admin = await SignInAdminAsync();
+
+        // A minimal PNG (magic bytes + a single IHDR chunk header) passes the signature check.
+        var png = new byte[]
+        {
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+            0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01
+        };
+        var ok = await admin.PostMultipartAsync(
+            "/CertificateDesigns", "/CertificateDesigns/UploadImage",
+            Array.Empty<KeyValuePair<string, string>>(), "file", "logo.png", png, "image/png");
+        ok.EnsureSuccessStatusCode();
+        var body = await ok.Content.ReadAsStringAsync();
+        Assert.Contains("/uploads/designs/", body);
+
+        // A file whose extension claims PNG but whose bytes do not is refused.
+        var fake = await admin.PostMultipartAsync(
+            "/CertificateDesigns", "/CertificateDesigns/UploadImage",
+            Array.Empty<KeyValuePair<string, string>>(), "file", "evil.png",
+            System.Text.Encoding.ASCII.GetBytes("<html></html>"), "image/png");
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, fake.StatusCode);
+    }
+
+    [Fact]
+    public async Task Editor_exposes_a_fullscreen_workspace()
+    {
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/CertificateDesigns");
+
+        Assert.Contains("id=\"fullscreenBtn\"", html);
+        Assert.Contains("function setFullscreen(", html);
+        Assert.Contains("ped-fullscreen", html);
+        // F toggles it, Escape leaves it.
+        Assert.Contains("setFullscreen(!document.getElementById('pedApp').classList.contains('ped-fullscreen'))", html);
+
+        var css = await admin.GetStringAsync("/css/certificate-design-editor.css");
+        Assert.Contains(".ped-app.ped-fullscreen", css);
+        Assert.Contains("position: fixed", css);
+    }
+
     private async Task<int> CreateDesignAsync(string name)
     {
         var id = await _fixture.Factory.WithDbAsync(async db =>

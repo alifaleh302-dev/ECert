@@ -57,6 +57,7 @@ public sealed class CertificateRenderService
             {
                 var isQr = string.Equals(e.ElementType, "qr", StringComparison.OrdinalIgnoreCase);
                 var isBarcode = string.Equals(e.ElementType, "barcode", StringComparison.OrdinalIgnoreCase);
+                var isStaticImage = CertificateDesignService.UploadedArtworkElementTypes.Contains(e.ElementType);
                 var encoded = isQr
                     ? verificationUrl
                     : isBarcode
@@ -74,10 +75,12 @@ public sealed class CertificateRenderService
                         ? _qr.BuildDataUri(encoded!, QrModulePixels(e))
                         : isBarcode
                             ? _barcode.BuildDataUri(encoded!, BarcodeModuleWidth(e), BarcodeHeight(e))
-                            : ResolvePartnerArtwork(e, partners)
-                                ?? (string.Equals(e.ElementType, "instructor_signature", StringComparison.OrdinalIgnoreCase)
-                                    ? signatureUrl
-                                    : null),
+                            : isStaticImage
+                                ? (CertificateDesignService.IsUploadedArtworkUrl(e.Content) ? e.Content : null)
+                                : ResolvePartnerArtwork(e, partners)
+                                    ?? (string.Equals(e.ElementType, "instructor_signature", StringComparison.OrdinalIgnoreCase)
+                                        ? signatureUrl
+                                        : null),
                     X = e.X,
                     Y = e.Y,
                     Width = e.Width,

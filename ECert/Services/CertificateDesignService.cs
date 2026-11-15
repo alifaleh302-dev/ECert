@@ -28,7 +28,32 @@ public sealed class CertificateDesignService
         };
 
     public static readonly IReadOnlySet<string> AllowedElementTypes =
-        new HashSet<string>(new[] { "text", "field", "divider", "qr", "barcode", "partner_logo", "partner_signature", "instructor_signature" }, StringComparer.OrdinalIgnoreCase);
+        new HashSet<string>(new[] { "text", "field", "divider", "qr", "barcode", "partner_logo", "partner_signature", "instructor_signature", "image" }, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Element types whose <c>Content</c> holds an uploaded bitmap path rather than text. The
+    /// designer uploads the file first, then stores the returned URL on the element, so a static
+    /// image is independent of any course data.
+    /// </summary>
+    public static readonly IReadOnlySet<string> UploadedArtworkElementTypes =
+        new HashSet<string>(new[] { "image" }, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Prefix every designer upload is written under; also the guard for stored paths.</summary>
+    public const string UploadUrlPrefix = "/uploads/designs/";
+
+    /// <summary>
+    /// True when <paramref name="url"/> is a same-origin designer upload path. Stored paths come
+    /// back from the browser, so they are re-checked here rather than trusted.
+    /// </summary>
+    public static bool IsUploadedArtworkUrl(string? url)
+    {
+        var value = (url ?? string.Empty).Trim();
+        if (!value.StartsWith(UploadUrlPrefix, StringComparison.Ordinal))
+            return false;
+        var name = value[UploadUrlPrefix.Length..];
+        return name.Length is > 0 and <= 120
+            && !name.Contains('/') && !name.Contains('\\') && !name.Contains("..");
+    }
 
     /// <summary>
     /// Element types that render a course partner's artwork. Their <c>FieldKey</c> holds the

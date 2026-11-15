@@ -74,14 +74,15 @@
                         var isPartnerLogo = string.Equals(element.ElementType, "partner_logo", StringComparison.OrdinalIgnoreCase);
                         var isPartnerSignature = string.Equals(element.ElementType, "partner_signature", StringComparison.OrdinalIgnoreCase);
                         var isInstructorSignature = string.Equals(element.ElementType, "instructor_signature", StringComparison.OrdinalIgnoreCase);
+                        var isStaticImage = string.Equals(element.ElementType, "image", StringComparison.OrdinalIgnoreCase);
                         var isSignature = isPartnerSignature || isInstructorSignature;
                         // Artwork elements render nothing when the course has nothing to place.
-                        if ((isPartnerLogo || isSignature) && string.IsNullOrWhiteSpace(element.ImageSrc))
+                        if ((isPartnerLogo || isSignature || isStaticImage) && string.IsNullOrWhiteSpace(element.ImageSrc))
                         {
                             continue;
                         }
-                        var isImage = isQr || isBarcode || isPartnerLogo || isSignature;
-                        var imageAlt = isQr ? "رمز التحقق (QR)" : isBarcode ? "باركود الشهادة" : isPartnerLogo ? "شعار الجهة الداعمة" : isPartnerSignature ? "توقيع الجهة الداعمة" : "توقيع المدرب";
+                        var isImage = isQr || isBarcode || isPartnerLogo || isSignature || isStaticImage;
+                        var imageAlt = isQr ? "رمز التحقق (QR)" : isBarcode ? "باركود الشهادة" : isPartnerLogo ? "شعار الجهة الداعمة" : isPartnerSignature ? "توقيع الجهة الداعمة" : isStaticImage ? "صورة" : "توقيع المدرب";
                         // QR/barcode pixels are generated server-side (data: URIs), so they bypass the
                         // URL guard; logo and signature paths are admin-supplied and must be sanitised.
                         var imageSrc = isQr || isBarcode ? element.ImageSrc : SafeUrl.ForAttribute(element.ImageSrc, "#");

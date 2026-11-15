@@ -92,7 +92,7 @@
     .ped-app.grid-on .ped-grid { display: block; }
 
     /* elements */
-    .ped-el { position: absolute; display: flex; align-items: center; justify-content: center; padding: 6px 10px; overflow: hidden; white-space: pre-wrap; line-height: 1.3; user-select: none; cursor: grab; word-break: break-word; box-sizing: border-box; }
+    .ped-el { position: absolute; display: flex; align-items: center; justify-content: center; padding: 6px 10px; overflow: hidden; white-space: pre-wrap; line-height: 1.3; user-select: none; cursor: grab; word-break: break-word; box-sizing: border-box; touch-action: none; contain: layout style; }
     .ped-el:active { cursor: grabbing; }
     .ped-el.el-divider { cursor: grab; padding: 0; border-top: 2px solid currentColor; height: 0 !important; background: transparent !important; }
     .ped-el.el-divider .ped-el-inner { display: none; }
@@ -104,6 +104,16 @@
     .ped-el.el-partner-signature, .ped-el.el-signature { padding: 0 8px; background: rgba(148,163,184,.08); border: 1px dashed #cbd5e1; border-radius: 2px; }
     .ped-el.el-partner-signature::after { content: "\f604"; font-family: "bootstrap-icons"; font-size: 26px; color: #94a3b8; }
     .ped-el.el-signature::after { content: "\f4d6"; font-family: "bootstrap-icons"; font-size: 26px; color: #94a3b8; }
+    /* Static image: an admin-uploaded bitmap placed by hand, independent of course data. */
+    .ped-el.el-image { padding: 0; background: transparent; }
+    .ped-el.el-image img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
+    .ped-el.el-image.is-empty { background: repeating-conic-gradient(#eef2f7 0% 25%, #f8fafc 0% 50%) 50% / 12px 12px; border: 1px dashed #cbd5e1; border-radius: 2px; }
+    .ped-el.el-image.is-empty::after { content: "\f3f4"; font-family: "bootstrap-icons"; font-size: 30px; color: #94a3b8; }
+
+    /* While a drag is in flight the element itself is translated directly, so hint the compositor
+       and stop the per-frame overlay teardown from fighting the pointer. */
+    .ped-app.is-dragging .ped-el { will-change: transform; }
+    .ped-app.is-dragging .ped-overlay { transition: none !important; }
 
     /* selection overlay */
     .ped-overlay { position: absolute; pointer-events: none; z-index: 9999; }
@@ -294,3 +304,20 @@
 /* Inside the admin shell the editor sits below the topbar, so give it a stable viewport height. */
 .admin-shell .ped-app { height: calc(100vh - 148px); min-height: 560px; }
 @media (max-width: 992px) { .admin-shell .ped-app { height: auto; min-height: 520px; } }
+
+/* ---------- Fullscreen workspace ----------
+   The editor is promoted to a fixed overlay covering the viewport, so the canvas gets the whole
+   screen instead of the space left over under the admin chrome. `position: fixed` beats the shell's
+   stacking context without touching its markup. */
+.ped-app.ped-fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 1080;
+    height: 100vh;
+    min-height: 0;
+    border-radius: 0;
+    border: 0;
+}
+.ped-app.ped-fullscreen .ped-canvas-area { background-image: radial-gradient(#1e2b45 1px, transparent 1px); }
+.ped-app.ped-fullscreen .ped-stage { margin: 46px auto 70px; }
+body.ped-fullscreen-open { overflow: hidden; }

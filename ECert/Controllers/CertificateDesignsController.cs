@@ -53,6 +53,39 @@ public class CertificateDesignsController : Controller
             System.IO.File.Delete(path);
     }
 
+    /// <summary>
+    /// Accepts an image for a static (non-dynamic) design element and returns its public path. The
+    /// designer uploads the file, then places the returned URL on an <c>image</c> element.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadImage(IFormFile? file)
+    {
+        if (!await CanManageAsync()) return Forbid();
+
+        var (valid, error) = await ImageUploadValidator.ValidateAsync(file!);
+        if (!valid) return BadRequest(new { error });
+
+        var uploadsDir = Path.Combine(_env.WebRootPath, "uploads", "designs");
+        Directory.CreateDirectory(uploadsDir);
+        var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file!.FileName)}";
+        using (var stream = new FileStream(Path.Combine(uploadsDir, fileName), FileMode.Create))
+        {
+            await file.CopyToAsync(stream);
+        }
+
+        var url = $"{CertificateDesignService.UploadUrlPrefix}{fileName}";
+        await _audit.LogAsync(
+            User.Identity?.Name ?? string.Empty,
+            "UploadImage",
+            "CertificateDesign",
+            null,
+            null,
+            $"Uploaded: {url}",
+            HttpContext.Connection.RemoteIpAddress?.ToString());
+        return Json(new { url });
+    }
+
     private async Task<bool> CanManageAsync()
     {
         if (User.IsInRole("SuperAdmin") || User.HasClaim(c => c.Type == "Permission" && c.Value == "manage-certificate-designs"))
@@ -322,6 +355,20 @@ public class CertificateDesignsController : Controller
                 return new List<CertificateDesignElement>();
             }
 
+            // A static image carries an uploaded file path in Content; anything that is not one of
+            // our own upload paths is dropped rather than stored.
+            var isUploadedArtwork = CertificateDesignService.UploadedArtworkElementTypes.Contains(type);
+            var content = TrimTo(payload.Content, 1000, string.Empty);
+            if (isUploadedArtwork && !CertificateDesignService.IsUploadedArtworkUrl(content))
+            {
+                if (content.Length > 0)
+                {
+                    error = "مسار الصورة غير صالح. أعد رفع الصورة وحاول مرة أخرى.";
+                    return new List<CertificateDesignElement>();
+                }
+                content = string.Empty;
+            }
+
             // Partner elements store their partner slot (0-based) in FieldKey; everything else keeps
             // the key empty because it carries no dynamic reference.
             var isPartnerSlot = CertificateDesignService.PartnerSlotElementTypes.Contains(type);
@@ -335,7 +382,7 @@ public class CertificateDesignsController : Controller
             {
                 ElementType = type,
                 FieldKey = normalizedFieldKey,
-                Content = TrimTo(payload.Content, 1000, string.Empty),
+                Content = content,
                 X = Math.Clamp(payload.X, 0, canvasWidth - 20),
                 Y = Math.Clamp(payload.Y, 0, canvasHeight - 20),
                 Width = Math.Clamp(payload.Width, 20, canvasWidth),
