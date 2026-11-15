@@ -52,22 +52,79 @@
                         <div class="col-6"><div class="bg-light rounded p-2"><strong class="d-block">@userCount</strong><small class="text-muted">مستخدمون</small></div></div>
                     </div>
 
-                    <div class="mb-3">
-                        <small class="text-muted d-block mb-2">الصلاحيات الممنوحة</small>
-                        @if (role.RolePermissions.Any())
-                        {
-                            <div class="d-flex flex-wrap gap-1">
-                                @foreach (var rolePermission in role.RolePermissions.OrderBy(rp => rp.Permission?.Description))
-                                {
-                                    <span class="a-badge a-badge--neutral">@(rolePermission.Permission?.Description ?? rolePermission.Permission?.PermissionName)</span>
-                                }
-                            </div>
-                        }
-                        else
-                        {
+                    @{
+                        var permissionNames = role.RolePermissions
+                            .Select(rp => rp.Permission?.PermissionName ?? string.Empty)
+                            .Where(name => name.Length > 0)
+                            .ToList();
+                        var viewCount = permissionNames.Count(n => AdminPermissions.LevelOf(n) == "view");
+                        var manageCount = permissionNames.Count(n => AdminPermissions.LevelOf(n) == "manage");
+                        var approveCount = permissionNames.Count(n => AdminPermissions.LevelOf(n) == "approve");
+                        var sectionLabels = permissionNames
+                            .SelectMany(AdminPermissions.SectionLabelsFor)
+                            .Distinct()
+                            .OrderBy(label => label)
+                            .ToList();
+                    }
+
+                    @if (permissionNames.Any())
+                    {
+                        <div class="rp-levels mb-3">
+                            @if (viewCount > 0)
+                            {
+                                <div class="rp-level rp-level--view">
+                                    <div class="rp-level__head">
+                                        <span><i class="bi bi-eye" aria-hidden="true"></i> قراءة</span>
+                                        <span class="rp-level__count">@viewCount</span>
+                                    </div>
+                                    <div class="rp-level__bar"><div class="rp-level__fill" style="width:100%"></div></div>
+                                </div>
+                            }
+                            @if (manageCount > 0)
+                            {
+                                <div class="rp-level rp-level--manage">
+                                    <div class="rp-level__head">
+                                        <span><i class="bi bi-pencil-square" aria-hidden="true"></i> إدارة</span>
+                                        <span class="rp-level__count">@manageCount</span>
+                                    </div>
+                                    <div class="rp-level__bar"><div class="rp-level__fill" style="width:100%"></div></div>
+                                </div>
+                            }
+                            @if (approveCount > 0)
+                            {
+                                <div class="rp-level rp-level--approve">
+                                    <div class="rp-level__head">
+                                        <span><i class="bi bi-patch-check" aria-hidden="true"></i> اعتماد</span>
+                                        <span class="rp-level__count">@approveCount</span>
+                                    </div>
+                                    <div class="rp-level__bar"><div class="rp-level__fill" style="width:100%"></div></div>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="mb-3">
+                            <small class="text-muted d-block mb-2"><i class="bi bi-window-stack"></i> الأقسام المتاحة</small>
+                            @if (sectionLabels.Any())
+                            {
+                                <div class="d-flex flex-wrap gap-1">
+                                    @foreach (var label in sectionLabels)
+                                    {
+                                        <span class="rp-section-chip">@label</span>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="text-muted small">لا يفتح هذا الدور أي قسم ظاهر.</span>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
                             <span class="text-muted small">لا توجد صلاحيات مرتبطة.</span>
-                        }
-                    </div>
+                        </div>
+                    }
 
                     <div class="d-flex justify-content-end gap-2 border-top pt-3">
                         @if (role.IsSystem)
@@ -92,4 +149,8 @@
 @if (!Model.Any())
 {
     <div class="text-center text-muted py-5">لا توجد أدوار حتى الآن.</div>
+}
+
+@section Styles {
+    <link href="~/css/role-permissions.css" rel="stylesheet" asp-append-version="true" />
 }

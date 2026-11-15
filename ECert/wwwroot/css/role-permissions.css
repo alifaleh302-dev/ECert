@@ -1,0 +1,422 @@
+/* ==========================================================================
+   ECert — Role permission editor
+   A two-pane, searchable permission picker used by Views/Roles/_RoleForm.
+   Built on the admin design tokens (--a-*), so it follows the active theme,
+   the RTL layout and the reduced-motion preference automatically.
+   ========================================================================== */
+
+.rp,
+:root {
+    /* One accent per permission level, reused by badges, bars and counters. */
+    --rp-view: var(--a-info);
+    --rp-view-soft: var(--a-info-soft);
+    --rp-manage: var(--a-brand);
+    --rp-manage-soft: var(--a-brand-soft);
+    --rp-approve: var(--a-warning);
+    --rp-approve-soft: var(--a-warning-soft);
+}
+
+/* --------------------------------------------------------------------------
+   1. Layout — main picker + sticky summary
+   -------------------------------------------------------------------------- */
+.rp__layout {
+    display: grid;
+    gap: var(--a-5);
+    align-items: start;
+}
+
+@media (min-width: 1100px) {
+    .rp__layout { grid-template-columns: minmax(0, 1fr) 330px; }
+}
+
+.rp__main { min-width: 0; display: grid; gap: var(--a-4); }
+
+.rp__aside { position: static; }
+
+@media (min-width: 1100px) {
+    .rp__aside { position: sticky; inset-block-start: 84px; }
+}
+
+/* --------------------------------------------------------------------------
+   2. Presets — quick-start bundles
+   -------------------------------------------------------------------------- */
+.rp-presets {
+    padding: var(--a-4);
+    background: var(--a-surface-2);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-r-lg);
+}
+
+.rp-presets__title {
+    display: flex;
+    align-items: center;
+    gap: var(--a-2);
+    margin-bottom: var(--a-1);
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--a-text);
+}
+
+.rp-presets__hint {
+    margin: 0 0 var(--a-3);
+    font-size: 0.78rem;
+    color: var(--a-text-3);
+}
+
+.rp-presets__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--a-2);
+}
+
+.rp-preset {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 13px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--a-text-2);
+    background: var(--a-surface);
+    border: 1px solid var(--a-border-strong);
+    border-radius: var(--a-r-full);
+    cursor: pointer;
+    transition: color var(--a-t-fast), background var(--a-t-fast),
+        border-color var(--a-t-fast), box-shadow var(--a-t-fast);
+}
+
+.rp-preset:hover {
+    color: var(--a-brand-strong);
+    border-color: var(--a-brand);
+    box-shadow: var(--a-e1);
+}
+
+.rp-preset:focus-visible {
+    outline: 3px solid var(--a-brand-ring);
+    outline-offset: 2px;
+}
+
+.rp-preset[aria-pressed='true'] {
+    color: #fff;
+    background: var(--a-brand);
+    border-color: var(--a-brand);
+}
+
+.rp-preset__count {
+    padding: 0 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.6;
+    color: inherit;
+    background: var(--a-surface-3);
+    border-radius: var(--a-r-full);
+}
+
+.rp-preset[aria-pressed='true'] .rp-preset__count {
+    background: rgba(255, 255, 255, 0.24);
+}
+
+/* --------------------------------------------------------------------------
+   3. Toolbar — search + bulk actions
+   -------------------------------------------------------------------------- */
+.rp-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--a-3);
+    padding: var(--a-3) var(--a-4);
+    background: var(--a-surface);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-r-lg);
+    box-shadow: var(--a-e1);
+}
+
+.rp-search {
+    position: relative;
+    flex: 1 1 220px;
+    min-width: 0;
+}
+
+.rp-search__icon {
+    position: absolute;
+    inset-inline-start: 12px;
+    inset-block-start: 50%;
+    transform: translateY(-50%);
+    color: var(--a-text-3);
+    pointer-events: none;
+}
+
+.rp-search input {
+    width: 100%;
+    padding-inline-start: 36px;
+}
+
+.rp-toolbar__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--a-2);
+}
+
+/* --------------------------------------------------------------------------
+   4. Groups
+   -------------------------------------------------------------------------- */
+.rp-group {
+    background: var(--a-surface);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-r-lg);
+    box-shadow: var(--a-e1);
+    overflow: hidden;
+}
+
+.rp-group[hidden] { display: none; }
+
+.rp-group__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--a-3);
+    padding: var(--a-3) var(--a-4);
+    background: var(--a-surface-2);
+    border-bottom: 1px solid var(--a-border);
+}
+
+.rp-group__toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--a-2);
+    margin: 0;
+    cursor: pointer;
+}
+
+.rp-group__name {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--a-2);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--a-text);
+}
+
+.rp-group__name i { color: var(--a-brand); }
+
+.rp-group__count {
+    flex-shrink: 0;
+    padding: 3px 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--a-text-2);
+    background: var(--a-surface-3);
+    border-radius: var(--a-r-full);
+    font-variant-numeric: tabular-nums;
+}
+
+.rp-group__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: var(--a-2);
+    padding: var(--a-3);
+}
+
+/* --------------------------------------------------------------------------
+   5. Permission item
+   -------------------------------------------------------------------------- */
+.rp-perm {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--a-2);
+    margin: 0;
+    padding: var(--a-3);
+    background: var(--a-surface);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-r);
+    cursor: pointer;
+    transition: background var(--a-t-fast), border-color var(--a-t-fast),
+        box-shadow var(--a-t-fast);
+}
+
+.rp-perm[hidden] { display: none; }
+
+.rp-perm:hover {
+    background: var(--a-surface-2);
+    border-color: var(--a-border-strong);
+}
+
+.rp-perm:has(.rp-perm__check:checked) {
+    background: var(--a-brand-soft);
+    border-color: var(--a-brand);
+}
+
+.rp-perm:has(.rp-perm__check:focus-visible) {
+    outline: 3px solid var(--a-brand-ring);
+    outline-offset: 1px;
+}
+
+.rp-perm__check { margin-top: 2px; flex-shrink: 0; }
+
+.rp-perm__body { min-width: 0; flex: 1; }
+
+.rp-perm__title {
+    display: block;
+    font-size: 0.86rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--a-text);
+}
+
+.rp-perm__code {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.72rem;
+    color: var(--a-text-3);
+    direction: ltr;
+    text-align: start;
+    word-break: break-all;
+}
+
+.rp-badge {
+    flex-shrink: 0;
+    align-self: flex-start;
+    padding: 2px 8px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    white-space: nowrap;
+    border-radius: var(--a-r-full);
+}
+
+.rp-badge--view { color: var(--rp-view); background: var(--rp-view-soft); }
+.rp-badge--manage { color: var(--rp-manage); background: var(--rp-manage-soft); }
+.rp-badge--approve { color: var(--rp-approve); background: var(--rp-approve-soft); }
+
+/* --------------------------------------------------------------------------
+   6. Empty search result
+   -------------------------------------------------------------------------- */
+.rp-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--a-2);
+    padding: var(--a-8) var(--a-4);
+    text-align: center;
+    color: var(--a-text-3);
+    background: var(--a-surface);
+    border: 1px dashed var(--a-border-strong);
+    border-radius: var(--a-r-lg);
+}
+
+.rp-empty[hidden] { display: none; }
+
+.rp-empty i { font-size: 1.8rem; }
+
+/* --------------------------------------------------------------------------
+   7. Sticky summary
+   -------------------------------------------------------------------------- */
+.rp-summary {
+    display: grid;
+    gap: var(--a-4);
+    padding: var(--a-4);
+    background: var(--a-surface);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-r-lg);
+    box-shadow: var(--a-e1);
+}
+
+.rp-summary__head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--a-2);
+    padding-bottom: var(--a-3);
+    border-bottom: 1px solid var(--a-border);
+}
+
+.rp-summary__big {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--a-brand);
+    font-variant-numeric: tabular-nums;
+}
+
+.rp-summary__of {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--a-text-3);
+}
+
+.rp-levels { display: grid; gap: var(--a-3); }
+
+.rp-level__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--a-2);
+    margin-bottom: 5px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--a-text-2);
+}
+
+.rp-level__head span:first-child {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.rp-level__count { font-variant-numeric: tabular-nums; color: var(--a-text-3); }
+
+.rp-level__bar {
+    height: 7px;
+    border-radius: var(--a-r-full);
+    background: var(--a-surface-3);
+    overflow: hidden;
+}
+
+.rp-level__fill {
+    height: 100%;
+    width: 0;
+    border-radius: var(--a-r-full);
+    transition: width var(--a-t);
+}
+
+.rp-level--view .rp-level__fill { background: var(--rp-view); }
+.rp-level--manage .rp-level__fill { background: var(--rp-manage); }
+.rp-level--approve .rp-level__fill { background: var(--rp-approve); }
+
+.rp-sections__title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: var(--a-2);
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--a-text);
+}
+
+.rp-sections__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.rp-section-chip {
+    padding: 3px 10px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--a-brand-strong);
+    background: var(--a-brand-soft);
+    border: 1px solid var(--a-brand);
+    border-radius: var(--a-r-full);
+}
+
+.rp-sections__empty {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--a-text-3);
+}
+
+.rp-sections__empty[hidden] { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    .rp-perm,
+    .rp-preset,
+    .rp-level__fill { transition: none; }
+}

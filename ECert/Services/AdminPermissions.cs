@@ -153,6 +153,57 @@ public static class AdminPermissions
             .Select(entry => entry.Key);
 
     /// <summary>
+    /// Human-readable Arabic name for each section (controller), mirroring the sidebar so the role
+    /// editor can tell an administrator which pages a permission opens without duplicating labels.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> SectionLabels =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Registrations"] = "التسجيلات",
+            ["CoursesManage"] = "الدورات",
+            ["CategoriesManage"] = "الفئات",
+            ["Instructors"] = "المدربون",
+            ["Certificates"] = "الشهادات",
+            ["CertificateDesigns"] = "تصاميم الشهادات",
+            ["Finance"] = "لوحة المؤشرات المالية",
+            ["Invoices"] = "الفواتير",
+            ["Payments"] = "الدفعات",
+            ["Installments"] = "الأقساط والخطط",
+            ["Custody"] = "عهدة الموظف والتوريد",
+            ["Receivables"] = "المتأخرات",
+            ["Refunds"] = "استرداد الرسوم",
+            ["Expenses"] = "المصروفات",
+            ["Cashbox"] = "الصندوق",
+            ["Reports"] = "تقارير الإيرادات",
+            ["FinancialAudit"] = "سجل التدقيق المالي",
+            ["FinanceSettings"] = "إعدادات النظام المالية",
+            ["PostsManage"] = "المنشورات",
+            ["NewsManage"] = "الأخبار",
+            ["HomepageManage"] = "الصفحة الرئيسية",
+            ["Users"] = "المستخدمون",
+            ["Roles"] = "الأدوار والصلاحيات",
+            ["AuditLog"] = "سجل العمليات",
+            ["SecuritySettings"] = "الأمان والنسخ الاحتياطي",
+            ["AcademicCatalog"] = "البيانات الجامعية",
+            ["PhoneCountries"] = "مفاتيح الهواتف",
+        };
+
+    /// <summary>The Arabic labels of the sections a permission opens, in navigation order.</summary>
+    public static IEnumerable<string> SectionLabelsFor(string permission) =>
+        SectionsFor(permission).Select(section => SectionLabels.TryGetValue(section, out var label) ? label : section);
+
+    /// <summary>
+    /// Classifies a permission by what it lets the holder do, so the role editor can group and
+    /// colour them consistently: <c>view</c> reads, <c>approve</c> decides, <c>manage</c> writes.
+    /// </summary>
+    public static string LevelOf(string permission)
+    {
+        if (permission.StartsWith("view-", StringComparison.Ordinal)) return "view";
+        if (permission.StartsWith("approve-", StringComparison.Ordinal)) return "approve";
+        return "manage";
+    }
+
+    /// <summary>
     /// Permissions that must never be handed to a custom role: they govern who may change
     /// roles, users and the security posture, so granting them would let a role escalate its
     /// own privileges or weaken the system. Only the built-in SuperAdmin holds them.

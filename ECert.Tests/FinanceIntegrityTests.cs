@@ -109,9 +109,8 @@ public class FinanceIntegrityTests
         var admin = await SignInAdminAsync();
         var html = await admin.GetStringAsync("/Roles/Create");
 
-        Assert.Contains("id=\"rolePreset\"", html);
         foreach (var preset in ECert.Services.AdminPermissions.Presets)
-            Assert.Contains($"value=\"{preset.Key}\"", html);
+            Assert.Contains($"data-perm-preset=\"{preset.Key}\"", html);
     }
 
     private async Task<AppClient> SignInAdminAsync()
