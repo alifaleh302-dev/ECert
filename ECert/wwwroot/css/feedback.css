@@ -1,0 +1,191 @@
+/* ==========================================================================
+   ECert — Shared feedback layer (toasts + confirm dialog).
+   Loaded by BOTH the public site and the admin dashboard, so success/error
+   feedback looks and behaves the same everywhere. It carries its own copy of the
+   handful of design tokens the feedback components use, because the public pages
+   load site.css (which has none of the --a-* tokens) rather than admin.css.
+
+   The toast item class is namespaced under the host (.toast-host__item) so no
+   third-party rule can reach it — Bootstrap ships `.toast:not(.show){display:none}`,
+   which silently hid every notification when the item was classed `toast`.
+
+   The token block uses :where(:root) (zero specificity) so it only supplies
+   defaults on the public pages: on the dashboard, admin.css's :root and its
+   [data-theme="dark"] override still win, so dark mode is unaffected.
+   ========================================================================== */
+:where(:root) {
+    --a-2: 8px;
+    --a-3: 12px;
+    --a-4: 16px;
+    --a-5: 20px;
+    --a-6: 24px;
+
+    --a-surface: #ffffff;
+    --a-border: #e5e9f0;
+    --a-text: #0f172a;
+    --a-text-2: #475569;
+
+    --a-brand: #2563eb;
+    --a-brand-soft: #eff6ff;
+    --a-success: #059669;
+    --a-warning: #b45309;
+    --a-danger: #dc2626;
+    --a-danger-soft: #fef2f2;
+    --a-info: #0369a1;
+
+    --a-r: 12px;
+    --a-r-lg: 16px;
+    --a-r-full: 999px;
+
+    --a-e2: 0 2px 8px rgba(15, 23, 42, 0.06);
+    --a-e4: 0 24px 48px -12px rgba(15, 23, 42, 0.28);
+
+    --a-t-fast: 130ms cubic-bezier(0.4, 0, 0.2, 1);
+    --a-t: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+    --z-toast: 3000;
+    --z-confirm: 3100;
+}
+
+/* --------------------------------------------------------------------------
+   20. Notifications — one toast stack and one confirm dialog for the whole app.
+   Server flash messages (TempData) and client feedback both render here, so a
+   result is announced the same way no matter where it came from. The host is
+   fixed and lives above every overlay (see --z-toast / --z-confirm).
+   -------------------------------------------------------------------------- */
+.toast-host {
+    position: fixed;
+    top: var(--a-4);
+    inset-inline-end: var(--a-4);
+    z-index: var(--z-toast);
+    display: flex;
+    flex-direction: column;
+    gap: var(--a-3);
+    width: min(420px, calc(100vw - 2 * var(--a-4)));
+    pointer-events: none;
+}
+
+.toast-host__item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--a-3);
+    padding: var(--a-3) var(--a-4);
+    border-radius: var(--a-r);
+    border: 1px solid var(--a-border);
+    background: var(--a-surface);
+    color: var(--a-text);
+    box-shadow: var(--a-e4);
+    pointer-events: auto;
+    position: relative;
+    overflow: hidden;
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.7;
+    animation: toast-in var(--a-t) both;
+}
+
+.toast-host__item.is-leaving { animation: toast-out var(--a-t-fast) both; }
+
+.toast-host__icon { font-size: 1.15rem; flex-shrink: 0; margin-top: 1px; }
+.toast-host__body { flex: 1 1 auto; min-width: 0; }
+.toast-host__close {
+    flex-shrink: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    opacity: 0.55;
+    cursor: pointer;
+    line-height: 1;
+    font-size: 1rem;
+    padding: 0;
+}
+.toast-host__close:hover { opacity: 1; }
+
+/* A thin bar drains over the toast's lifetime so the dismissal is predictable. */
+.toast-host__timer {
+    position: absolute;
+    inset-block-end: 0;
+    inset-inline-start: 0;
+    height: 3px;
+    background: currentColor;
+    opacity: 0.35;
+    animation: toast-timer linear both;
+}
+
+.toast-host__item--success { border-inline-start: 4px solid var(--a-success); }
+.toast-host__item--success .toast-host__icon { color: var(--a-success); }
+.toast-host__item--info { border-inline-start: 4px solid var(--a-info); }
+.toast-host__item--info .toast-host__icon { color: var(--a-info); }
+.toast-host__item--warning { border-inline-start: 4px solid var(--a-warning); }
+.toast-host__item--warning .toast-host__icon { color: var(--a-warning); }
+.toast-host__item--danger { border-inline-start: 4px solid var(--a-danger); }
+.toast-host__item--danger .toast-host__icon { color: var(--a-danger); }
+
+@keyframes toast-in {
+    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toast-out {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-6px); }
+}
+@keyframes toast-timer {
+    from { width: 100%; }
+    to { width: 0; }
+}
+
+/* Without JS the flash partial renders plain alerts; keep them on-brand. */
+.no-js-flash .alert {
+    border-radius: var(--a-r);
+    border: 1px solid var(--a-border);
+    box-shadow: var(--a-e2);
+}
+
+/* --------------------------------------------------------------------------
+   21. Confirm dialog — replaces window.confirm with an on-brand modal.
+   -------------------------------------------------------------------------- */
+.confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-confirm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--a-4);
+    background: rgba(8, 15, 30, 0.55);
+    animation: toast-in var(--a-t-fast) both;
+}
+
+.confirm-box {
+    width: min(440px, 100%);
+    background: var(--a-surface);
+    color: var(--a-text);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-r-lg);
+    box-shadow: var(--a-e4);
+    padding: var(--a-6);
+    text-align: center;
+}
+
+.confirm-box__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border-radius: var(--a-r-full);
+    font-size: 1.5rem;
+    margin-bottom: var(--a-3);
+    background: var(--a-brand-soft);
+    color: var(--a-brand);
+}
+.confirm-box--danger .confirm-box__icon { background: var(--a-danger-soft); color: var(--a-danger); }
+
+.confirm-box__title { font-size: 1.05rem; font-weight: 800; margin: 0 0 var(--a-2); }
+.confirm-box__text { font-size: 0.9rem; color: var(--a-text-2); margin: 0 0 var(--a-5); line-height: 1.8; }
+.confirm-box__actions { display: flex; gap: var(--a-3); justify-content: center; }
+.confirm-box__actions .btn { min-width: 120px; }
+
+@media (max-width: 480px) {
+    .toast-host { inset-inline: var(--a-3); width: auto; }
+}

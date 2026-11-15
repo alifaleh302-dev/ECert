@@ -53,15 +53,35 @@ public class NotificationTests
         {
             var html = await admin.GetStringAsync(path);
             Assert.Contains("notify.js", html);
+            Assert.Contains("feedback.css", html);
         }
 
-        var css = await admin.GetStringAsync("/css/admin.css");
+        var css = await admin.GetStringAsync("/css/feedback.css");
         Assert.Contains(".toast-host", css);
         Assert.Contains("--z-toast", css);
         // The toast layer must sit above the designer's fullscreen overlay.
         var toastZ = int.Parse(Regex.Match(css, @"--z-toast:\s*(\d+)").Groups[1].Value);
-        var designerZ = int.Parse(Regex.Match(css, @"--z-designer:\s*(\d+)").Groups[1].Value);
+        var adminCss = await admin.GetStringAsync("/css/admin.css");
+        var designerZ = int.Parse(Regex.Match(adminCss, @"--z-designer:\s*(\d+)").Groups[1].Value);
         Assert.True(toastZ > designerZ, "the toast host must sit above the designer overlay");
+    }
+
+    [Fact]
+    public async Task Public_pages_load_the_shared_feedback_stylesheet()
+    {
+        // Regression: the public layout loaded only site.css, which carries neither the toast
+        // styling nor the --a-* tokens the feedback layer needs, so a validation warning on the
+        // public registration form (e.g. a bad phone number) rendered invisible.
+        var courseId = await _fixture.Factory.FirstOpenCourseIdAsync();
+        var client = AppClient.Create(_fixture.Factory);
+
+        var html = await client.GetStringAsync($"/Registration/Register?courseId={courseId}");
+        Assert.Contains("feedback.css", html);
+        Assert.Contains("notify.js", html);
+
+        var css = await client.GetStringAsync("/css/feedback.css");
+        Assert.Contains(".toast-host__item", css);
+        Assert.Contains("--a-surface", css);
     }
 
     [Fact]
@@ -112,6 +132,24 @@ public class NotificationTests
         var admin = await SignInAdminAsync();
         var js = await admin.GetStringAsync("/js/notify.js");
         Assert.Contains("window.Notify = Notify", js);
+    }
+
+    [Fact]
+    public async Task Toast_styling_is_namespaced_so_bootstrap_cannot_hide_it()
+    {
+        // Regression: the toast used Bootstrap's own `.toast` class. bootstrap.rtl.min.css ships
+        // `.toast:not(.show){display:none}` (specificity 0,2,0) which beats the app's
+        // `.toast{display:flex}` (0,1,0) — and notify.js never adds `.show`, so every success
+        // and error notification rendered invisible. The item class is namespaced under the host
+        // so no third-party `.toast` rule can reach it.
+        var admin = await SignInAdminAsync();
+        var js = await admin.GetStringAsync("/js/notify.js");
+        var css = await admin.GetStringAsync("/css/feedback.css");
+
+        Assert.Contains("toast-host__item", js);
+        Assert.DoesNotContain("`toast toast--", js);
+        Assert.Contains(".toast-host__item", css);
+        Assert.Contains(".toast-host__item--success", css);
     }
 
     private async Task<AppClient> SignInAdminAsync()
