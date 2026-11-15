@@ -26,6 +26,10 @@
     --rp-r: 4px;
     --rp-head-h: 42px;
     --rp-group-h: 36px;
+    --rp-scrollbar: 8px;
+    --rp-scrollbar-track: var(--a-surface-3);
+    --rp-scrollbar-thumb: var(--a-border-strong);
+    --rp-scrollbar-thumb-hover: var(--a-brand);
 }
 
 /* --------------------------------------------------------------------------
@@ -144,18 +148,42 @@
     border: 1px solid var(--rp-border);
     border-radius: var(--rp-r);
     overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--rp-scrollbar-thumb) transparent;
 }
+
+/* Slim, theme-aware scrollbar (WebKit/Blink). Firefox uses the standard
+   `scrollbar-*` properties above; this covers the Chromium/WebKit engines. */
+.rp-matrix::-webkit-scrollbar {
+    width: var(--rp-scrollbar);
+    height: var(--rp-scrollbar);
+}
+
+.rp-matrix::-webkit-scrollbar-track {
+    background: var(--rp-scrollbar-track);
+    border-radius: var(--rp-r);
+}
+
+.rp-matrix::-webkit-scrollbar-thumb {
+    background: var(--rp-scrollbar-thumb);
+    border-radius: var(--rp-r);
+}
+
+.rp-matrix::-webkit-scrollbar-thumb:hover { background: var(--rp-scrollbar-thumb-hover); }
+
+.rp-matrix::-webkit-scrollbar-corner { background: transparent; }
 
 .rp-table {
     width: 100%;
-    min-width: 640px;               /* below this the wrapper scrolls sideways */
+    min-width: 480px;               /* only very narrow screens scroll sideways */
     border-collapse: separate;
     border-spacing: 0;
     font-size: 0.85rem;
+    table-layout: fixed;
 }
 
 .rp-col--feature { width: auto; }
-.rp-col--level { width: clamp(96px, 12vw, 150px); }
+.rp-col--level { width: clamp(80px, 9vw, 128px); }
 
 .rp-table thead th {
     position: sticky;
@@ -214,6 +242,7 @@
     font-weight: 500;
     color: var(--rp-text);
     text-align: start;
+    overflow-wrap: anywhere;
     background: var(--rp-surface);
     border-bottom: 1px solid var(--rp-border);
 }
