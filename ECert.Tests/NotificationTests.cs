@@ -85,6 +85,20 @@ public class NotificationTests
     }
 
     [Fact]
+    public async Task Standalone_auth_pages_can_render_feedback()
+    {
+        // Regression: Login and VerifyTwoFactor set `Layout = null`, so they bypass both layouts.
+        // When the toast CSS moved into feedback.css they lost it, and Login — the page that
+        // receives the "password updated" flash — had no notify.js either, so that message
+        // vanished. These pages must carry the shared feedback assets themselves.
+        var client = AppClient.Create(_fixture.Factory);
+        var html = await client.GetStringAsync("/Auth/Login");
+
+        Assert.Contains("feedback.css", html);
+        Assert.Contains("notify.js", html);
+    }
+
+    [Fact]
     public async Task A_page_without_a_flash_renders_no_alert_banner()
     {
         // Cashbox/Index used to render its own TempData banner. A plain visit carries no flash,
