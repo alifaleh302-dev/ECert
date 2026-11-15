@@ -113,20 +113,6 @@ CREATE TABLE IF NOT EXISTS `CertificateDesignElements` (
             _db.CertificateDesigns.Add(CertificateDesignService.CreateDefault("system"));
             await _db.SaveChangesAsync();
         }
-
-        var published = await _db.CertificateDesigns
-            .Where(t => t.IsPublished)
-            .OrderByDescending(t => t.UpdatedAt)
-            .ThenByDescending(t => t.CertificateDesignId)
-            .ToListAsync();
-
-        if (published.Count > 1)
-        {
-            foreach (var duplicate in published.Skip(1))
-                duplicate.IsPublished = false;
-
-            await _db.SaveChangesAsync();
-        }
     }
 
     private async Task EnsureColumnAsync(string tableName, string columnName, string definitionSql)

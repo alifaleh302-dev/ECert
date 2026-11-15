@@ -86,6 +86,22 @@ public class CertificateDesignsController : Controller
         return Json(new { url });
     }
 
+    /// <summary>
+    /// Deletes a background file only when no other design still points at it. Duplicated and forked
+    /// designs share the same file path, so deleting it on one of them would blank the others.
+    /// </summary>
+    private async Task DeleteBackgroundImageIfUnreferencedAsync(string? url, int exceptDesignId)
+    {
+        if (string.IsNullOrWhiteSpace(url) || !url.StartsWith("/uploads/designs/", StringComparison.Ordinal))
+            return;
+
+        var stillReferenced = await _db.CertificateDesigns
+            .AnyAsync(d => d.CertificateDesignId != exceptDesignId && d.BackgroundImageUrl == url);
+        if (stillReferenced) return;
+
+        DeleteBackgroundImage(url);
+    }
+
     private async Task<bool> CanManageAsync()
     {
         if (User.IsInRole("SuperAdmin") || User.HasClaim(c => c.Type == "Permission" && c.Value == "manage-certificate-designs"))
@@ -140,12 +156,37 @@ public class CertificateDesignsController : Controller
             .ToListAsync();
 
         ViewData["Title"] = "تصميم شهادة جديد";
+        var draft = CertificateDesignService.CreateDefault(User.Identity?.Name);
+        draft.Name = await NextDesignNameAsync();
+        draft.IsPublished = false;
+        draft.DesignKey = string.Empty;
         return View("Index", new CertificateDesignEditorViewModel
         {
-            Design = CertificateDesignService.CreateDefault(User.Identity?.Name),
+            Design = draft,
             Designs = designs,
             FieldLabels = CertificateDesignService.FieldLabels
         });
+    }
+
+    /// <summary>
+    /// Suggests a name that is not already taken ("قالب جديد 2", "قالب جديد 3", …) so freshly created
+    /// templates are distinguishable in the list instead of all sharing one default name.
+    /// </summary>
+    private async Task<string> NextDesignNameAsync()
+    {
+        const string baseName = "قالب جديد";
+        var names = await _db.CertificateDesigns
+            .Where(t => t.Name == baseName || t.Name.StartsWith(baseName + " "))
+            .Select(t => t.Name)
+            .ToListAsync();
+
+        if (!names.Contains(baseName)) return baseName;
+        for (var n = 2; n < 1000; n++)
+        {
+            var candidate = $"{baseName} {n}";
+            if (!names.Contains(candidate)) return candidate;
+        }
+        return $"{baseName} {Guid.NewGuid():N}"[..20];
     }
 
     [HttpPost]
@@ -178,28 +219,27 @@ public class CertificateDesignsController : Controller
         }
 
         var saveAsDraft = !model.Publish && current?.IsPublished == true;
-        CertificateDesign design;
         if (saveAsDraft)
         {
-            design = new CertificateDesign
-            {
-                Name = string.IsNullOrWhiteSpace(model.Name) ? "مسودة شهادة" : model.Name.Trim() + " (مسودة)",
-                DesignKey = $"draft-{Guid.NewGuid():N}",
-                IsPublished = false,
-                CreatedAt = DateTime.Now
-            };
-            _db.CertificateDesigns.Add(design);
+            // Editing a published design without publishing keeps the published artwork intact by
+            // forking it into a new draft copy.
+            current = await CloneDesignAsync(current!, " (مسودة)");
+        }
+
+        CertificateDesign design;
+        if (current != null)
+        {
+            design = current;
         }
         else
         {
-            design = current ?? new CertificateDesign
+            design = new CertificateDesign
             {
-                Name = string.IsNullOrWhiteSpace(model.Name) ? "تصميم شهادة" : model.Name.Trim(),
+                Name = TrimTo(model.Name, 120, "تصميم شهادة"),
                 DesignKey = $"design-{Guid.NewGuid():N}",
                 CreatedAt = DateTime.Now
             };
-            if (current == null)
-                _db.CertificateDesigns.Add(design);
+            _db.CertificateDesigns.Add(design);
         }
 
         design.Name = TrimTo(model.Name, 120, "تصميم شهادة");
@@ -213,12 +253,13 @@ public class CertificateDesignsController : Controller
         if (newBackground != null)
         {
             if (design.CertificateDesignId > 0)
-                DeleteBackgroundImage(current?.BackgroundImageUrl);
+                await DeleteBackgroundImageIfUnreferencedAsync(current?.BackgroundImageUrl, design.CertificateDesignId);
             design.BackgroundImageUrl = newBackground;
         }
         else if (model.RemoveBackgroundImage)
         {
-            DeleteBackgroundImage(current?.BackgroundImageUrl);
+            if (design.CertificateDesignId > 0)
+                await DeleteBackgroundImageIfUnreferencedAsync(current?.BackgroundImageUrl, design.CertificateDesignId);
             design.BackgroundImageUrl = null;
         }
         else if (design.CertificateDesignId == 0)
@@ -229,16 +270,9 @@ public class CertificateDesignsController : Controller
 
         design.UpdatedBy = TrimTo(User.Identity?.Name, 100, "system");
         design.UpdatedAt = DateTime.Now;
+        // Publishing a design makes it available to certificates that have no course-specific
+        // template; it does not affect the other published designs, which stay selectable.
         design.IsPublished = model.Publish;
-
-        if (model.Publish)
-        {
-            var published = await _db.CertificateDesigns
-                .Where(t => t.IsPublished && t.CertificateDesignId != design.CertificateDesignId)
-                .ToListAsync();
-            foreach (var other in published)
-                other.IsPublished = false;
-        }
 
         if (design.CertificateDesignId > 0 && design.Elements.Count > 0)
             _db.CertificateDesignElements.RemoveRange(design.Elements);
@@ -284,8 +318,14 @@ public class CertificateDesignsController : Controller
 
         if (design.IsPublished)
         {
-            TempData["Error"] = "لا يمكن حذف التصميم المنشور. انشر تصميمًا آخر أولًا ثم أعد المحاولة.";
-            return RedirectToAction(nameof(Index), new { id });
+            // Keep at least one published template as the fallback for courses without their own.
+            var hasAnotherPublished = await _db.CertificateDesigns
+                .AnyAsync(t => t.IsPublished && t.CertificateDesignId != id);
+            if (!hasAnotherPublished)
+            {
+                TempData["Error"] = "لا يمكن حذف القالب المنشور الوحيد. انشر قالبًا آخر أولًا ثم أعد المحاولة.";
+                return RedirectToAction(nameof(Index), new { id });
+            }
         }
 
         if (await _db.Courses.AnyAsync(course => course.CertificateDesignId == id))
@@ -295,7 +335,7 @@ public class CertificateDesignsController : Controller
         }
 
         var name = design.Name;
-        DeleteBackgroundImage(design.BackgroundImageUrl);
+        await DeleteBackgroundImageIfUnreferencedAsync(design.BackgroundImageUrl, id);
         _db.CertificateDesignElements.RemoveRange(design.Elements);
         _db.CertificateDesigns.Remove(design);
         await _db.SaveChangesAsync();
@@ -310,6 +350,135 @@ public class CertificateDesignsController : Controller
 
         TempData["Success"] = "تم حذف التصميم.";
         return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// Duplicates a design, including its elements, so a template can be reused as a starting point.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Duplicate(int id)
+    {
+        if (!await CanManageAsync()) return Forbid();
+
+        var source = await _db.CertificateDesigns
+            .Include(t => t.Elements)
+            .FirstOrDefaultAsync(t => t.CertificateDesignId == id);
+
+        if (source == null)
+            return NotFound();
+
+        var copy = await CloneDesignAsync(source, " (نسخة)", publish: false);
+        await _db.SaveChangesAsync();
+        await _audit.LogAsync(
+            User.Identity?.Name ?? string.Empty,
+            "Duplicate",
+            "CertificateDesign",
+            copy.CertificateDesignId,
+            null,
+            $"Design: {copy.Name} (from {source.Name})",
+            HttpContext.Connection.RemoteIpAddress?.ToString());
+
+        TempData["Success"] = "تم تكرار التصميم.";
+        return RedirectToAction(nameof(Index), new { id = copy.CertificateDesignId });
+    }
+
+    /// <summary>
+    /// Renames a design without touching its artwork. Kept separate from <see cref="Save"/> so a
+    /// rename can never be confused with publishing, and so it works on the published design too.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Rename(int id, string name)
+    {
+        if (!await CanManageAsync()) return Forbid();
+
+        var design = await _db.CertificateDesigns.FirstOrDefaultAsync(t => t.CertificateDesignId == id);
+        if (design == null)
+            return NotFound();
+
+        var trimmed = (name ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            TempData["Error"] = "لا يمكن أن يكون اسم القالب فارغًا.";
+            return RedirectToAction(nameof(Index), new { id });
+        }
+
+        var previous = design.Name;
+        design.Name = TrimTo(trimmed, 120, previous);
+        design.UpdatedBy = TrimTo(User.Identity?.Name, 100, "system");
+        design.UpdatedAt = DateTime.Now;
+        await _db.SaveChangesAsync();
+        await _audit.LogAsync(
+            User.Identity?.Name ?? string.Empty,
+            "Rename",
+            "CertificateDesign",
+            id,
+            null,
+            $"Design: {previous} -> {design.Name}",
+            HttpContext.Connection.RemoteIpAddress?.ToString());
+
+        TempData["Success"] = "تمت إعادة تسمية القالب.";
+        return RedirectToAction(nameof(Index), new { id });
+    }
+
+    /// <summary>
+    /// Copies a design and its elements into a new, unpublished row. The caller is responsible for
+    /// calling <c>SaveChangesAsync</c>; the clone is added to the change tracker but not saved.
+    /// </summary>
+    private async Task<CertificateDesign> CloneDesignAsync(CertificateDesign source, string nameSuffix, bool publish = false)
+    {
+        var copy = new CertificateDesign
+        {
+            Name = TrimTo(source.Name + nameSuffix, 120, "تصميم شهادة"),
+            DesignKey = $"design-{Guid.NewGuid():N}",
+            IsPublished = publish,
+            CanvasWidth = source.CanvasWidth,
+            CanvasHeight = source.CanvasHeight,
+            BackgroundColor = source.BackgroundColor,
+            BorderColor = source.BorderColor,
+            BorderWidth = source.BorderWidth,
+            BorderRadius = source.BorderRadius,
+            BackgroundImageUrl = source.BackgroundImageUrl,
+            UpdatedBy = TrimTo(User.Identity?.Name, 100, "system"),
+            CreatedAt = DateTime.Now,
+            UpdatedAt = DateTime.Now
+        };
+
+        foreach (var element in source.Elements)
+        {
+            copy.Elements.Add(new CertificateDesignElement
+            {
+                ElementType = element.ElementType,
+                FieldKey = element.FieldKey,
+                Content = element.Content,
+                X = element.X,
+                Y = element.Y,
+                Width = element.Width,
+                Height = element.Height,
+                FontSize = element.FontSize,
+                FontFamily = element.FontFamily,
+                FontColor = element.FontColor,
+                FontWeight = element.FontWeight,
+                TextAlign = element.TextAlign,
+                IsItalic = element.IsItalic,
+                IsUnderline = element.IsUnderline,
+                LineHeight = element.LineHeight,
+                LetterSpacing = element.LetterSpacing,
+                GroupId = element.GroupId,
+                IsVisible = element.IsVisible,
+                IsLocked = element.IsLocked,
+                ZIndex = element.ZIndex,
+                Rotation = element.Rotation,
+                Opacity = element.Opacity,
+                SortOrder = element.SortOrder
+            });
+        }
+
+        _db.CertificateDesigns.Add(copy);
+        // Flush so the clone gets its identity before the caller keeps working with it.
+        await _db.SaveChangesAsync();
+        return copy;
     }
 
     private static List<CertificateDesignElement> ParseElements(string? json, int canvasWidth, int canvasHeight, out string? error)

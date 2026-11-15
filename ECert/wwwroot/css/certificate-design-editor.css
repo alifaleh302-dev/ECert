@@ -52,10 +52,18 @@
     .ped-designs-menu .ds-item { display: flex; align-items: center; gap: .6rem; padding: .5rem .65rem; border-radius: var(--ped-r); cursor: pointer; text-decoration: none; color: var(--ped-ink); font-size: .84rem; }
     .ped-designs-menu .ds-item:hover { background: #1d2942; }
     .ped-designs-menu .ds-item.active { background: rgba(59, 110, 240, .14); box-shadow: inset 0 0 0 1px rgba(59, 110, 240, .45); }
+    .ped-designs-menu .ds-row { display: flex; align-items: center; gap: .25rem; border-radius: var(--ped-r); }
+    .ped-designs-menu .ds-row:hover { background: #1d2942; }
+    .ped-designs-menu .ds-row.active { background: rgba(59, 110, 240, .14); box-shadow: inset 0 0 0 1px rgba(59, 110, 240, .45); }
+    .ped-designs-menu .ds-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: .6rem; padding: .5rem .65rem; border-radius: var(--ped-r); cursor: pointer; text-decoration: none; color: var(--ped-ink); font-size: .84rem; }
+    .ped-designs-menu .ds-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ped-designs-menu .ds-actions { display: flex; align-items: center; gap: 1px; padding-inline-end: .35rem; opacity: 0; transition: opacity .12s ease; }
+    .ped-designs-menu .ds-row:hover .ds-actions, .ped-designs-menu .ds-row.active .ds-actions { opacity: 1; }
+    .ped-designs-menu .ds-act-form { margin: 0; display: flex; }
+    .ped-designs-menu .ds-act { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: var(--ped-r); background: transparent; color: var(--ped-muted); cursor: pointer; font-size: .78rem; transition: .12s ease; }
+    .ped-designs-menu .ds-act:hover { background: #26334d; color: var(--ped-ink); }
+    .ped-designs-menu .ds-act--danger:hover { background: rgba(224, 87, 91, .16); color: #ffb4b6; }
     .ped-designs-menu .ds-divider { height: 1px; background: var(--ped-line); margin: .3rem .4rem; }
-    .ped-designs-menu .ds-delete-form { margin: 0; }
-    .ped-designs-menu .ds-item--danger { width: 100%; border: 0; background: transparent; color: #e88b8e; text-align: start; }
-    .ped-designs-menu .ds-item--danger:hover { background: rgba(224, 87, 91, .14); color: #ffb4b6; }
     .ped-designs-menu .ds-i-live { color: #9fb0ca; }
     .ped-designs-menu .ds-i-accent { color: var(--ped-accent-2); }
     /* Status labels are quiet text, not coloured chips: the accent is reserved for actions. */

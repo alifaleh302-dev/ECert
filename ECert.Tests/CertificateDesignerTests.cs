@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.RegularExpressions;
 using ECert.Models;
 using ECert.Services;
@@ -109,18 +110,20 @@ public class CertificateDesignerTests
     }
 
     [Fact]
-    public async Task Delete_refuses_the_published_design()
+    public async Task Delete_refuses_the_last_published_design()
     {
+        // At least one published template must survive as the fallback for courses without their
+        // own design, so the only live template cannot be removed.
         var admin = await SignInAdminAsync();
-        var publishedId = await _fixture.Factory.WithDbAsync(db =>
-            Task.FromResult(db.CertificateDesigns.Where(d => d.IsPublished).Select(d => d.CertificateDesignId).First()));
+        var publishedId = await CreateDesignAsync("القالب المنشور الوحيد", published: true);
+        await MakeOnlyPublishedAsync(publishedId);
 
         var response = await admin.PostFormAsync("/CertificateDesigns", $"/CertificateDesigns/Delete/{publishedId}", new Dictionary<string, string>());
         response.EnsureSuccessStatusCode();
 
         Assert.True(await _fixture.Factory.WithDbAsync(db =>
             Task.FromResult(db.CertificateDesigns.Any(d => d.CertificateDesignId == publishedId))),
-            "the published design must survive a delete request");
+            "the only published design must survive a delete request");
     }
 
     [Fact]
@@ -154,14 +157,15 @@ public class CertificateDesignerTests
     }
 
     [Fact]
-    public async Task The_delete_button_is_hidden_for_the_published_design()
+    public async Task Every_template_row_exposes_a_delete_control()
     {
+        // The delete control is now offered per row (not only for the selected draft); the server
+        // still refuses to remove the last published template or one a course points at.
         var admin = await SignInAdminAsync();
-        var publishedId = await _fixture.Factory.WithDbAsync(db =>
-            Task.FromResult(db.CertificateDesigns.Where(d => d.IsPublished).Select(d => d.CertificateDesignId).First()));
+        var draftId = await CreateDesignAsync("مسودة لها زر حذف");
 
-        var html = await admin.GetStringAsync($"/CertificateDesigns?id={publishedId}");
-        Assert.DoesNotContain($"/CertificateDesigns/Delete/{publishedId}", html);
+        var html = await admin.GetStringAsync($"/CertificateDesigns?id={draftId}");
+        Assert.Contains($"/CertificateDesigns/Delete/{draftId}", html);
     }
 
     [Fact]
@@ -583,7 +587,7 @@ public class CertificateDesignerTests
         Assert.Contains("position: fixed", css);
     }
 
-    private async Task<int> CreateDesignAsync(string name)
+    private async Task<int> CreateDesignAsync(string name, bool published = false)
     {
         var id = await _fixture.Factory.WithDbAsync(async db =>
         {
@@ -591,7 +595,7 @@ public class CertificateDesignerTests
             {
                 Name = name,
                 DesignKey = $"draft-{Guid.NewGuid():N}",
-                IsPublished = false,
+                IsPublished = published,
                 UpdatedBy = "test"
             };
             db.CertificateDesigns.Add(design);
@@ -599,6 +603,175 @@ public class CertificateDesignerTests
             return design.CertificateDesignId;
         });
         return id;
+    }
+
+    /// <summary>
+    /// Leaves exactly <paramref name="keepId"/> published so a test's published-set is deterministic
+    /// regardless of what other tests in the shared fixture database created.
+    /// </summary>
+    private Task MakeOnlyPublishedAsync(int keepId) =>
+        _fixture.Factory.ExecuteRawAsync(
+            $"UPDATE CertificateDesigns SET IsPublished = 0 WHERE CertificateDesignId <> {keepId};");
+
+    // ---------------------------------------------------------------------------------------------
+    // Template management: several templates may be published at once, a template can be renamed in
+    // place (including the published one), duplicated, and deleted — while at least one published
+    // template always survives as the fallback.
+    // ---------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Publishing_a_template_does_not_unpublish_the_others()
+    {
+        // Regression: publishing a template used to flip every other published template to draft, so
+        // only one template could ever be live and the rest silently became dead drafts.
+        var admin = await SignInAdminAsync();
+        var existingPublishedId = await CreateDesignAsync("قالب منشور مسبقًا", published: true);
+        await MakeOnlyPublishedAsync(existingPublishedId);
+
+        var response = await admin.PostFormAsync("/CertificateDesigns", "/CertificateDesigns/Save", new Dictionary<string, string>
+        {
+            ["CertificateDesignId"] = "0",
+            ["Name"] = $"قالب ثانٍ {Guid.NewGuid():N}"[..24],
+            ["CanvasWidth"] = "1120",
+            ["CanvasHeight"] = "792",
+            ["BackgroundColor"] = "#fffdf7",
+            ["BorderColor"] = "#c9a227",
+            ["BorderWidth"] = "12",
+            ["BorderRadius"] = "8",
+            ["ElementsJson"] = "[]",
+            ["Publish"] = "true"
+        });
+        response.EnsureSuccessStatusCode();
+
+        var published = await _fixture.Factory.WithDbAsync(db =>
+            Task.FromResult(db.CertificateDesigns.Count(d => d.IsPublished)));
+        Assert.Equal(2, published);
+        Assert.True(await _fixture.Factory.WithDbAsync(db =>
+            Task.FromResult(db.CertificateDesigns.Single(d => d.CertificateDesignId == existingPublishedId).IsPublished)),
+            "publishing a new template must leave the existing published template live");
+    }
+
+    [Fact]
+    public async Task Renaming_the_published_template_renames_it_in_place()
+    {
+        // Regression: saving the published template without publishing forked a new draft named
+        // "<name> (مسودة)" and left the original name untouched, so a rename looked like it failed
+        // and produced duplicates. Renaming must now change the name of the same row.
+        var admin = await SignInAdminAsync();
+        var publishedId = await CreateDesignAsync("قالب منشور لإعادة التسمية", published: true);
+
+        var before = await _fixture.Factory.WithDbAsync(db =>
+            Task.FromResult(db.CertificateDesigns.Count()));
+
+        var name = $"اسم جديد {Guid.NewGuid():N}"[..24];
+        var response = await admin.PostFormAsync("/CertificateDesigns", $"/CertificateDesigns/Rename/{publishedId}",
+            new Dictionary<string, string> { ["name"] = name });
+        response.EnsureSuccessStatusCode();
+
+        var stored = await _fixture.Factory.WithDbAsync(db =>
+            Task.FromResult(db.CertificateDesigns.Single(d => d.CertificateDesignId == publishedId).Name));
+        Assert.Equal(name, stored);
+
+        var after = await _fixture.Factory.WithDbAsync(db =>
+            Task.FromResult(db.CertificateDesigns.Count()));
+        Assert.Equal(before, after);
+    }
+
+    [Fact]
+    public async Task Rename_without_an_antiforgery_token_is_rejected()
+    {
+        var admin = await SignInAdminAsync();
+        var designId = await CreateDesignAsync("مسودة ومحاولة إعادة تسمية");
+
+        var response = await admin.PostWithoutTokenAsync($"/CertificateDesigns/Rename/{designId}",
+            new Dictionary<string, string> { ["name"] = "اسم مزوّر" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.True(await _fixture.Factory.WithDbAsync(db =>
+            Task.FromResult(db.CertificateDesigns.Single(d => d.CertificateDesignId == designId).Name != "اسم مزوّر")),
+            "a CSRF rename attempt must not change the name");
+    }
+
+    [Fact]
+    public async Task Duplicate_copies_the_template_and_its_elements_as_a_draft()
+    {
+        var admin = await SignInAdminAsync();
+        var sourceId = await CreateDesignAsync("قالب للنسخ");
+        await _fixture.Factory.WithDbAsync(async db =>
+        {
+            db.CertificateDesignElements.Add(new CertificateDesignElement
+            {
+                CertificateDesignId = sourceId,
+                ElementType = "field",
+                FieldKey = "trainee_name"
+            });
+            await db.SaveChangesAsync();
+            return 0;
+        });
+
+        var response = await admin.PostFormAsync("/CertificateDesigns", $"/CertificateDesigns/Duplicate/{sourceId}", new Dictionary<string, string>());
+        response.EnsureSuccessStatusCode();
+
+        var copy = await _fixture.Factory.WithDbAsync(db =>
+            Task.FromResult(db.CertificateDesigns
+                .Where(d => d.CertificateDesignId != sourceId && d.Name.StartsWith("قالب للنسخ"))
+                .Select(d => new { d.CertificateDesignId, d.IsPublished })
+                .FirstOrDefault()));
+        Assert.NotNull(copy);
+        Assert.False(copy!.IsPublished);
+        Assert.True(await _fixture.Factory.WithDbAsync(db =>
+            Task.FromResult(db.CertificateDesignElements.Any(e => e.CertificateDesignId == copy.CertificateDesignId))),
+            "the duplicate must carry the source's elements");
+    }
+
+    [Fact]
+    public async Task A_published_template_can_be_deleted_when_another_published_one_remains()
+    {
+        var admin = await SignInAdminAsync();
+        var firstId = await CreateDesignAsync("قالب منشور أول", published: true);
+        var secondId = await CreateDesignAsync("قالب منشور ثانٍ", published: true);
+        await MakeOnlyPublishedAsync(firstId);
+        await _fixture.Factory.ExecuteRawAsync($"UPDATE CertificateDesigns SET IsPublished = 1 WHERE CertificateDesignId IN ({firstId}, {secondId});");
+
+        var response = await admin.PostFormAsync("/CertificateDesigns", $"/CertificateDesigns/Delete/{firstId}", new Dictionary<string, string>());
+        response.EnsureSuccessStatusCode();
+
+        Assert.False(await _fixture.Factory.WithDbAsync(db =>
+            Task.FromResult(db.CertificateDesigns.Any(d => d.CertificateDesignId == firstId))));
+        Assert.True(await _fixture.Factory.WithDbAsync(db =>
+            Task.FromResult(db.CertificateDesigns.Any(d => d.CertificateDesignId == secondId))));
+    }
+
+    [Fact]
+    public async Task New_templates_are_suggested_distinct_names()
+    {
+        // Regression: every new template started with the same name, so the list showed several
+        // identical entries. A fresh template now gets a free "قالب جديد N" that no other design uses.
+        var admin = await SignInAdminAsync();
+        await admin.PostFormAsync("/CertificateDesigns", "/CertificateDesigns/Save", new Dictionary<string, string>
+        {
+            ["CertificateDesignId"] = "0",
+            ["Name"] = "قالب جديد",
+            ["CanvasWidth"] = "1120",
+            ["CanvasHeight"] = "792",
+            ["BackgroundColor"] = "#fffdf7",
+            ["BorderColor"] = "#c9a227",
+            ["BorderWidth"] = "12",
+            ["BorderRadius"] = "8",
+            ["ElementsJson"] = "[]",
+            ["Publish"] = "false"
+        });
+
+        var existing = await _fixture.Factory.WithDbAsync(db =>
+            Task.FromResult(db.CertificateDesigns.Select(d => d.Name).ToList()));
+
+        var html = System.Net.WebUtility.HtmlDecode(await admin.GetStringAsync("/CertificateDesigns/New"));
+        var match = System.Text.RegularExpressions.Regex.Match(html, "id=\"templateName\"[^>]*value=\"([^\"]*)\"");
+        Assert.True(match.Success, "the new-template page must render the name field");
+        var suggested = match.Groups[1].Value;
+
+        Assert.StartsWith("قالب جديد", suggested);
+        Assert.DoesNotContain(suggested, existing);
     }
 
     private async Task<AppClient> SignInAdminAsync()
