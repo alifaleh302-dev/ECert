@@ -232,6 +232,8 @@ public class CertificateIndexPageViewModel
     public List<Course> Courses { get; set; } = new();
     public List<Certificate> Certificates { get; set; } = new();
     public Dictionary<int, string> VerificationUrls { get; set; } = new();
+    /// <summary>True when the viewer may issue certificates (not just read the listing).</summary>
+    public bool CanManage { get; set; }
 }
 
 public class PublicCertificateVerificationViewModel

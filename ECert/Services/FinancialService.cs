@@ -16,7 +16,7 @@ public sealed record RefundResult(bool Success, string Message, Refund? Refund =
 ///
 /// A refund above the configured direct ceiling does not apply immediately: it is stored as
 /// <see cref="RefundStatus.PendingApproval"/> and touches neither the invoice nor the custody until a
-/// SuperAdmin approves it (see <see cref="ApproveRefundAsync"/>).
+/// holder of <c>approve-refunds</c> approves it (see <see cref="ApproveRefundAsync"/>).
 /// </summary>
 public class FinancialService
 {
@@ -82,7 +82,7 @@ public class FinancialService
         string? receiptNumber,
         int performingUserId,
         string performingUserName,
-        bool isSuperAdmin = false)
+        bool canDrawFromFund = false)
     {
         if (invoice.Status == "Cancelled")
             return new RefundResult(false, "لا يمكن استرداد رسوم من فاتورة ملغية.");
@@ -107,15 +107,16 @@ public class FinancialService
 
         // Where the money comes from. The refund is normally paid out of the employee's own custody,
         // and is refused when that custody cannot cover it — so a custody can never go negative. A
-        // SuperAdmin whose own custody cannot cover it may draw the amount from the main fund instead
-        // (the fund must cover it), so the SuperAdmin is never blocked and no custody is pushed below zero.
+        // holder of manage-cashbox (who may withdraw from the main fund anyway) whose own custody
+        // cannot cover it may draw the amount from the main fund instead (the fund must cover it), so
+        // the cashier is never blocked and no custody is pushed below zero.
         var custody = await _ledger.GetCustodyBalanceAsync(performingUserId);
         var payFromFund = false;
         if (amount > custody)
         {
-            if (!isSuperAdmin)
+            if (!canDrawFromFund)
                 return new RefundResult(false,
-                    $"رصيد عهدتك ({custody:N2}) لا يكفي لصرف هذا الاسترداد ({amount:N2}). ورّد عهدتك أو تواصل مع مدير النظام.");
+                    $"رصيد عهدتك ({custody:N2}) لا يكفي لصرف هذا الاسترداد ({amount:N2}). ورّد عهدتك أو تواصل مع أمين الصندوق.");
 
             var fund = await _ledger.GetMainFundBalanceAsync();
             if (amount > fund)
@@ -182,7 +183,8 @@ public class FinancialService
 
         // Re-check the funding source at approval time: custody may have been handed over since the
         // request was created, so a request that no longer has cover must not go through. The approver
-        // is always a SuperAdmin, so a shortfall may be drawn from the main fund (never a negative custody).
+        // holds approve-refunds (a high-trust permission), so a shortfall may be drawn from the main
+        // fund — never leaving a negative custody.
         var custody = await _ledger.GetCustodyBalanceAsync(performingUserId);
         if (refund.Amount > custody)
         {

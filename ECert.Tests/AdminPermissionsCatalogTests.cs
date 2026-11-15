@@ -70,6 +70,47 @@ public class AdminPermissionsCatalogTests
         Assert.All(financial, name => Assert.Contains(name, catalogNames));
     }
 
+    [Theory]
+    [InlineData(AdminPermissions.ViewCashbox, "Cashbox")]
+    [InlineData(AdminPermissions.ManageCashbox, "Cashbox")]
+    [InlineData(AdminPermissions.ApproveCustody, "Custody")]
+    [InlineData(AdminPermissions.ApproveRefunds, "Refunds")]
+    [InlineData(AdminPermissions.ApproveExpenses, "Expenses")]
+    [InlineData(AdminPermissions.ViewExpenses, "Expenses")]
+    [InlineData(AdminPermissions.ViewRegistrations, "Registrations")]
+    [InlineData(AdminPermissions.ViewPayments, "Payments")]
+    [InlineData(AdminPermissions.ViewInstallments, "Installments")]
+    public void Granular_permission_maps_to_its_section(string permission, string section)
+    {
+        Assert.Contains(section, AdminPermissions.SectionsFor(permission));
+    }
+
+    [Fact]
+    public void Read_only_permissions_are_not_super_admin_only()
+    {
+        // A read-only grant must be delegable: it must never sit in the SuperAdmin-only set.
+        string[] readOnly =
+        {
+            AdminPermissions.ViewRegistrations, AdminPermissions.ViewCourses,
+            AdminPermissions.ViewInstructors, AdminPermissions.ViewCategories,
+            AdminPermissions.ViewCertificates, AdminPermissions.ViewPayments,
+            AdminPermissions.ViewExpenses, AdminPermissions.ViewInstallments,
+            AdminPermissions.ViewCashbox
+        };
+        Assert.All(readOnly, name => Assert.DoesNotContain(name, AdminPermissions.SuperAdminOnly));
+    }
+
+    [Fact]
+    public void Cashbox_is_reachable_through_grantable_permissions()
+    {
+        // The main fund is no longer SuperAdmin-only: it is unlocked by view/manage-cashbox.
+        var cashboxViewer = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim(AdminPrincipalExtensions.PermissionClaimType, AdminPermissions.ViewCashbox)
+        }, "Test"));
+        Assert.True(cashboxViewer.CanAccessSection("Cashbox"));
+    }
+
     [Fact]
     public void The_finance_preset_grants_the_new_financial_permissions()
     {
@@ -78,6 +119,28 @@ public class AdminPermissionsCatalogTests
         Assert.Contains(AdminPermissions.ManageRefunds, finance.Permissions);
         Assert.Contains(AdminPermissions.ViewReceivables, finance.Permissions);
         Assert.Contains(AdminPermissions.ViewFinancialAudit, finance.Permissions);
+    }
+
+    [Fact]
+    public void The_cashier_preset_manages_and_approves_but_stays_non_system()
+    {
+        var cashier = AdminPermissions.Presets.Single(p => p.Key == "cashier");
+        Assert.Contains(AdminPermissions.ManageCashbox, cashier.Permissions);
+        Assert.Contains(AdminPermissions.ApproveExpenses, cashier.Permissions);
+        Assert.Contains(AdminPermissions.ApproveRefunds, cashier.Permissions);
+        Assert.Contains(AdminPermissions.ApproveCustody, cashier.Permissions);
+        Assert.DoesNotContain(AdminPermissions.ManageUsers, cashier.Permissions);
+        Assert.DoesNotContain(AdminPermissions.ManageRoles, cashier.Permissions);
+    }
+
+    [Fact]
+    public void The_read_only_presets_grant_no_write_permission()
+    {
+        foreach (var key in new[] { "finance_readonly", "hr_readonly" })
+        {
+            var preset = AdminPermissions.Presets.Single(p => p.Key == key);
+            Assert.All(preset.Permissions, name => Assert.StartsWith("view-", name));
+        }
     }
 
     [Fact]

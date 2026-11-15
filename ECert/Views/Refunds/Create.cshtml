@@ -6,13 +6,13 @@
     var invoice = ViewBag.Invoice as Invoice;
     decimal refunded = ViewBag.RefundedAmount is decimal ra ? ra : 0m;
     decimal refundable = (invoice?.PaidAmount ?? 0m);
-    bool isSuperAdmin = ViewBag.IsSuperAdmin is bool sa && sa;
+    bool canDrawFromFund = ViewBag.CanDrawFromFund is bool cdf && cdf;
     decimal custodyBalance = ViewBag.CustodyBalance is decimal cb ? cb : 0m;
     decimal fundBalance = ViewBag.FundBalance is decimal fb ? fb : 0m;
     // An employee may only refund out of their own custody. A SuperAdmin may draw the shortfall from
     // the main fund, so their ceiling is custody + fund. Neither can ever push a custody below zero.
-    string sourceLabel = isSuperAdmin ? "عهدتك ثم الصندوق الرئيسي" : "عهدتك";
-    decimal sourceBalance = isSuperAdmin ? custodyBalance + fundBalance : custodyBalance;
+    string sourceLabel = canDrawFromFund ? "عهدتك ثم الصندوق الرئيسي" : "عهدتك";
+    decimal sourceBalance = canDrawFromFund ? custodyBalance + fundBalance : custodyBalance;
     decimal maxRefund = Math.Max(0m, Math.Min(refundable, sourceBalance));
 }
 
@@ -39,7 +39,7 @@
             </div>
         </div>
 
-        <form asp-action="Create" method="post" onsubmit="return confirm('تأكيد تسجيل سند الاسترداد؟ سيُخصم المبلغ من @(isSuperAdmin ? "الصندوق الرئيسي" : "عهدتك").')">
+        <form asp-action="Create" method="post" onsubmit="return confirm('تأكيد تسجيل سند الاسترداد؟ سيُخصم المبلغ من @(canDrawFromFund ? "الصندوق الرئيسي" : "عهدتك").')">
             @Html.AntiForgeryToken()
             <input type="hidden" name="invoiceId" value="@invoice?.InvoiceId" />
 

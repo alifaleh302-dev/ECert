@@ -63,11 +63,12 @@ public class InstructorsController : Controller
 
     public async Task<IActionResult> Index(string? search)
     {
-        if (!HasPermission("manage-instructors")) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.ManageInstructors, AdminPermissions.ViewInstructors)) return Forbid();
         var query = _db.Instructors.Include(i => i.CourseInstructors).AsQueryable();
         if (!string.IsNullOrEmpty(search))
             query = query.Where(i => i.FullName.Contains(search) || i.Specialization!.Contains(search));
         ViewBag.Search = search;
+        ViewBag.CanManage = HasPermission(AdminPermissions.ManageInstructors);
         var instructors = await query.OrderByDescending(i => i.CreatedAt).ToListAsync();
         return View(instructors);
     }

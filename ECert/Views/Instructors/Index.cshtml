@@ -4,11 +4,15 @@
     ViewData["PageIcon"] = "bi-person-badge";
     ViewData["PageDesc"] = "إضافة وإدارة بيانات المدربين وصورهم الشخصية";
     Layout = "_AdminLayout";
+    bool canManage = ViewBag.CanManage is bool cm && cm;
 }
 <div class="page-header">
     <partial name="_PageHeader" />
     <div class="page-actions">
-        <a asp-action="Create" class="btn btn-primary"><i class="bi bi-plus-circle"></i> إضافة مدرب</a>
+        @if (canManage)
+        {
+            <a asp-action="Create" class="btn btn-primary"><i class="bi bi-plus-circle"></i> إضافة مدرب</a>
+        }
     </div>
 </div>
 

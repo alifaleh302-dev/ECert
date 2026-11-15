@@ -40,6 +40,10 @@ public class RefundsController : Controller
     }
 
     private bool HasPermission(string perm) => User.HasPermission(perm);
+
+    /// <summary>Reading the refund list needs the section permission; approving needs its own.</summary>
+    private bool HasAnyRefundPermission() =>
+        User.HasAnyPermission(AdminPermissions.ManageRefunds, AdminPermissions.ApproveRefunds);
     private int? CurrentUserId =>
         int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : null;
     private string Actor => User.Identity?.Name ?? "System";
@@ -57,7 +61,7 @@ public class RefundsController : Controller
     /// <summary>Refunds inside the caller's course scope, newest first.</summary>
     public async Task<IActionResult> Index(string? search)
     {
-        if (!HasPermission(AdminPermissions.ManageRefunds)) return Forbid();
+        if (!HasAnyRefundPermission()) return Forbid();
 
         var query = _db.Refunds
             .Include(r => r.Invoice).ThenInclude(i => i!.Registration)
@@ -89,7 +93,9 @@ public class RefundsController : Controller
 
         ViewBag.Invoice = invoice;
         ViewBag.RefundedAmount = await _financial.GetRefundedAmountAsync(invoiceId);
-        ViewBag.IsSuperAdmin = User.IsSuperAdmin();
+        // Only a holder of manage-cashbox may draw a shortfall from the main fund.
+        ViewBag.CanDrawFromFund = HasPermission(AdminPermissions.ManageCashbox);
+        ViewBag.IsSuperAdmin = ViewBag.CanDrawFromFund;
         ViewBag.CustodyBalance = CurrentUserId.HasValue
             ? await _ledger.GetCustodyBalanceAsync(CurrentUserId.Value)
             : 0m;
@@ -114,7 +120,7 @@ public class RefundsController : Controller
 
         await using var transaction = await _db.Database.BeginTransactionAsync();
         var result = await _financial.CreateRefundAsync(invoice, amount, reason, refundMethod, receiptNumber,
-            CurrentUserId.Value, Actor, isSuperAdmin: User.IsSuperAdmin());
+            CurrentUserId.Value, Actor, canDrawFromFund: HasPermission(AdminPermissions.ManageCashbox));
 
         if (!result.Success)
         {
@@ -133,17 +139,16 @@ public class RefundsController : Controller
 
     /// <summary>
     /// Approves a refund that was waiting for approval, after re-checking the refundable ceiling so a
-    /// crafted request cannot push an invoice past fully refunded. SuperAdmin only; the caller must
-    /// already be inside a transaction.
+    /// crafted request cannot push an invoice past fully refunded. Requires <c>approve-refunds</c>; the
+    /// caller must already be inside a transaction.
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Approve(int id)
     {
-        if (!HasPermission(AdminPermissions.ManageRefunds)) return Forbid();
-        if (!User.IsSuperAdmin())
+        if (!HasPermission(AdminPermissions.ApproveRefunds))
         {
-            TempData["Error"] = "اعتماد الاستردادات يتطلب صلاحية مدير النظام.";
+            TempData["Error"] = "اعتماد الاستردادات يتطلب صلاحية «اعتماد الاستردادات».";
             return RedirectToAction(nameof(Index));
         }
 
@@ -189,7 +194,7 @@ public class RefundsController : Controller
     [HttpGet]
     public async Task<IActionResult> Receipt(int id)
     {
-        if (!HasPermission(AdminPermissions.ManageRefunds)) return Forbid();
+        if (!HasAnyRefundPermission()) return Forbid();
         var refund = await _db.Refunds
             .Include(r => r.Invoice).ThenInclude(i => i!.Registration)
             .FirstOrDefaultAsync(r => r.RefundId == id);

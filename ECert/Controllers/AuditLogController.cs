@@ -26,7 +26,7 @@ public class AuditLogController : Controller
     // bind the MVC route value ("Index"), so the filter silently became Action='Index'.
     public async Task<IActionResult> Index(string? entityType, [FromQuery(Name = "action")] string? action)
     {
-        if (!User.HasPermission(AdminPermissions.ViewAuditLog) && !User.IsSuperAdmin()) return Forbid();
+        if (!User.CanAccessSection("AuditLog")) return Forbid();
 
         var roleName = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
 

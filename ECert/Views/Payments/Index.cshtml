@@ -4,6 +4,7 @@
     ViewData["PageDesc"] = "متابعة سجل دفعات المتدربين وطرق السداد";
     Layout = "_AdminLayout";
     var payments = ViewBag.Payments as List<ECert.Models.Payment> ?? new();
+    bool canManage = ViewBag.CanManage is bool cm && cm;
 }
 <div class="page-header">
     <partial name="_PageHeader" />
@@ -110,11 +111,14 @@
                                     }
                                 </td>
                                 <td>
-                                    <form asp-action="Delete" method="post" style="display:inline" onsubmit="return confirm('هل أنت متأكد من حذف هذه الدفعة؟ سيتم تحديث رصيد الفاتورة تلقائياً.')">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="id" value="@p.PaymentId" />
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button>
-                                    </form>
+                                    @if (canManage)
+                                    {
+                                        <form asp-action="Delete" method="post" style="display:inline" onsubmit="return confirm('هل أنت متأكد من حذف هذه الدفعة؟ سيتم تحديث رصيد الفاتورة تلقائياً.')">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@p.PaymentId" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button>
+                                        </form>
+                                    }
                                 </td>
                             </tr>
                         }

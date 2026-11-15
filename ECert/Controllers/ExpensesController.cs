@@ -12,8 +12,10 @@ namespace ECert.Controllers;
 
 /// <summary>
 /// Expense management (إدارة المصروفات): categories, submission with an optional attachment, and the
-/// SuperAdmin approval queue. Nothing here is course-scoped — an expense belongs to the institution —
-/// so the section is gated by the <c>manage-expenses</c> permission and approval is SuperAdmin-only.
+/// approval queue. Nothing here is course-scoped — an expense belongs to the institution — so the
+/// section opens for <c>manage-expenses</c>, <c>view-expenses</c> or <c>approve-expenses</c>.
+/// Submitting and editing categories need <c>manage-expenses</c>; deciding a pending expense needs
+/// <c>approve-expenses</c>, which is what lets a cashier approve without being a SuperAdmin.
 /// </summary>
 [Authorize]
 public class ExpensesController : Controller
@@ -35,7 +37,7 @@ public class ExpensesController : Controller
 
     public async Task<IActionResult> Index(int? categoryId, string? status, DateTime? from, DateTime? to)
     {
-        if (!User.HasPermission(AdminPermissions.ManageExpenses)) return Forbid();
+        if (!User.CanAccessSection("Expenses")) return Forbid();
 
         var query = _db.Expenses.Include(e => e.Category).AsQueryable();
         if (categoryId.HasValue) query = query.Where(e => e.ExpenseCategoryId == categoryId.Value);
@@ -54,7 +56,8 @@ public class ExpensesController : Controller
         ViewBag.To = to?.ToString("yyyy-MM-dd");
         ViewBag.ApprovedTotal = expenses.Where(e => e.Status == ExpenseStatus.Approved).Sum(e => e.Amount);
         ViewBag.PendingCount = expenses.Count(e => e.Status == ExpenseStatus.PendingApproval);
-        ViewBag.IsSuperAdmin = User.IsSuperAdmin();
+        ViewBag.CanManage = User.HasPermission(AdminPermissions.ManageExpenses);
+        ViewBag.CanApprove = User.HasPermission(AdminPermissions.ApproveExpenses);
         return View();
     }
 
@@ -105,7 +108,7 @@ public class ExpensesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Approve(int id, string? note)
     {
-        if (!User.IsSuperAdmin()) return Forbid();
+        if (!User.HasPermission(AdminPermissions.ApproveExpenses)) return Forbid();
 
         // Two approvers can act at once; serialise on the expense row and re-read inside the
         // transaction so a second request sees the already-approved status and writes nothing
@@ -133,7 +136,7 @@ public class ExpensesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Reject(int id, string? note)
     {
-        if (!User.IsSuperAdmin()) return Forbid();
+        if (!User.HasPermission(AdminPermissions.ApproveExpenses)) return Forbid();
 
         await using var transaction = await _db.Database.BeginTransactionAsync();
         await LockExpenseRowAsync(id);
@@ -211,7 +214,7 @@ public class ExpensesController : Controller
 
     public async Task<IActionResult> ExportXlsx(int? categoryId, string? status, DateTime? from, DateTime? to)
     {
-        if (!User.HasPermission(AdminPermissions.ManageExpenses)) return Forbid();
+        if (!User.CanAccessSection("Expenses")) return Forbid();
 
         var query = _db.Expenses.Include(e => e.Category).AsQueryable();
         if (categoryId.HasValue) query = query.Where(e => e.ExpenseCategoryId == categoryId.Value);

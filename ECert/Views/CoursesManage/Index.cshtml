@@ -4,13 +4,17 @@
     ViewData["PageIcon"] = "bi-book";
     ViewData["PageDesc"] = "إضافة وتعديل الدورات التدريبية ومتابعة حالاتها وأسعارها";
     Layout = "_AdminLayout";
+    bool canManage = ViewBag.CanManage is bool cm && cm;
 }
 <div class="page-header">
     <partial name="_PageHeader" />
     <div class="page-actions">
-        <a asp-action="Import" class="btn btn-outline-primary"><i class="bi bi-file-earmark-spreadsheet"></i> استيراد من Excel</a>
         <a asp-action="Export" class="btn btn-outline-success"><i class="bi bi-file-earmark-excel"></i> تصدير إلى Excel</a>
-        <a asp-action="Create" class="btn btn-primary"><i class="bi bi-plus-circle"></i> إضافة دورة</a>
+        @if (canManage)
+        {
+            <a asp-action="Import" class="btn btn-outline-primary"><i class="bi bi-file-earmark-spreadsheet"></i> استيراد من Excel</a>
+            <a asp-action="Create" class="btn btn-primary"><i class="bi bi-plus-circle"></i> إضافة دورة</a>
+        }
     </div>
 </div>
 

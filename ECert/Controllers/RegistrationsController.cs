@@ -44,7 +44,7 @@ public class RegistrationsController : Controller
 
     public async Task<IActionResult> Index(string? status, string? search, int? courseId, DateTime? dateFrom, DateTime? dateTo)
     {
-        if (!HasPermission("manage-registrations")) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.ManageRegistrations, AdminPermissions.ViewRegistrations)) return Forbid();
 
         var query = _db.Registrations
             .Include(r => r.Course)
@@ -78,13 +78,14 @@ public class RegistrationsController : Controller
             .ToListAsync();
         ViewBag.TotalCount = registrations.Count;
         ViewBag.PendingCount = registrations.Count(r => r.Status == "Pending");
+        ViewBag.CanManage = User.HasPermission(AdminPermissions.ManageRegistrations);
         ViewBag.ReturnUrl = $"{Request.PathBase}{Request.Path}{Request.QueryString}";
         return View();
     }
 
     public async Task<IActionResult> Details(int id)
     {
-        if (!HasPermission("manage-registrations")) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.ManageRegistrations, AdminPermissions.ViewRegistrations)) return Forbid();
         var reg = await _db.Registrations
             .Include(r => r.Course)
             .Include(r => r.Invoice).ThenInclude(i => i!.Payments)
@@ -832,7 +833,7 @@ public class RegistrationsController : Controller
 
     public async Task<IActionResult> ExportXlsx(string? status, string? search, int? courseId, DateTime? dateFrom, DateTime? dateTo)
     {
-        if (!HasPermission("manage-registrations")) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.ManageRegistrations, AdminPermissions.ViewRegistrations)) return Forbid();
         var query = _db.Registrations.Include(r => r.Course).Include(r => r.Invoice).InScope(User).AsQueryable();
         if (!string.IsNullOrEmpty(status)) query = query.Where(r => r.Status == status);
         if (!string.IsNullOrEmpty(search))

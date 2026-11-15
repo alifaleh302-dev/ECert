@@ -7,19 +7,26 @@
     var categories = ViewBag.Categories as List<ExpenseCategory> ?? new();
     decimal approvedTotal = ViewBag.ApprovedTotal is decimal a ? a : 0m;
     int pendingCount = ViewBag.PendingCount is int p ? p : 0;
-    bool isSuperAdmin = ViewBag.IsSuperAdmin is bool sa && sa;
+    bool canManage = ViewBag.CanManage is bool cm && cm;
+    bool canApprove = ViewBag.CanApprove is bool ca && ca;
     string statusLabel(string s) => ECert.Controllers.ExpensesController.StatusLabel(s);
 }
 
 <div class="page-header">
     <partial name="_PageHeader" />
     <div class="page-actions">
-        <a asp-action="Categories" class="btn btn-outline-secondary"><i class="bi bi-tags"></i> بنود المصروفات</a>
+        @if (canManage)
+        {
+            <a asp-action="Categories" class="btn btn-outline-secondary"><i class="bi bi-tags"></i> بنود المصروفات</a>
+        }
         <a asp-action="ExportXlsx" asp-route-categoryId="@ViewBag.CategoryId" asp-route-status="@ViewBag.Status"
            asp-route-from="@ViewBag.From" asp-route-to="@ViewBag.To" class="btn btn-success">
             <i class="bi bi-file-earmark-excel"></i> تصدير XLSX
         </a>
-        <a asp-action="Create" class="btn btn-primary"><i class="bi bi-plus-lg"></i> مصروف جديد</a>
+        @if (canManage)
+        {
+            <a asp-action="Create" class="btn btn-primary"><i class="bi bi-plus-lg"></i> مصروف جديد</a>
+        }
     </div>
 </div>
 
@@ -103,7 +110,7 @@
                                     <span class="a-badge @(e.Status == "Approved" ? "a-badge--success" : e.Status == "Rejected" ? "a-badge--danger" : "a-badge--warning")">@statusLabel(e.Status)</span>
                                 </td>
                                 <td>
-                                    @if (isSuperAdmin && e.Status == "PendingApproval")
+                                    @if (canApprove && e.Status == "PendingApproval")
                                     {
                                         <div class="d-flex gap-1">
                                             <form asp-action="Approve" asp-route-id="@e.ExpenseId" method="post" class="d-inline">

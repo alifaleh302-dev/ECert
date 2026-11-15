@@ -4,6 +4,7 @@
     ViewData["PageDesc"] = "خطط الأقساط المرتبطة بالفواتير وحالة كل قسط (مسدد / جزئي / متأخر / قادم)";
     Layout = "_AdminLayout";
     var rows = ViewBag.Rows as List<ECert.Services.InstallmentService.PlanRow> ?? new();
+    bool canManage = ViewBag.CanManage is bool cm && cm;
 }
 
 <div class="page-header">
@@ -48,9 +49,12 @@
                                 <td>@if (row.LateCount > 0) { <span class="a-badge a-badge--danger">@row.LateCount متأخر</span> } else { <span class="text-muted">—</span> }</td>
                                 <td class="a-amount a-amount--out fw-bold">@row.Remaining.ToString("N2")</td>
                                 <td>
-                                    <a class="btn btn-sm btn-outline-primary" asp-action="Create" asp-route-invoiceId="@plan.InvoiceId">
-                                        <i class="bi bi-pencil"></i> تعديل الخطة
-                                    </a>
+                                    @if (canManage)
+                                    {
+                                        <a class="btn btn-sm btn-outline-primary" asp-action="Create" asp-route-invoiceId="@plan.InvoiceId">
+                                            <i class="bi bi-pencil"></i> تعديل الخطة
+                                        </a>
+                                    }
                                     <a class="btn btn-sm btn-outline-secondary" asp-action="Print" asp-route-invoiceId="@plan.InvoiceId" target="_blank" rel="noopener">
                                         <i class="bi bi-printer"></i> طباعة
                                     </a>

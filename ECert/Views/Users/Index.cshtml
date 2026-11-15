@@ -5,6 +5,8 @@
     ViewData["PageDesc"] = "إنشاء حسابات موظفي النظام وإدارتها وربطها بالأدوار المتاحة";
     Layout = "_AdminLayout";
     var roles = ViewBag.Roles as List<Role> ?? new();
+    bool isSuperAdmin = ViewBag.IsSuperAdmin is bool isa && isa;
+    var superAdminUserIds = ViewBag.SuperAdminUserIds as List<int> ?? new();
 }
 <div class="page-header">
     <partial name="_PageHeader" />
@@ -111,6 +113,12 @@
                                 </td>
                                 <td>@(user.LastLoginAt?.ToString("yyyy-MM-dd HH:mm") ?? "لم يسجل دخول")</td>
                                 <td>
+                                    @if (!isSuperAdmin && superAdminUserIds.Contains(user.UserId))
+                                    {
+                                        <span class="a-badge a-badge--warning" title="لا يمكن تعديل حساب مدير النظام إلا من مدير النظام نفسه">محمي</span>
+                                    }
+                                    else
+                                    {
                                     <div class="btn-group btn-group-sm">
                                         <a asp-action="Edit" asp-route-id="@user.UserId" class="btn btn-outline-primary" title="تعديل"><i class="bi bi-pencil"></i></a>
                                         <form asp-action="ToggleActive" method="post" style="display:inline">
@@ -129,6 +137,7 @@
                                             <i class="bi bi-key"></i>
                                         </button>
                                     </div>
+                                    }
                                 </td>
                             </tr>
 
