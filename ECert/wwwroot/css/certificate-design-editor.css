@@ -138,6 +138,67 @@
     .ped-overlay-multi .ped-box { border-color: var(--ped-accent); opacity: .75; }
     .ped-group-box { position: absolute; inset: -6px; border: 1px dashed var(--ped-accent); border-radius: 2px; pointer-events: none; }
 
+    /* rulers */
+    .ped-ruler { position: absolute; z-index: 40; pointer-events: none; overflow: hidden; background: rgba(16, 24, 40, .92); }
+    .ped-ruler-h { top: 0; left: 22px; right: 0; height: 20px; border-bottom: 1px solid var(--ped-line); }
+    .ped-ruler-v { top: 20px; left: 0; bottom: 0; width: 22px; border-inline-end: 1px solid var(--ped-line); }
+    .ped-ruler-corner { position: absolute; top: 0; left: 0; width: 22px; height: 20px; z-index: 41; background: var(--ped-toolbar); border-inline-end: 1px solid var(--ped-line); border-bottom: 1px solid var(--ped-line); }
+    .ped-app:not(.rulers-on) .ped-ruler, .ped-app:not(.rulers-on) .ped-ruler-corner { display: none; }
+    .ped-app.rulers-on .ped-canvas-area { padding-top: 20px; padding-inline-start: 22px; }
+    .ped-ruler-band { position: absolute; background: rgba(59, 110, 240, .1); }
+    .ped-ruler-h .ped-ruler-band { top: 0; bottom: 0; left: 0; width: var(--ped-ruler-span, 0); }
+    .ped-ruler-v .ped-ruler-band { left: 0; right: 0; top: 0; height: var(--ped-ruler-span, 0); }
+    .ped-ruler-tick { position: absolute; background: #3c4a63; }
+    .ped-ruler-h .ped-ruler-tick { top: 12px; bottom: 0; width: 1px; }
+    .ped-ruler-v .ped-ruler-tick { left: 12px; right: 0; height: 1px; }
+    .ped-ruler-tick.major { background: #6b7d9c; }
+    .ped-ruler-h .ped-ruler-tick.major { top: 6px; }
+    .ped-ruler-v .ped-ruler-tick.major { left: 6px; }
+    .ped-ruler-num { position: absolute; font-size: .56rem; color: #8595b0; font-variant-numeric: tabular-nums; }
+    .ped-ruler-h .ped-ruler-num { top: 2px; }
+    .ped-ruler-v .ped-ruler-num { left: 3px; writing-mode: vertical-rl; }
+    .ped-ruler-sel { position: absolute; background: var(--ped-accent); opacity: .85; }
+    .ped-ruler-h .ped-ruler-sel { bottom: 0; height: 3px; }
+    .ped-ruler-v .ped-ruler-sel { right: 0; width: 3px; }
+    .ped-app.preview-mode .ped-ruler, .ped-app.preview-mode .ped-ruler-corner { display: none; }
+
+    /* inline text editing */
+    .ped-inline-edit { position: absolute; z-index: 10001; }
+    .ped-inline-input { width: 100%; height: 100%; resize: none; border: 1.5px solid var(--ped-accent); border-radius: 2px; background: #fff; line-height: 1.3; padding: 6px 10px; box-sizing: border-box; outline: none; box-shadow: 0 0 0 3px rgba(59, 110, 240, .22); }
+
+    /* context menu */
+    .ped-menu { position: absolute; z-index: 80; min-width: 218px; background: var(--ped-panel); border: 1px solid var(--ped-line); border-radius: var(--ped-r); box-shadow: 0 22px 55px rgba(0, 0, 0, .5); padding: .3rem; }
+    .ped-menu-item { display: flex; align-items: center; gap: .55rem; width: 100%; border: 0; background: transparent; color: var(--ped-ink); font-size: .8rem; text-align: start; padding: .4rem .5rem; border-radius: 3px; cursor: pointer; }
+    .ped-menu-item i { color: var(--ped-accent-2); width: 15px; }
+    .ped-menu-item span:first-of-type { flex: 1; }
+    .ped-menu-item:hover:not(:disabled) { background: #1d2942; color: #fff; }
+    .ped-menu-item:disabled { opacity: .35; cursor: not-allowed; }
+    .ped-menu-sep { height: 1px; background: var(--ped-line); margin: .3rem .4rem; }
+
+    /* command palette */
+    .ped-cmdk { position: fixed; inset: 0; z-index: 200; background: rgba(6, 11, 20, .55); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; }
+    .ped-cmdk-box { width: min(560px, 92vw); background: var(--ped-panel); border: 1px solid var(--ped-line); border-radius: var(--ped-r); box-shadow: 0 30px 70px rgba(0, 0, 0, .6); overflow: hidden; }
+    .ped-cmdk-head { display: flex; align-items: center; gap: .55rem; padding: .7rem .85rem; border-bottom: 1px solid var(--ped-line); }
+    .ped-cmdk-head > i { color: var(--ped-accent-2); }
+    .ped-cmdk-input { flex: 1; border: 0; background: transparent; color: var(--ped-ink); font-size: .92rem; outline: none; }
+    .ped-cmdk-list { max-height: 52vh; overflow-y: auto; padding: .3rem; scrollbar-width: thin; scrollbar-color: #33425e transparent; }
+    .ped-cmdk-item { display: flex; align-items: center; gap: .6rem; width: 100%; border: 0; background: transparent; color: var(--ped-ink); font-size: .82rem; text-align: start; padding: .48rem .6rem; border-radius: 3px; cursor: pointer; }
+    .ped-cmdk-item i { color: var(--ped-accent-2); width: 16px; }
+    .ped-cmdk-item span:first-of-type { flex: 1; }
+    .ped-cmdk-item.active, .ped-cmdk-item:hover { background: rgba(59, 110, 240, .16); color: #fff; }
+
+    /* shortcuts sheet */
+    .ped-sheet { position: fixed; inset: 0; z-index: 200; background: rgba(6, 11, 20, .55); display: flex; align-items: center; justify-content: center; }
+    .ped-sheet-box { width: min(680px, 94vw); max-height: 84vh; overflow-y: auto; background: var(--ped-panel); border: 1px solid var(--ped-line); border-radius: var(--ped-r); box-shadow: 0 30px 70px rgba(0, 0, 0, .6); padding: 1rem 1.2rem 1.4rem; scrollbar-width: thin; scrollbar-color: #33425e transparent; }
+    .ped-sheet-head { display: flex; align-items: center; justify-content: space-between; font-weight: 700; color: var(--ped-ink); font-size: .9rem; margin-bottom: .6rem; }
+    .ped-sheet-head i { color: var(--ped-accent-2); }
+    .ped-sheet-group { margin-bottom: .8rem; }
+    .ped-sheet-row { display: flex; align-items: center; gap: .8rem; padding: .3rem 0; font-size: .8rem; color: var(--ped-ink); border-bottom: 1px solid var(--ped-line-soft); }
+    .ped-sheet-row .ped-kbd { min-width: 150px; text-align: center; }
+
+    /* floating cursor coordinate read-out while dragging */
+    .ped-cursor { position: absolute; z-index: 90; pointer-events: none; background: #101828; border: 1px solid var(--ped-line); color: #fff; font-size: .68rem; font-weight: 700; padding: .12rem .45rem; border-radius: 3px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
     /* library */
     .ped-field-chip { display: flex; align-items: center; gap: .5rem; width: 100%; text-align: start; border: 1px solid var(--ped-line); background: var(--ped-panel-2); border-radius: var(--ped-r); padding: .42rem .6rem; font-size: .78rem; color: var(--ped-ink); cursor: pointer; margin-bottom: .35rem; transition: .12s ease; }
     .ped-field-chip:hover { background: #1d2942; border-color: rgba(59,110,240,.5); color: #fff; }
