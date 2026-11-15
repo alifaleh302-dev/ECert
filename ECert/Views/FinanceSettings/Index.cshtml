@@ -15,14 +15,6 @@
     <partial name="_PageHeader" />
 </div>
 
-@if (TempData["Success"] != null)
-{
-    <div class="a-note a-note--success mb-4" role="status"><i class="bi bi-check-circle" aria-hidden="true"></i> <div>@TempData["Success"]</div></div>
-}
-@if (TempData["Error"] != null)
-{
-    <div class="a-note a-note--danger mb-4" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> <div>@TempData["Error"]</div></div>
-}
 
 <div class="row g-4">
     <div class="col-lg-6">
@@ -104,7 +96,7 @@
                         <input id="lockNote" type="text" name="note" maxlength="500" class="form-control" placeholder="اختياري" />
                     </div>
                     <div class="a-field a-field--full">
-                        <button type="submit" class="btn btn-warning" onclick="return confirm('إقفال الفترة المالية؟');"><i class="bi bi-lock"></i> إقفال الفترة</button>
+                        <button type="submit" class="btn btn-warning" data-confirm="إقفال الفترة المالية؟"><i class="bi bi-lock"></i> إقفال الفترة</button>
                     </div>
                 </form>
             </div>
@@ -116,7 +108,7 @@
                         <input id="reopenNote" type="text" name="note" maxlength="500" class="form-control" placeholder="اختياري" />
                     </div>
                     <div class="a-field a-field--full">
-                        <button type="submit" class="btn btn-outline-danger" onclick="return confirm('إعادة فتح الفترة المالية؟');"><i class="bi bi-unlock"></i> إعادة الفتح</button>
+                        <button type="submit" class="btn btn-outline-danger" data-confirm="إعادة فتح الفترة المالية؟"><i class="bi bi-unlock"></i> إعادة الفتح</button>
                     </div>
                 </form>
             </div>

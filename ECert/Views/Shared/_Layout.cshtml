@@ -131,18 +131,7 @@
     </nav>
 
     <main>
-        @if (TempData["Success"] != null)
-        {
-            <div class="container mt-3">
-                <div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle"></i> @TempData["Success"]<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
-            </div>
-        }
-        @if (TempData["Error"] != null)
-        {
-            <div class="container mt-3">
-                <div class="alert alert-danger alert-dismissible fade show"><i class="bi bi-exclamation-circle"></i> @TempData["Error"]<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
-            </div>
-        }
+        <partial name="_Flash" />
         @if (ViewData["FullWidth"] as bool? == true)
         {
             @RenderBody()
@@ -247,6 +236,7 @@
     <button id="backToTop" class="back-to-top" aria-label="الرجوع للأعلى" title="الرجوع للأعلى"><i class="bi bi-arrow-up-short"></i></button>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/notify.js" asp-append-version="true"></script>
     <script src="~/js/site.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>

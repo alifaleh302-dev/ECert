@@ -42,7 +42,7 @@
                                         <input type="hidden" name="id" value="@t.HeroAnimatedTextId" />
                                         <button class="btn btn-sm btn-outline-warning"><i class="bi bi-toggle-on"></i></button>
                                     </form>
-                                    <form method="post" action="/HomepageManage/DeleteAnimatedText" class="d-inline" onsubmit="return confirm('حذف؟')">
+                                    <form method="post" action="/HomepageManage/DeleteAnimatedText" class="d-inline" data-confirm="حذف؟" data-confirm-tone="danger">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="id" value="@t.HeroAnimatedTextId" />
                                         <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>

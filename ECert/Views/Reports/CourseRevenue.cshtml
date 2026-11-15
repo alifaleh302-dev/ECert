@@ -33,18 +33,6 @@
     </div>
 </div>
 
-@if (TempData["Success"] != null)
-{
-    <div class="a-note a-note--success mb-3" role="status">
-        <i class="bi bi-check-circle" aria-hidden="true"></i> <div>@TempData["Success"]</div>
-    </div>
-}
-@if (TempData["Error"] != null)
-{
-    <div class="a-note a-note--danger mb-3" role="alert">
-        <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> <div>@TempData["Error"]</div>
-    </div>
-}
 
 <section class="a-kpis mb-4" aria-label="ملخص الإيرادات">
     <partial name="_KpiCard" model="@(new KpiCard { Label = "إجمالي الإيراد المتوقع", Value = summary.Expected.ToString("N0"), Icon = "bi-cash-stack", Tone = "brand", Hint = Currency.Symbol })" />

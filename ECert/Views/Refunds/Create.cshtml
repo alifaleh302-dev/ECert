@@ -39,7 +39,7 @@
             </div>
         </div>
 
-        <form asp-action="Create" method="post" onsubmit="return confirm('تأكيد تسجيل سند الاسترداد؟ سيُخصم المبلغ من @(canDrawFromFund ? "الصندوق الرئيسي" : "عهدتك").')">
+        <form asp-action="Create" method="post" data-confirm="تأكيد تسجيل سند الاسترداد؟ سيُخصم المبلغ من @(canDrawFromFund ? "الصندوق الرئيسي" : "عهدتك").">
             @Html.AntiForgeryToken()
             <input type="hidden" name="invoiceId" value="@invoice?.InvoiceId" />
 

@@ -13,10 +13,6 @@
     </div>
 </div>
 
-@if (TempData["Error"] != null)
-{
-    <div class="a-note a-note--danger mb-4" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> <div>@TempData["Error"]</div></div>
-}
 
 @if (!categories.Any())
 {

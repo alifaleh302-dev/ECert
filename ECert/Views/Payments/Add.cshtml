@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const method = methodSelect.value;
         if (method !== 'Cash' && (!refInput.value || refInput.value.trim() === '')) {
             e.preventDefault();
-            alert('رقم السند مطلوب عند اختيار طريقة دفع إلكترونية');
+            Notify.warning('رقم السند مطلوب عند اختيار طريقة دفع إلكترونية');
             refInput.focus();
         }
     });

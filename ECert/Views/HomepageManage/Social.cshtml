@@ -58,7 +58,7 @@
                                             <input type="hidden" name="links[@i].IsActive" value="false" />
                                         </td>
                                         <td data-label="إجراء">
-                                            <form method="post" action="/HomepageManage/DeleteSocial" class="d-inline" onsubmit="return confirm('حذف؟')">
+                                            <form method="post" action="/HomepageManage/DeleteSocial" class="d-inline" data-confirm="حذف؟" data-confirm-tone="danger">
                                                 @Html.AntiForgeryToken()
                                                 <input type="hidden" name="id" value="@l.SocialLinkId" />
                                                 <button class="btn btn-outline-danger btn-icon" title="حذف"><i class="bi bi-trash"></i></button>

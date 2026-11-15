@@ -14,20 +14,6 @@
     </div>
 </div>
 
-@if (TempData["Success"] is string success)
-{
-    <div class="a-note a-note--success mb-3" role="status">
-        <i class="bi bi-check-circle" aria-hidden="true"></i>
-        <div>@success</div>
-    </div>
-}
-@if (TempData["Error"] is string error)
-{
-    <div class="a-note a-note--danger mb-3" role="alert">
-        <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
-        <div>@error</div>
-    </div>
-}
 
 <div class="a-grid-2">
     <section class="a-card">
@@ -54,7 +40,7 @@
                             </div>
                             <button class="btn btn-sm btn-outline-primary" type="submit" title="حفظ"><i class="bi bi-check-lg"></i></button>
                         </form>
-                        <form asp-action="DeleteUniversity" method="post" class="mt-2" onsubmit="return confirm('هل تريد حذف هذه الجامعة؟ لا يمكن حذفها إذا كانت مرتبطة بكليات أو تسجيلات.');">
+                        <form asp-action="DeleteUniversity" method="post" class="mt-2" data-confirm="هل تريد حذف هذه الجامعة؟ لا يمكن حذفها إذا كانت مرتبطة بكليات أو تسجيلات." data-confirm-tone="danger">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="id" value="@university.UniversityId" />
                             <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash ms-1"></i>حذف</button>
@@ -112,7 +98,7 @@
                             <div class="col-auto form-check form-switch mb-0"><input class="form-check-input" type="checkbox" name="isActive" value="true" checked="@college.IsActive" aria-label="تفعيل الكلية" /></div>
                             <div class="col-auto"><button class="btn btn-sm btn-outline-success" type="submit" title="حفظ"><i class="bi bi-check-lg"></i></button></div>
                         </form>
-                        <form asp-action="DeleteCollege" method="post" class="mt-2" onsubmit="return confirm('هل تريد حذف هذه الكلية؟ لا يمكن حذفها إذا كانت مرتبطة بتخصصات أو تسجيلات.');">
+                        <form asp-action="DeleteCollege" method="post" class="mt-2" data-confirm="هل تريد حذف هذه الكلية؟ لا يمكن حذفها إذا كانت مرتبطة بتخصصات أو تسجيلات." data-confirm-tone="danger">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="id" value="@college.CollegeId" />
                             <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash ms-1"></i>حذف</button>
@@ -166,7 +152,7 @@
                             <div class="col-auto form-check form-switch mb-0"><input class="form-check-input" type="checkbox" name="isActive" value="true" checked="@specialization.IsActive" aria-label="تفعيل التخصص" /></div>
                             <div class="col-auto"><button class="btn btn-sm btn-outline-warning" type="submit" title="حفظ"><i class="bi bi-check-lg"></i></button></div>
                         </form>
-                        <form asp-action="DeleteSpecialization" method="post" class="mt-2" onsubmit="return confirm('هل تريد حذف هذا التخصص؟ سيتم حذف مستوياته التابعة أيضًا.');">
+                        <form asp-action="DeleteSpecialization" method="post" class="mt-2" data-confirm="هل تريد حذف هذا التخصص؟ سيتم حذف مستوياته التابعة أيضًا." data-confirm-tone="danger">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="id" value="@specialization.AcademicSpecializationId" />
                             <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash ms-1"></i>حذف</button>
@@ -228,7 +214,7 @@
                             <div class="col-auto form-check form-switch mb-0"><input class="form-check-input" type="checkbox" name="isActive" value="true" checked="@level.IsActive" aria-label="تفعيل المستوى" /></div>
                             <div class="col-auto"><button class="btn btn-sm btn-outline-info" type="submit" title="حفظ"><i class="bi bi-check-lg"></i></button></div>
                         </form>
-                        <form asp-action="DeleteLevel" method="post" class="mt-2" onsubmit="return confirm('هل تريد حذف هذا المستوى؟');">
+                        <form asp-action="DeleteLevel" method="post" class="mt-2" data-confirm="هل تريد حذف هذا المستوى؟" data-confirm-tone="danger">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="id" value="@level.AcademicLevelOptionId" />
                             <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash ms-1"></i>حذف</button>

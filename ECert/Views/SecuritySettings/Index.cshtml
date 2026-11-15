@@ -14,14 +14,6 @@
     </div>
 </div>
 
-@if (TempData["Success"] != null)
-{
-    <div class="a-note a-note--success mb-4" role="status"><i class="bi bi-check-circle" aria-hidden="true"></i> <div>@TempData["Success"]</div></div>
-}
-@if (TempData["Error"] != null)
-{
-    <div class="a-note a-note--danger mb-4" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> <div>@TempData["Error"]</div></div>
-}
 
 <div class="a-note a-note--info mb-4">
     <i class="bi bi-info-circle" aria-hidden="true"></i>
@@ -132,7 +124,7 @@
                     <p class="a-hint mb-3">تُنشئ النسخة كاملة من قاعدة البيانات، تُضغط وتُشفّر AES-256، وتُرسل إلى قناة الأرشيف ثم تُحذف من ذاكرة السيرفر فوراً.</p>
                     <div class="d-flex flex-wrap gap-2">
                         <button type="submit" asp-action="RunBackupNow" class="btn btn-outline-primary"
-                                onclick="return confirm('إنشاء نسخة احتياطية مشفّرة الآن؟');">
+                                data-confirm="إنشاء نسخة احتياطية مشفّرة الآن؟">
                             <i class="bi bi-play-circle"></i> تشغيل نسخة الآن
                         </button>
                         <button type="submit" asp-action="PollTelegramLinks" class="btn btn-outline-secondary">

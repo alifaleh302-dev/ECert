@@ -94,7 +94,7 @@
                     {
                         <p class="a-hint mb-3">مرتبط منذ @(tgLinkedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—"). عند تفعيل المصادقة الثنائية يحتاج هذا المستخدم إلى رمز يُرسل إلى تليجرام عند كل دخول.</p>
                         <button type="submit" formaction="@Url.Action("UnlinkTelegram", new { id = Model.UserId })" class="btn btn-outline-danger"
-                                onclick="return confirm('إلغاء ربط تليجرام لهذا المستخدم؟');">
+                                data-confirm="إلغاء ربط تليجرام لهذا المستخدم؟" data-confirm-tone="danger">
                             <i class="bi bi-x-circle"></i> إلغاء الربط
                         </button>
                     }

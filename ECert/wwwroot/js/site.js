@@ -4,9 +4,11 @@ document.addEventListener('DOMContentLoaded', function () {
         setTimeout(function () { bootstrap.Alert.getOrCreateInstance(alert).close(); }, 5000);
     });
 
-    // Confirm delete actions
+    // Confirm actions. notify.js owns [data-confirm] when present (on-brand dialog);
+    // this native fallback only applies on pages that load site.js without notify.js.
     document.querySelectorAll('[data-confirm]').forEach(function (btn) {
         btn.addEventListener('click', function (e) {
+            if (window.Notify) return;
             if (!confirm(this.dataset.confirm)) {
                 e.preventDefault();
             }

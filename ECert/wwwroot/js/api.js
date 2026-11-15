@@ -58,8 +58,14 @@ const API = {
         });
     },
 
-    // Toast notification
+    // Toast notification — delegates to the shared Notify module so API results
+    // and server flash messages render identically. Kept for backwards compatibility.
     showToast(message, type = 'success') {
+        if (window.Notify) {
+            Notify.toast(message, type);
+            return;
+        }
+        // Fallback for any page that loads api.js without notify.js.
         const container = document.getElementById('toastContainer') || (() => {
             const div = document.createElement('div');
             div.id = 'toastContainer';

@@ -30,14 +30,6 @@
     </div>
 </div>
 
-@if (TempData["Success"] != null)
-{
-    <div class="a-note a-note--success mb-4" role="status"><i class="bi bi-check-circle" aria-hidden="true"></i> <div>@TempData["Success"]</div></div>
-}
-@if (TempData["Error"] != null)
-{
-    <div class="a-note a-note--danger mb-4" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> <div>@TempData["Error"]</div></div>
-}
 
 <section class="a-kpis mb-4" aria-label="ملخص المصروفات">
     <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المصروفات المعتمدة", Value = approvedTotal.ToString("N2"), Icon = "bi-cart-dash", Tone = "danger", Hint = Currency.Symbol })" />
@@ -115,11 +107,11 @@
                                         <div class="d-flex gap-1">
                                             <form asp-action="Approve" asp-route-id="@e.ExpenseId" method="post" class="d-inline">
                                                 @Html.AntiForgeryToken()
-                                                <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('اعتماد هذا المصروف؟');"><i class="bi bi-check-lg"></i> اعتماد</button>
+                                                <button type="submit" class="btn btn-sm btn-outline-success" data-confirm="اعتماد هذا المصروف؟"><i class="bi bi-check-lg"></i> اعتماد</button>
                                             </form>
                                             <form asp-action="Reject" asp-route-id="@e.ExpenseId" method="post" class="d-inline">
                                                 @Html.AntiForgeryToken()
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('رفض هذا المصروف؟');"><i class="bi bi-x-lg"></i> رفض</button>
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" data-confirm="رفض هذا المصروف؟" data-confirm-tone="danger"><i class="bi bi-x-lg"></i> رفض</button>
                                             </form>
                                         </div>
                                     }

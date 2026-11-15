@@ -82,7 +82,7 @@
                                 </td>
                                 <td>
                                     <a asp-action="Edit" asp-route-id="@cat.CategoryId" class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil"></i></a>
-                                    <form asp-action="Delete" asp-route-id="@cat.CategoryId" method="post" class="d-inline" onsubmit="return confirm('هل أنت متأكد من حذف هذه الفئة؟')">
+                                    <form asp-action="Delete" asp-route-id="@cat.CategoryId" method="post" class="d-inline" data-confirm="هل أنت متأكد من حذف هذه الفئة؟" data-confirm-tone="danger">
                                         @Html.AntiForgeryToken()
                                         <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
                                     </form>

@@ -292,18 +292,18 @@
             let phone = phoneInput.value.trim();
             if (phone.startsWith('0')) phone = phone.substring(1);
             if (phone && !/^\d+$/.test(phone)) {
-                e.preventDefault(); alert('رقم الهاتف يجب أن يحتوي على أرقام فقط'); return;
+                e.preventDefault(); Notify.warning('رقم الهاتف يجب أن يحتوي على أرقام فقط'); return;
             }
             if (phone && (phone.length < min || phone.length > max)) {
-                e.preventDefault(); alert(`رقم الهاتف يجب أن يكون بين ${min} و ${max} أرقام`); return;
+                e.preventDefault(); Notify.warning(`رقم الهاتف يجب أن يكون بين ${min} و ${max} أرقام`); return;
             }
             if (phone && prefixes.length > 0 && !prefixes.some(p => phone.startsWith(p))) {
-                e.preventDefault(); alert(`رقم الهاتف يجب أن يبدأ بأحد البادئات: ${prefixes.join(', ')}`); return;
+                e.preventDefault(); Notify.warning(`رقم الهاتف يجب أن يبدأ بأحد البادئات: ${prefixes.join(', ')}`); return;
             }
 
             if (!academicSection.hidden && (!university.idInput.value || !college.idInput.value || !specialization.idInput.value || !academicLevel.value)) {
                 e.preventDefault();
-                alert('يرجى اختيار الجامعة والكلية والتخصص والمستوى الدراسي قبل إرسال الطلب.');
+                Notify.warning('يرجى اختيار الجامعة والكلية والتخصص والمستوى الدراسي قبل إرسال الطلب.');
             }
         });
     });

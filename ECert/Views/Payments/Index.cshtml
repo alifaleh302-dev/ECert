@@ -113,7 +113,7 @@
                                 <td>
                                     @if (canManage)
                                     {
-                                        <form asp-action="Delete" method="post" style="display:inline" onsubmit="return confirm('هل أنت متأكد من حذف هذه الدفعة؟ سيتم تحديث رصيد الفاتورة تلقائياً.')">
+                                        <form asp-action="Delete" method="post" style="display:inline" data-confirm="هل أنت متأكد من حذف هذه الدفعة؟ سيتم تحديث رصيد الفاتورة تلقائياً." data-confirm-tone="danger">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="id" value="@p.PaymentId" />
                                             <button type="submit" class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button>

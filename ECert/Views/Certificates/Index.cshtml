@@ -255,7 +255,7 @@
                     btn.innerHTML = '<i class="bi bi-check2"></i> تم النسخ';
                     setTimeout(() => btn.innerHTML = original, 1500);
                 } catch {
-                    alert('تعذر نسخ الرابط تلقائياً. يمكنك تحديده ونسخه يدوياً.');
+                    Notify.warning('تعذر نسخ الرابط تلقائياً. يمكنك تحديده ونسخه يدوياً.');
                 }
             });
         });

@@ -76,7 +76,7 @@
                                 <form asp-action="Delete" asp-route-id="@item.CertificateDesignId" method="post" class="ds-act-form">
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="ds-act ds-act--danger" title="حذف القالب"
-                                            onclick="return confirm('سيتم حذف القالب «@item.Name» نهائياً. هل تريد المتابعة؟')"><i class="bi bi-trash3"></i></button>
+                                            data-confirm="سيتم حذف القالب «@item.Name» نهائياً. هل تريد المتابعة؟" data-confirm-tone="danger"><i class="bi bi-trash3"></i></button>
                                 </form>
                             </div>
                         </div>
@@ -430,8 +430,6 @@
     <input type="file" id="imageUploadInput" accept="image/png,image/jpeg,image/webp,image/gif" class="d-none" />
 </div>
 
-@if (TempData["Success"] is string success) { <div class="alert alert-success mt-3 mb-0 border-0 shadow-sm">@success</div> }
-@if (TempData["Error"] is string error) { <div class="alert alert-danger mt-3 mb-0 border-0 shadow-sm">@error</div> }
 
 <script>
 (() => {
@@ -2023,7 +2021,7 @@
             }
             url = (await res.json()).url;
         } catch (err) {
-            window.alert(err && err.message ? err.message : 'تعذر رفع الصورة.');
+            Notify.error(err && err.message ? err.message : 'تعذر رفع الصورة.');
             return;
         }
         if (target !== null && elements[target] && elements[target].elementType === 'image') {

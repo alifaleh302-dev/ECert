@@ -245,7 +245,7 @@
                                         {
                                             <form asp-action="Accept" asp-route-id="@registration.RegistrationId" asp-route-returnUrl="@returnUrl" method="post" class="d-inline">
                                                 @Html.AntiForgeryToken()
-                                                <button type="submit" class="btn btn-sm btn-success btn-icon" title="قبول الطلب" aria-label="قبول طلب @registration.RequestNumber" onclick="return confirm('هل تريد قبول طلب @registration.FullName؟');">
+                                                <button type="submit" class="btn btn-sm btn-success btn-icon" title="قبول الطلب" aria-label="قبول طلب @registration.RequestNumber" data-confirm="هل تريد قبول طلب @registration.FullName؟">
                                                     <i class="bi bi-check-lg" aria-hidden="true"></i>
                                                 </button>
                                             </form>
@@ -257,7 +257,7 @@
                                         {
                                             <form asp-action="Reopen" asp-route-id="@registration.RegistrationId" asp-route-returnUrl="@returnUrl" method="post" class="d-inline">
                                                 @Html.AntiForgeryToken()
-                                                <button type="submit" class="btn btn-sm btn-outline-warning btn-icon" title="إعادة فتح الطلب" aria-label="إعادة فتح طلب @registration.RequestNumber" onclick="return confirm('هل تريد إعادة فتح هذا الطلب؟');">
+                                                <button type="submit" class="btn btn-sm btn-outline-warning btn-icon" title="إعادة فتح الطلب" aria-label="إعادة فتح طلب @registration.RequestNumber" data-confirm="هل تريد إعادة فتح هذا الطلب؟">
                                                     <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
                                                 </button>
                                             </form>
@@ -266,7 +266,7 @@
                                         {
                                             <form asp-action="Archive" asp-route-id="@registration.RegistrationId" asp-route-returnUrl="@returnUrl" method="post" class="d-inline">
                                                 @Html.AntiForgeryToken()
-                                                <button type="submit" class="btn btn-sm btn-outline-secondary btn-icon" title="أرشفة الطلب" aria-label="أرشفة طلب @registration.RequestNumber" onclick="return confirm('هل تريد أرشفة هذا الطلب؟');">
+                                                <button type="submit" class="btn btn-sm btn-outline-secondary btn-icon" title="أرشفة الطلب" aria-label="أرشفة طلب @registration.RequestNumber" data-confirm="هل تريد أرشفة هذا الطلب؟">
                                                     <i class="bi bi-archive" aria-hidden="true"></i>
                                                 </button>
                                             </form>
@@ -275,7 +275,7 @@
                                         {
                                             <form asp-action="Restore" asp-route-id="@registration.RegistrationId" asp-route-returnUrl="@returnUrl" method="post" class="d-inline">
                                                 @Html.AntiForgeryToken()
-                                                <button type="submit" class="btn btn-sm btn-outline-primary btn-icon" title="استعادة الطلب" aria-label="استعادة طلب @registration.RequestNumber" onclick="return confirm('هل تريد استعادة هذا الطلب؟');">
+                                                <button type="submit" class="btn btn-sm btn-outline-primary btn-icon" title="استعادة الطلب" aria-label="استعادة طلب @registration.RequestNumber" data-confirm="هل تريد استعادة هذا الطلب؟">
                                                     <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
                                                 </button>
                                             </form>
@@ -287,7 +287,7 @@
                                         {
                                             <form asp-action="Delete" asp-route-id="@registration.RegistrationId" asp-route-returnUrl="@returnUrl" method="post" class="d-inline">
                                                 @Html.AntiForgeryToken()
-                                                <button type="submit" class="btn btn-sm btn-outline-danger btn-icon" title="حذف نهائي" aria-label="حذف طلب @registration.RequestNumber نهائياً" onclick="return confirm('هل أنت متأكد من الحذف النهائي؟ لا يمكن التراجع.');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger btn-icon" title="حذف نهائي" aria-label="حذف طلب @registration.RequestNumber نهائياً" data-confirm="هل أنت متأكد من الحذف النهائي؟ لا يمكن التراجع." data-confirm-tone="danger">
                                                     <i class="bi bi-trash3" aria-hidden="true"></i>
                                                 </button>
                                             </form>

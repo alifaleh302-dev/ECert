@@ -1,0 +1,41 @@
+@*
+    Flash messages — the only place TempData is turned into markup.
+    With JS on, the messages are queued on window.__ecertFlash and rendered as
+    toasts by notify.js. With JS off, the <noscript> block shows plain alerts so
+    feedback is never lost. Layouts include this once; views must not read
+    TempData themselves or the message would appear twice.
+*@
+@{
+    var flashes = new List<(string Type, string Message)>();
+    if (TempData["Success"] is string success && !string.IsNullOrWhiteSpace(success)) flashes.Add(("success", success));
+    if (TempData["Error"] is string error && !string.IsNullOrWhiteSpace(error)) flashes.Add(("danger", error));
+    if (TempData["Warning"] is string warning && !string.IsNullOrWhiteSpace(warning)) flashes.Add(("warning", warning));
+    if (TempData["Info"] is string info && !string.IsNullOrWhiteSpace(info)) flashes.Add(("info", info));
+
+    string IconFor(string type) => type switch
+    {
+        "success" => "bi-check-circle",
+        "warning" => "bi-exclamation-triangle",
+        "info" => "bi-info-circle",
+        _ => "bi-exclamation-circle"
+    };
+}
+@if (flashes.Count > 0)
+{
+    var payload = System.Text.Json.JsonSerializer.Serialize(
+        flashes.Select(f => new { type = f.Type, message = f.Message }));
+    <script>
+        window.__ecertFlash = @Html.Raw(payload);
+    </script>
+    <noscript>
+        <div class="no-js-flash">
+            @foreach (var flash in flashes)
+            {
+                <div class="alert alert-@flash.Type" role="@(flash.Type == "danger" ? "alert" : "status")">
+                    <i class="bi @IconFor(flash.Type)" aria-hidden="true"></i>
+                    @flash.Message
+                </div>
+            }
+        </div>
+    </noscript>
+}

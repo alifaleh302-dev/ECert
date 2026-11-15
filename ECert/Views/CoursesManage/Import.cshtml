@@ -81,7 +81,7 @@ else
         <a asp-action="Import" class="btn btn-outline-secondary"><i class="bi bi-arrow-repeat"></i> رفع ملف آخر</a>
         @if (Model.Preview.CanCommit)
         {
-            <form asp-action="ConfirmImport" method="post" onsubmit="return confirm('سيتم إنشاء جميع الدورات المعروضة دفعة واحدة. هل تريد المتابعة؟');">
+            <form asp-action="ConfirmImport" method="post" data-confirm="سيتم إنشاء جميع الدورات المعروضة دفعة واحدة. هل تريد المتابعة؟">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="token" value="@Model.Preview.Token" />
                 <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle"></i> اعتماد استيراد @Model.Preview.ValidRows دورة</button>
