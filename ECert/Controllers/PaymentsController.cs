@@ -47,7 +47,7 @@ public class PaymentsController : Controller
 
     public async Task<IActionResult> Index(string? search, DateTime? dateFrom, DateTime? dateTo, string? method, string? status, string? courseName, string? studentName, string? invoiceNumber)
     {
-        if (!HasPermission("manage-payments")) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.ManagePayments, AdminPermissions.ViewPayments)) return Forbid();
         var query = _db.Payments.Include(p => p.Invoice).ThenInclude(i => i!.Registration).InScope(User).AsQueryable();
         if (!string.IsNullOrEmpty(search))
             query = query.Where(p => p.Invoice!.InvoiceNumber.Contains(search) || p.Invoice.TraineeName.Contains(search) || (p.Invoice.TraineeNameArabic != null && p.Invoice.TraineeNameArabic.Contains(search)) || (p.Invoice.TraineeNameEnglish != null && p.Invoice.TraineeNameEnglish.Contains(search)) || p.RecordedBy!.Contains(search));
@@ -74,6 +74,7 @@ public class PaymentsController : Controller
         ViewBag.CourseName = courseName;
         ViewBag.StudentName = studentName;
         ViewBag.InvoiceNumber = invoiceNumber;
+        ViewBag.CanManage = HasPermission(AdminPermissions.ManagePayments);
         return View();
     }
 
@@ -188,7 +189,7 @@ public class PaymentsController : Controller
     [HttpGet]
     public async Task<IActionResult> Receipt(int id)
     {
-        if (!HasPermission("manage-payments")) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.ManagePayments, AdminPermissions.ViewPayments)) return Forbid();
         var payment = await _db.Payments
             .Include(p => p.Invoice).ThenInclude(i => i!.Registration)
             .FirstOrDefaultAsync(p => p.PaymentId == id);
@@ -345,7 +346,7 @@ public class PaymentsController : Controller
 
     public async Task<IActionResult> ExportXlsx(string? search, DateTime? dateFrom, DateTime? dateTo, string? method)
     {
-        if (!HasPermission("manage-payments")) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.ManagePayments, AdminPermissions.ViewPayments)) return Forbid();
         var query = _db.Payments.Include(p => p.Invoice).ThenInclude(i => i!.Registration).InScope(User).AsQueryable();
         if (!string.IsNullOrEmpty(search))
             query = query.Where(p => p.Invoice!.InvoiceNumber.Contains(search) || p.Invoice.TraineeName.Contains(search) || p.PaymentMethod.Contains(search) || p.RecordedBy!.Contains(search));

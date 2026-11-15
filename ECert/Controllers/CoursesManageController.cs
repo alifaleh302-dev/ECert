@@ -83,11 +83,12 @@ public class CoursesManageController : Controller
 
     public async Task<IActionResult> Index(string? search)
     {
-        if (!HasPermission("manage-courses")) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.ManageCourses, AdminPermissions.ViewCourses)) return Forbid();
         var query = IncludeCourseInstructors(_db.Courses.Include(c => c.Category).Include(c => c.Registrations)).AsQueryable();
         if (!string.IsNullOrEmpty(search))
             query = query.Where(c => (c.CourseNameArabic != null && c.CourseNameArabic.Contains(search)) || (c.CourseNameEnglish != null && c.CourseNameEnglish.Contains(search)) || c.CourseName.Contains(search));
         ViewBag.Search = search;
+        ViewBag.CanManage = HasPermission(AdminPermissions.ManageCourses);
         var courses = await query.OrderByDescending(c => c.CreatedAt).ToListAsync();
         return View(courses);
     }
@@ -134,7 +135,7 @@ public class CoursesManageController : Controller
     [HttpGet]
     public async Task<IActionResult> Export()
     {
-        if (!HasPermission("manage-courses")) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.ManageCourses, AdminPermissions.ViewCourses)) return Forbid();
 
         var courses = await _db.Courses
             .Include(c => c.Category)

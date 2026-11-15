@@ -9,13 +9,13 @@ using Microsoft.EntityFrameworkCore;
 namespace ECert.Controllers;
 
 /// <summary>
-/// The main fund (الصندوق الرئيسي) — SuperAdmin only.
+/// The main fund (الصندوق الرئيسي).
 ///
 /// Money reaches the fund through exactly one path: an employee requests a handover (توريد) from
-/// <c>/Custody</c> and a SuperAdmin approves it. The legacy per-course "transfer" action is retired;
-/// this controller only reads the fund's movements (handovers in, withdrawals out) and lets the
-/// SuperAdmin withdraw from the fund. Every balance is derived from the ledgers at query time —
-/// there is no mutable stored balance.
+/// <c>/Custody</c> and someone holding <c>approve-custody</c> approves it. This controller reads the
+/// fund's movements (handovers in, withdrawals out) for anyone holding <c>view-cashbox</c> or
+/// <c>manage-cashbox</c>, and lets a holder of <c>manage-cashbox</c> withdraw from the fund. Every
+/// balance is derived from the ledgers at query time — there is no mutable stored balance.
 /// </summary>
 [Authorize]
 public class CashboxController : Controller
@@ -34,13 +34,14 @@ public class CashboxController : Controller
         _periods = periods;
     }
 
-    private bool IsSuperAdmin => User.IsSuperAdmin();
+    private bool CanView => User.CanAccessSection("Cashbox");
+    private bool CanWithdraw => User.HasPermission(AdminPermissions.ManageCashbox);
 
     /// <summary>منظر الصندوق الشامل — إجمالي الصندوق، التوريدات (من العهد)، والسحوبات.</summary>
     [HttpGet]
     public async Task<IActionResult> Index()
     {
-        if (!IsSuperAdmin) return Forbid();
+        if (!CanView) return Forbid();
 
         // الترحيلات تُقرأ عبر ADO.NET لتجاوز edge case في EF مع Pomelo.
         var transfers = new List<CashboxTransfer>();
@@ -96,16 +97,16 @@ public class CashboxController : Controller
         ViewBag.FundRemaining = totalTransferred - totalWithdrawn;
         ViewBag.CustodyTotal = custodyTotal;
         ViewBag.Courses = await _db.Courses.OrderBy(c => c.CourseName).ToListAsync();
-        ViewBag.IsSuperAdmin = IsSuperAdmin;
+        ViewBag.CanWithdraw = CanWithdraw;
         return View();
     }
 
-    /// <summary>سحب من الصندوق — SuperAdmin فقط، مع احترام إقفال الفترة المالية.</summary>
+    /// <summary>سحب من الصندوق — يتطلب صلاحية إدارة الصندوق، مع احترام إقفال الفترة المالية.</summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Withdraw(decimal amount, string reason)
     {
-        if (!IsSuperAdmin) return Forbid();
+        if (!CanWithdraw) return Forbid();
 
         if (amount <= 0)
         {

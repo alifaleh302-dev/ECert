@@ -106,6 +106,61 @@ public class RolePermissionFlowTests
     }
 
     [Fact]
+    public void The_test_fixture_section_map_matches_the_production_map()
+    {
+        // Guards the fixture itself: Sections.All must mirror AdminPermissions.SectionAccess,
+        // otherwise the end-to-end assertions below would be checking the wrong contract.
+        var drifted = Sections.DriftedSections().ToList();
+        Assert.True(drifted.Count == 0,
+            "These sections drifted between the test fixture and AdminPermissions.SectionAccess: "
+            + string.Join(", ", drifted));
+    }
+
+    [Fact]
+    public async Task A_read_only_finance_role_opens_the_read_sections()
+    {
+        // Regression: read-only grants must open their listing, and the export it shows.
+        var granted = new[]
+        {
+            AdminPermissions.ViewInvoices, AdminPermissions.ViewPayments,
+            AdminPermissions.ViewCustody, AdminPermissions.ViewCashbox,
+            AdminPermissions.ViewExpenses, AdminPermissions.ViewInstallments
+        };
+        var user = await CreateUserWithRoleAsync(granted);
+        var client = await SignInAsync(user.Username, user.Password);
+
+        Assert.True(await client.CanOpenAsync("/Invoices"));
+        Assert.True(await client.CanOpenAsync("/Payments"));
+        Assert.True(await client.CanOpenAsync("/Custody"));
+        Assert.True(await client.CanOpenAsync("/Cashbox"));
+        Assert.True(await client.CanOpenAsync("/Expenses"));
+        Assert.True(await client.CanOpenAsync("/Installments"));
+    }
+
+    [Fact]
+    public async Task A_read_only_role_cannot_reach_a_write_action()
+    {
+        var granted = new[] { AdminPermissions.ViewPayments };
+        var user = await CreateUserWithRoleAsync(granted);
+        var client = await SignInAsync(user.Username, user.Password);
+
+        // The listing opens, but adding a payment (a write) is refused.
+        Assert.True(await client.CanOpenAsync("/Payments"));
+        Assert.True(await client.IsDeniedAsync("/Payments/Add?invoiceId=1"));
+    }
+
+    [Fact]
+    public async Task An_approve_only_role_opens_the_approval_section()
+    {
+        // A cashier approving refunds must see the refund list without the manage permission.
+        var granted = new[] { AdminPermissions.ApproveRefunds };
+        var user = await CreateUserWithRoleAsync(granted);
+        var client = await SignInAsync(user.Username, user.Password);
+
+        Assert.True(await client.CanOpenAsync("/Refunds"));
+    }
+
+    [Fact]
     public async Task Super_admin_only_permission_is_not_grantable()
     {
         // manage-roles must never appear in the role editor, so a custom role cannot escalate.

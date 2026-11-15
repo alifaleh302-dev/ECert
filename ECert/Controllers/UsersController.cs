@@ -23,6 +23,13 @@ public class UsersController : Controller
 
     private bool HasPermission(string perm) => User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
     private bool IsSuperAdmin => User.IsSuperAdmin();
+
+    /// <summary>
+    /// Roles the caller may bind to a user. A SuperAdmin sees every role; a custom administrator
+    /// (someone holding <c>manage-users</c> without being a SuperAdmin) sees only the non-system
+    /// roles. The built-in SuperAdmin role is <see cref="Role.IsSystem"/>, so a delegated
+    /// administrator can never mint a SuperAdmin account and escalate.
+    /// </summary>
     private IQueryable<Role> AssignableRolesQuery() => IsSuperAdmin ? _db.Roles : _db.Roles.Where(r => !r.IsSystem);
 
     /// <summary>
@@ -41,6 +48,8 @@ public class UsersController : Controller
     private async Task<CourseScopePickerViewModel> BuildScopePickerAsync(
         IEnumerable<int>? courseIds = null, IEnumerable<int>? categoryIds = null, bool isUnscopableAccount = false)
     {
+        // Course scoping is a SuperAdmin-only power: a delegated administrator creates users who
+        // inherit the administrator's own scope, so the picker is shown read-only (or not at all).
         var canAssign = IsSuperAdmin && !isUnscopableAccount;
         return new CourseScopePickerViewModel
         {
@@ -80,6 +89,12 @@ public class UsersController : Controller
         ViewBag.Status = status;
         ViewBag.Scope = scope;
         ViewBag.Roles = await _db.Roles.ToListAsync();
+        // The SuperAdmin account(s) are shown read-only to a delegated administrator, so the row
+        // actions (edit / disable / reset) that would otherwise be refused are hidden.
+        ViewBag.IsSuperAdmin = IsSuperAdmin;
+        ViewBag.SuperAdminUserIds = await _db.UserRoles
+            .Where(ur => ur.Role!.RoleName == AdminPrincipalExtensions.SuperAdminRole)
+            .Select(ur => ur.UserId).ToListAsync();
         var users = await query.OrderByDescending(u => u.CreatedAt).ToListAsync();
         return View(users);
     }
@@ -212,6 +227,9 @@ public class UsersController : Controller
         if (user == null) return NotFound();
 
         var isSuperAdminAccount = await IsSuperAdminAccountAsync(user);
+        // A delegated administrator must not be able to demote or reconfigure the SuperAdmin
+        // account; only the SuperAdmin itself may edit it.
+        if (isSuperAdminAccount && !IsSuperAdmin) return Forbid();
         var assignableRoles = await AssignableRolesQuery().OrderBy(r => r.RoleName).ToListAsync();
         if (!assignableRoles.Any(r => r.RoleId == model.RoleId))
             ModelState.AddModelError(nameof(model.RoleId), "اختر دوراً متاحاً");
@@ -264,6 +282,7 @@ public class UsersController : Controller
         if (!HasPermission("manage-users")) return Forbid();
         var user = await _db.Users.FindAsync(id);
         if (user == null) return NotFound();
+        if (!IsSuperAdmin && await IsSuperAdminAccountAsync(id)) return Forbid();
         user.IsActive = !user.IsActive;
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Update", "User", id, null, $"Active: {user.IsActive}");
@@ -278,6 +297,7 @@ public class UsersController : Controller
         if (!HasPermission("manage-users")) return Forbid();
         var user = await _db.Users.FindAsync(id);
         if (user == null) return NotFound();
+        if (!IsSuperAdmin && await IsSuperAdminAccountAsync(id)) return Forbid();
 
         var policyError = PasswordPolicy.Validate(newPassword).FirstOrDefault();
         if (policyError != null)
@@ -334,6 +354,10 @@ public class UsersController : Controller
         var roleIds = user.UserRoles.Select(ur => ur.RoleId).ToList();
         return await _db.Roles.AnyAsync(r => roleIds.Contains(r.RoleId) && r.RoleName == AdminPrincipalExtensions.SuperAdminRole);
     }
+
+    /// <summary>True when the account identified by <paramref name="userId"/> is a SuperAdmin.</summary>
+    private Task<bool> IsSuperAdminAccountAsync(int userId) =>
+        _db.UserRoles.AnyAsync(ur => ur.UserId == userId && ur.Role!.RoleName == AdminPrincipalExtensions.SuperAdminRole);
 
     /// <summary>Keeps only ids that refer to a real course, so a tampered form cannot insert a dangling row.</summary>
     private async Task<List<int>> ValidateCourseIdsAsync(IEnumerable<int>? courseIds)

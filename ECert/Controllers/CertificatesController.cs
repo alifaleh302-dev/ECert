@@ -55,7 +55,7 @@ public class CertificatesController : Controller
     [HttpGet]
     public async Task<IActionResult> Index(string? search, int? courseId, DateTime? issueFrom, DateTime? issueTo)
     {
-        if (!HasPermission("issue-certificates")) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.IssueCertificates, AdminPermissions.ViewCertificates)) return Forbid();
 
         var query = _db.Certificates
             .InScope(User)
@@ -103,6 +103,7 @@ public class CertificatesController : Controller
             IssueTo = issueTo,
             Courses = await _db.Courses.InScope(User).OrderBy(c => c.CourseNameArabic).ToListAsync(),
             Certificates = certificates,
+            CanManage = HasPermission(AdminPermissions.IssueCertificates),
             VerificationUrls = certificates.ToDictionary(
                 c => c.CertificateId,
                 c => BuildVerificationUrl(c))
@@ -257,7 +258,7 @@ public class CertificatesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ExportSelected(int[] certificateIds)
     {
-        if (!HasPermission("issue-certificates")) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.IssueCertificates, AdminPermissions.ViewCertificates)) return Forbid();
 
         var ids = certificateIds?.Where(id => id > 0).Distinct().ToArray() ?? Array.Empty<int>();
         var idList = ids.ToList();
@@ -287,7 +288,7 @@ public class CertificatesController : Controller
     [HttpGet]
     public async Task<IActionResult> ExportFiltered(string? search, int? courseId, DateTime? issueFrom, DateTime? issueTo)
     {
-        if (!HasPermission("issue-certificates")) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.IssueCertificates, AdminPermissions.ViewCertificates)) return Forbid();
 
         var query = _db.Certificates
             .InScope(User)

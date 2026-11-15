@@ -37,21 +37,34 @@ public sealed class AppCollection : ICollectionFixture<AppFixture>
 public static class Sections
 {
     public const string ManageRegistrations = AdminPermissions.ManageRegistrations;
+    public const string ViewRegistrations = AdminPermissions.ViewRegistrations;
     public const string ManageCourses = AdminPermissions.ManageCourses;
+    public const string ViewCourses = AdminPermissions.ViewCourses;
     public const string ManageInstructors = AdminPermissions.ManageInstructors;
+    public const string ViewInstructors = AdminPermissions.ViewInstructors;
     public const string ManageCategories = AdminPermissions.ManageCategories;
+    public const string ViewCategories = AdminPermissions.ViewCategories;
     public const string IssueCertificates = AdminPermissions.IssueCertificates;
+    public const string ViewCertificates = AdminPermissions.ViewCertificates;
     public const string ManageCertificateDesigns = AdminPermissions.ManageCertificateDesigns;
     public const string ManageFinance = AdminPermissions.ManageFinance;
     public const string ViewInvoices = AdminPermissions.ViewInvoices;
     public const string ManagePayments = AdminPermissions.ManagePayments;
+    public const string ViewPayments = AdminPermissions.ViewPayments;
     public const string ViewReports = AdminPermissions.ViewReports;
     public const string ViewCustody = AdminPermissions.ViewCustody;
+    public const string ApproveCustody = AdminPermissions.ApproveCustody;
+    public const string ViewCashbox = AdminPermissions.ViewCashbox;
+    public const string ManageCashbox = AdminPermissions.ManageCashbox;
     public const string ManageRefunds = AdminPermissions.ManageRefunds;
+    public const string ApproveRefunds = AdminPermissions.ApproveRefunds;
     public const string ViewReceivables = AdminPermissions.ViewReceivables;
     public const string ViewFinancialAudit = AdminPermissions.ViewFinancialAudit;
     public const string ManageExpenses = AdminPermissions.ManageExpenses;
+    public const string ApproveExpenses = AdminPermissions.ApproveExpenses;
+    public const string ViewExpenses = AdminPermissions.ViewExpenses;
     public const string ManageInstallments = AdminPermissions.ManageInstallments;
+    public const string ViewInstallments = AdminPermissions.ViewInstallments;
     public const string ViewFinanceDashboard = AdminPermissions.ViewFinanceDashboard;
     public const string ManageFinanceSettings = AdminPermissions.ManageFinanceSettings;
     public const string ManagePosts = AdminPermissions.ManagePosts;
@@ -69,22 +82,21 @@ public static class Sections
 
     public static readonly Section[] All =
     {
-        new("Registrations", "/Registrations", new[] { ManageRegistrations }),
-        new("CoursesManage", "/CoursesManage", new[] { ManageCourses }),
-        new("CategoriesManage", "/CategoriesManage", new[] { ManageCategories }),
-        new("Instructors", "/Instructors", new[] { ManageInstructors }),
-        new("Certificates", "/Certificates", new[] { IssueCertificates }),
+        new("Registrations", "/Registrations", new[] { ManageRegistrations, ViewRegistrations }),
+        new("CoursesManage", "/CoursesManage", new[] { ManageCourses, ViewCourses }),
+        new("CategoriesManage", "/CategoriesManage", new[] { ManageCategories, ViewCategories }),
+        new("Instructors", "/Instructors", new[] { ManageInstructors, ViewInstructors }),
+        new("Certificates", "/Certificates", new[] { IssueCertificates, ViewCertificates }),
         new("CertificateDesigns", "/CertificateDesigns", new[] { ManageCertificateDesigns }),
         new("Invoices", "/Invoices", new[] { ViewInvoices, ManageFinance }),
-        new("Payments", "/Payments", new[] { ManagePayments }),
-        // The main fund is SuperAdmin-only by design; no grantable permission unlocks it.
-        new("Cashbox", "/Cashbox", Array.Empty<string>(), SuperAdminOnly: true),
-        new("Custody", "/Custody", new[] { ViewCustody }),
-        new("Refunds", "/Refunds", new[] { ManageRefunds }),
+        new("Payments", "/Payments", new[] { ManagePayments, ViewPayments }),
+        new("Cashbox", "/Cashbox", new[] { ViewCashbox, ManageCashbox }),
+        new("Custody", "/Custody", new[] { ViewCustody, ApproveCustody }),
+        new("Refunds", "/Refunds", new[] { ManageRefunds, ApproveRefunds }),
         new("Receivables", "/Receivables", new[] { ViewReceivables }),
         new("FinancialAudit", "/FinancialAudit", new[] { ViewFinancialAudit }),
-        new("Expenses", "/Expenses", new[] { ManageExpenses }),
-        new("Installments", "/Installments", new[] { ManageInstallments }),
+        new("Expenses", "/Expenses", new[] { ManageExpenses, ViewExpenses, ApproveExpenses }),
+        new("Installments", "/Installments", new[] { ManageInstallments, ViewInstallments }),
         new("Finance", "/Finance", new[] { ViewFinanceDashboard }),
         new("FinanceSettings", "/FinanceSettings", new[] { ManageFinanceSettings }),
         new("Reports", "/Reports/CourseRevenue", new[] { ViewReports }),
@@ -94,13 +106,30 @@ public static class Sections
         new("HomepageManage", "/HomepageManage", new[] { ManageHomepage }),
         new("Users", "/Users", new[] { ManageUsers }),
         new("Roles", "/Roles", new[] { ManageRoles }),
-        new("AuditLog", "/AuditLog", new[] { ViewAuditLog }),
+        new("AuditLog", "/AuditLog", new[] { ViewAuditLog, ViewSecurityAudit }),
         new("AcademicCatalog", "/AcademicCatalog", new[] { ManageAcademicCatalog }),
         new("PhoneCountries", "/PhoneCountries", new[] { ManagePhoneCountries }),
     };
 
     /// <summary>Sections the role editor is allowed to grant (excludes SuperAdmin-only sections).</summary>
     public static IEnumerable<Section> Grantable => All.Where(section => !section.SuperAdminOnly);
+
+    /// <summary>
+    /// Every section must list exactly the permissions that unlock it in <c>AdminPermissions</c>,
+    /// so the test fixture can never drift from the production section map.
+    /// </summary>
+    public static IEnumerable<string> DriftedSections()
+    {
+        foreach (var section in All.Where(s => !s.SuperAdminOnly))
+        {
+            var expected = section.Permissions.OrderBy(p => p, StringComparer.Ordinal).ToArray();
+            var actual = AdminPermissions.SectionAccess.TryGetValue(section.Name, out var mapped)
+                ? mapped.OrderBy(p => p, StringComparer.Ordinal).ToArray()
+                : Array.Empty<string>();
+            if (!expected.SequenceEqual(actual))
+                yield return section.Name;
+        }
+    }
 
     public static IEnumerable<Section> ExpectedFor(IEnumerable<string> grantedPermissions)
     {

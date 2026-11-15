@@ -12,23 +12,36 @@ namespace ECert.Services;
 public static class AdminPermissions
 {
     public const string ManageRegistrations = "manage-registrations";
+    public const string ViewRegistrations = "view-registrations";
     public const string ManageCourses = "manage-courses";
+    public const string ViewCourses = "view-courses";
     public const string ManageInstructors = "manage-instructors";
+    public const string ViewInstructors = "view-instructors";
     public const string ManageCategories = "manage-categories";
+    public const string ViewCategories = "view-categories";
     public const string IssueCertificates = "issue-certificates";
+    public const string ViewCertificates = "view-certificates";
     public const string ManageCertificateDesigns = "manage-certificate-designs";
     public const string ManageFinance = "manage-finance";
     public const string ViewInvoices = "view-invoices";
     public const string ManagePayments = "manage-payments";
+    public const string ViewPayments = "view-payments";
     public const string ViewReports = "view-reports";
     public const string ViewCustody = "view-custody";
     public const string ManageRefunds = "manage-refunds";
+    public const string ApproveRefunds = "approve-refunds";
     public const string ViewReceivables = "view-receivables";
     public const string ViewFinancialAudit = "view-financial-audit";
     public const string ManageExpenses = "manage-expenses";
+    public const string ApproveExpenses = "approve-expenses";
+    public const string ViewExpenses = "view-expenses";
     public const string ManageInstallments = "manage-installments";
+    public const string ViewInstallments = "view-installments";
     public const string ViewFinanceDashboard = "view-finance-dashboard";
     public const string ManageFinanceSettings = "manage-finance-settings";
+    public const string ViewCashbox = "view-cashbox";
+    public const string ManageCashbox = "manage-cashbox";
+    public const string ApproveCustody = "approve-custody";
     public const string ManagePosts = "manage-posts";
     public const string ManageNews = "manage-news";
     public const string ManageHomepage = "manage-homepage";
@@ -49,21 +62,34 @@ public static class AdminPermissions
     public static readonly IReadOnlyList<PermissionDefinition> Catalog = new List<PermissionDefinition>
     {
         new(ManageRegistrations, "إدارة التسجيلات", "إدارة التدريب"),
+        new(ViewRegistrations, "مشاهدة التسجيلات (قراءة فقط)", "إدارة التدريب"),
         new(ManageCourses, "إدارة الدورات", "إدارة التدريب"),
+        new(ViewCourses, "مشاهدة الدورات (قراءة فقط)", "إدارة التدريب"),
         new(ManageInstructors, "إدارة المدربين", "إدارة التدريب"),
+        new(ViewInstructors, "مشاهدة المدربين (قراءة فقط)", "إدارة التدريب"),
         new(ManageCategories, "إدارة الفئات", "إدارة التدريب"),
+        new(ViewCategories, "مشاهدة الفئات (قراءة فقط)", "إدارة التدريب"),
         new(IssueCertificates, "إصدار الشهادات", "الشهادات"),
+        new(ViewCertificates, "مشاهدة الشهادات (قراءة فقط)", "الشهادات"),
         new(ManageCertificateDesigns, "إدارة تصميم الشهادات", "الشهادات"),
         new(ManageFinance, "إدارة المالية", "الإدارة المالية"),
         new(ViewInvoices, "مشاهدة الفواتير", "الإدارة المالية"),
         new(ManagePayments, "إدارة الدفعات", "الإدارة المالية"),
+        new(ViewPayments, "مشاهدة الدفعات (قراءة فقط)", "الإدارة المالية"),
         new(ViewReports, "مشاهدة تقارير الإيرادات", "الإدارة المالية"),
         new(ViewCustody, "عهدة الموظف والتوريد للصندوق", "الإدارة المالية"),
+        new(ApproveCustody, "اعتماد توريد العهد إلى الصندوق", "الإدارة المالية"),
+        new(ViewCashbox, "مشاهدة الصندوق الرئيسي (قراءة فقط)", "الإدارة المالية"),
+        new(ManageCashbox, "إدارة الصندوق الرئيسي والسحب منه", "الإدارة المالية"),
         new(ManageRefunds, "استرداد الرسوم", "الإدارة المالية"),
+        new(ApproveRefunds, "اعتماد الاستردادات", "الإدارة المالية"),
         new(ViewReceivables, "تقارير المتأخرات وكشف الحساب", "الإدارة المالية"),
         new(ViewFinancialAudit, "سجل التدقيق المالي", "الإدارة المالية"),
         new(ManageExpenses, "إدارة المصروفات", "الإدارة المالية"),
+        new(ApproveExpenses, "اعتماد المصروفات", "الإدارة المالية"),
+        new(ViewExpenses, "مشاهدة المصروفات (قراءة فقط)", "الإدارة المالية"),
         new(ManageInstallments, "إدارة الأقساط والخطة الدراسية", "الإدارة المالية"),
+        new(ViewInstallments, "مشاهدة الأقساط (قراءة فقط)", "الإدارة المالية"),
         new(ViewFinanceDashboard, "لوحة المؤشرات المالية", "الإدارة المالية"),
         new(ManageFinanceSettings, "إعدادات النظام المالية (العملة والفترات)", "الإدارة المالية"),
         new(ManagePosts, "إدارة المنشورات", "المحتوى"),
@@ -89,22 +115,23 @@ public static class AdminPermissions
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> SectionAccess =
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
         {
-            ["Registrations"] = new[] { ManageRegistrations },
-            ["CoursesManage"] = new[] { ManageCourses },
-            ["CategoriesManage"] = new[] { ManageCategories },
-            ["Instructors"] = new[] { ManageInstructors },
-            ["Certificates"] = new[] { IssueCertificates },
+            ["Registrations"] = new[] { ManageRegistrations, ViewRegistrations },
+            ["CoursesManage"] = new[] { ManageCourses, ViewCourses },
+            ["CategoriesManage"] = new[] { ManageCategories, ViewCategories },
+            ["Instructors"] = new[] { ManageInstructors, ViewInstructors },
+            ["Certificates"] = new[] { IssueCertificates, ViewCertificates },
             ["CertificateDesigns"] = new[] { ManageCertificateDesigns },
             ["Invoices"] = new[] { ViewInvoices, ManageFinance },
-            ["Payments"] = new[] { ManagePayments },
-            ["Custody"] = new[] { ViewCustody },
-            ["Refunds"] = new[] { ManageRefunds },
+            ["Payments"] = new[] { ManagePayments, ViewPayments },
+            ["Custody"] = new[] { ViewCustody, ApproveCustody },
+            ["Refunds"] = new[] { ManageRefunds, ApproveRefunds },
             ["Receivables"] = new[] { ViewReceivables },
             ["FinancialAudit"] = new[] { ViewFinancialAudit },
-            ["Expenses"] = new[] { ManageExpenses },
-            ["Installments"] = new[] { ManageInstallments },
+            ["Expenses"] = new[] { ManageExpenses, ViewExpenses, ApproveExpenses },
+            ["Installments"] = new[] { ManageInstallments, ViewInstallments },
             ["Finance"] = new[] { ViewFinanceDashboard },
             ["FinanceSettings"] = new[] { ManageFinanceSettings },
+            ["Cashbox"] = new[] { ViewCashbox, ManageCashbox },
             ["Reports"] = new[] { ViewReports },
             ["PostsManage"] = new[] { ManagePosts },
             ["NewsManage"] = new[] { ManageNews },
@@ -127,8 +154,8 @@ public static class AdminPermissions
 
     /// <summary>
     /// Permissions that must never be handed to a custom role: they govern who may change
-    /// roles and users, so granting them would let a role escalate its own privileges.
-    /// Only the built-in SuperAdmin holds them.
+    /// roles, users and the security posture, so granting them would let a role escalate its
+    /// own privileges or weaken the system. Only the built-in SuperAdmin holds them.
     /// </summary>
     public static readonly IReadOnlySet<string> SuperAdminOnly =
         new HashSet<string>(StringComparer.Ordinal) { ManageRoles, ManageFinanceSettings, ManageSecuritySettings };
@@ -142,11 +169,27 @@ public static class AdminPermissions
 
     public static readonly IReadOnlyList<RolePreset> Presets = new List<RolePreset>
     {
+        new("cashier", "أمين الصندوق", "إدارة الصندوق الرئيسي والسحب منه، واعتماد المصروفات وتوريد العهد والاستردادات.", new[]
+        {
+            ManageFinance, ViewInvoices, ManagePayments, ViewReports,
+            ViewCustody, ApproveCustody, ManageRefunds, ApproveRefunds, ViewReceivables,
+            ViewFinancialAudit, ManageExpenses, ApproveExpenses, ViewExpenses,
+            ManageInstallments, ViewFinanceDashboard, ViewCashbox, ManageCashbox
+        }),
         new("finance", "محاسب", "تسجيل الدفعات ومتابعة الفواتير والعهدة دون إدارة النظام.", new[]
         {
             ManageFinance, ViewInvoices, ManagePayments, ViewReports,
             ViewCustody, ManageRefunds, ViewReceivables, ViewFinancialAudit,
             ManageExpenses, ManageInstallments, ViewFinanceDashboard
+        }),
+        new("finance_readonly", "مراجع مالي (قراءة فقط)", "مشاهدة الفواتير والدفعات والعهد والصندوق والتقارير دون أي إضافة أو اعتماد.", new[]
+        {
+            ViewInvoices, ViewPayments, ViewCustody, ViewCashbox, ViewReceivables,
+            ViewExpenses, ViewInstallments, ViewReports, ViewFinancialAudit, ViewFinanceDashboard
+        }),
+        new("hr_readonly", "الموارد البشرية (قراءة فقط)", "مشاهدة التسجيلات والدورات والمدربين والشهادات دون أي تعديل.", new[]
+        {
+            ViewRegistrations, ViewCourses, ViewInstructors, ViewCategories, ViewCertificates
         }),
         new("collections", "محصّل رسوم", "تسجيل الدفعات ومتابعة الفواتير وعهدته فقط.", new[]
         {

@@ -60,13 +60,9 @@
     };
 
     // A section is visible when the signed-in role holds any of its permissions. The map in
-    // AdminPermissions is the single source of truth, mirrored by the controller guards.
-    // The main fund (الصندوق) is SuperAdmin-only: it is deliberately absent from SectionAccess so
-    // no grantable permission can unlock it.
-    bool CanSee(string ctrl) =>
-        string.Equals(ctrl, "Cashbox", StringComparison.OrdinalIgnoreCase)
-            ? User.IsSuperAdmin()
-            : User.CanAccessSection(ctrl);
+    // AdminPermissions is the single source of truth, mirrored by the controller guards — the
+    // main fund (الصندوق) is unlocked by view-cashbox / manage-cashbox like any other section.
+    bool CanSee(string ctrl) => User.CanAccessSection(ctrl);
 
     var visibleGroups = groups
         .Select(g => (g.Key, g.Label, g.Icon, Items: g.Items.Where(i => CanSee(i.Ctrl)).ToList()))

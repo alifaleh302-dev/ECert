@@ -13,9 +13,9 @@ namespace ECert.Controllers;
 /// (توريد / ترحيل للصندوق الرئيسي).
 ///
 /// A financial employee sees their own custody balance and ledger, and can request handing over
-/// part or all of it. Only a SuperAdmin reviews those requests: approval debits the employee's
-/// custody and credits the main fund in a single transaction, so the money is never counted twice
-/// and never disappears. A rejected request changes nothing.
+/// part or all of it. Someone holding <c>approve-custody</c> reviews those requests: approval debits
+/// the employee's custody and credits the main fund in a single transaction, so the money is never
+/// counted twice and never disappears. A rejected request changes nothing.
 /// </summary>
 [Authorize]
 public class CustodyController : Controller
@@ -36,21 +36,31 @@ public class CustodyController : Controller
         int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : null;
     private string Actor => User.Identity?.Name ?? "System";
 
+    /// <summary>May review every employee's custody and decide handover requests.</summary>
+    private bool CanReviewAll => HasPermission(AdminPermissions.ApproveCustody);
+
     /// <summary>
-    /// The custody page. A SuperAdmin sees every employee's custody and the pending handover queue;
+    /// Requesting a handover is a write: it is the collector handing money back. Read-only roles
+    /// (view-custody only) must not reach it, so it additionally needs a collecting permission.
+    /// </summary>
+    private bool CanRequestHandover => HasPermission(AdminPermissions.ViewCustody)
+        && User.HasAnyPermission(AdminPermissions.ManagePayments, AdminPermissions.ManageRefunds, AdminPermissions.ManageCashbox);
+
+    /// <summary>
+    /// The custody page. An approver sees every employee's custody and the pending handover queue;
     /// everyone else sees only their own custody and ledger. The movements table is filtered by entry
     /// type, date range and free text, and paged 20 rows at a time.
     /// </summary>
     public async Task<IActionResult> Index(int? userId, string? entryType, DateTime? from, DateTime? to,
         string? search, int page = 1)
     {
-        if (!HasPermission(AdminPermissions.ViewCustody)) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.ViewCustody, AdminPermissions.ApproveCustody)) return Forbid();
 
-        var isSuperAdmin = User.IsSuperAdmin();
+        var canReviewAll = CanReviewAll;
 
-        // The employee whose custody is displayed: an explicit selection (SuperAdmin only),
+        // The employee whose custody is displayed: an explicit selection (reviewer only),
         // otherwise the signed-in user.
-        var targetUserId = isSuperAdmin && userId.HasValue ? userId.Value : CurrentUserId;
+        var targetUserId = canReviewAll && userId.HasValue ? userId.Value : CurrentUserId;
         if (!targetUserId.HasValue) return Forbid();
 
         var target = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == targetUserId.Value);
@@ -84,7 +94,9 @@ public class CustodyController : Controller
         ViewBag.TargetUser = target;
         ViewBag.Entries = entries;
         ViewBag.Balance = await _ledger.GetCustodyBalanceAsync(targetUserId.Value);
-        ViewBag.IsSuperAdmin = isSuperAdmin;
+        ViewBag.CanReview = canReviewAll;
+        ViewBag.CanRequestHandover = CanRequestHandover;
+        ViewBag.IsSuperAdmin = canReviewAll;
         ViewBag.EntryType = entryType;
         ViewBag.From = from?.ToString("yyyy-MM-dd");
         ViewBag.To = to?.ToString("yyyy-MM-dd");
@@ -94,7 +106,7 @@ public class CustodyController : Controller
         ViewBag.TotalMovements = totalMovements;
         ViewBag.TotalPages = totalPages;
 
-        // The employee's own pending handover requests, and — for a SuperAdmin — the full queue.
+        // The employee's own pending handover requests, and — for a reviewer — the full queue.
         ViewBag.MyPending = await _db.CustodyHandovers
             .Where(h => h.UserId == targetUserId.Value && h.Status == CustodyHandoverStatus.Pending)
             .OrderByDescending(h => h.RequestedAt)
@@ -106,7 +118,7 @@ public class CustodyController : Controller
             .Take(100)
             .ToListAsync();
 
-        if (isSuperAdmin)
+        if (canReviewAll)
         {
             ViewBag.Employees = await _db.CustodyEntries
                 .GroupBy(e => e.UserId)
@@ -138,7 +150,7 @@ public class CustodyController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RequestHandover(decimal amount, string? note)
     {
-        if (!HasPermission(AdminPermissions.ViewCustody)) return Forbid();
+        if (!CanRequestHandover) return Forbid();
         if (!CurrentUserId.HasValue) return Forbid();
 
         amount = Math.Round(amount, 2, MidpointRounding.AwayFromZero);
@@ -180,12 +192,12 @@ public class CustodyController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    /// <summary>SuperAdmin approves a handover: the custody is debited and the main fund credited.</summary>
+    /// <summary>An approver approves a handover: the custody is debited and the main fund credited.</summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Approve(int id, string? note)
     {
-        if (!User.IsSuperAdmin()) return Forbid();
+        if (!CanReviewAll) return Forbid();
 
         var handover = await _db.CustodyHandovers.Include(h => h.User).FirstOrDefaultAsync(h => h.CustodyHandoverId == id);
         if (handover == null) return NotFound();
@@ -232,12 +244,12 @@ public class CustodyController : Controller
         return RedirectToAction(nameof(Index), new { userId = handover.UserId });
     }
 
-    /// <summary>SuperAdmin rejects a handover; nothing moves.</summary>
+    /// <summary>An approver rejects a handover; nothing moves.</summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Reject(int id, string? note)
     {
-        if (!User.IsSuperAdmin()) return Forbid();
+        if (!CanReviewAll) return Forbid();
 
         var handover = await _db.CustodyHandovers.FirstOrDefaultAsync(h => h.CustodyHandoverId == id);
         if (handover == null) return NotFound();

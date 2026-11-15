@@ -30,7 +30,7 @@ public class InstallmentsController : Controller
 
     public async Task<IActionResult> Index()
     {
-        if (!User.HasPermission(AdminPermissions.ManageInstallments)) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.ManageInstallments, AdminPermissions.ViewInstallments)) return Forbid();
 
         var today = DateTime.Today;
         var plans = await _db.InstallmentPlans
@@ -64,6 +64,7 @@ public class InstallmentsController : Controller
         }).ToList();
 
         ViewBag.Rows = rows;
+        ViewBag.CanManage = User.HasPermission(AdminPermissions.ManageInstallments);
         return View();
     }
 
@@ -110,7 +111,7 @@ public class InstallmentsController : Controller
 
     public async Task<IActionResult> Late()
     {
-        if (!User.HasPermission(AdminPermissions.ManageInstallments)) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.ManageInstallments, AdminPermissions.ViewInstallments)) return Forbid();
 
         var late = await _installments.LateInstallmentsAsync(User, DateTime.Today);
         var planIds = late.Select(i => i.InstallmentPlanId).Distinct().ToList();
@@ -147,7 +148,7 @@ public class InstallmentsController : Controller
     /// <summary>Clean printable installment schedule (جدول الأقساط) for the trainee.</summary>
     public async Task<IActionResult> Print(int invoiceId)
     {
-        if (!User.HasPermission(AdminPermissions.ManageInstallments)) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.ManageInstallments, AdminPermissions.ViewInstallments)) return Forbid();
 
         var plan = await _db.InstallmentPlans
             .Include(p => p.Installments)

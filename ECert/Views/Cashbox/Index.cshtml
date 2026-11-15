@@ -1,8 +1,9 @@
 @{
     ViewData["Title"] = "الصندوق الرئيسي";
     ViewData["PageIcon"] = "bi-safe";
-    ViewData["PageDesc"] = "الصندوق الرئيسي — التوريدات المعتمدة من العهد والسحوبات. الوصول لمدير النظام فقط";
+    ViewData["PageDesc"] = "الصندوق الرئيسي — التوريدات المعتمدة من العهد والسحوبات.";
     Layout = "_AdminLayout";
+    bool canWithdraw = ViewBag.CanWithdraw is bool cw && cw;
 
     var transfers = ViewBag.Transfers as List<CashboxTransfer> ?? new();
     var withdrawals = ViewBag.Withdrawals as List<CashboxWithdrawal> ?? new();
@@ -55,27 +56,34 @@
 
 <div class="a-card mb-4">
     <div class="a-card__header">
-        <h2 class="a-card__title"><i class="bi bi-cash-withdraw" aria-hidden="true"></i> سحب من الصندوق — لمدير النظام فقط</h2>
+        <h2 class="a-card__title"><i class="bi bi-cash-withdraw" aria-hidden="true"></i> سحب من الصندوق</h2>
     </div>
     <div class="a-card__body">
-        <form asp-action="Withdraw" method="post" class="a-form__grid">
-            @Html.AntiForgeryToken()
-            <div class="a-field">
-                <label class="a-field__label a-label--required">المبلغ (@Currency.Symbol)</label>
-                <input type="number" name="amount" min="0.01" step="0.01" max="@fundRemaining.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required />
-            </div>
-            <div class="a-field">
-                <label class="a-field__label a-label--required">السبب / البيان</label>
-                <input type="text" name="reason" maxlength="500" class="form-control" placeholder="مثلاً: مصروفات تشغيلية شهرية" required />
-            </div>
-            <div class="a-field a-field--full">
-                <button type="submit" class="btn btn-danger"
-                        onclick="return confirm('تأكيد سحب المبلغ من الصندوق العام؟');">
-                    <i class="bi bi-dash-circle"></i> سحب
-                </button>
-                <p class="a-hint mt-2 mb-0">الصندوق المتاح للسحب الآن: <strong>@fundRemaining.ToString("N0")</strong> @Currency.Symbol</p>
-            </div>
-        </form>
+        @if (canWithdraw)
+        {
+            <form asp-action="Withdraw" method="post" class="a-form__grid">
+                @Html.AntiForgeryToken()
+                <div class="a-field">
+                    <label class="a-field__label a-label--required">المبلغ (@Currency.Symbol)</label>
+                    <input type="number" name="amount" min="0.01" step="0.01" max="@fundRemaining.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required />
+                </div>
+                <div class="a-field">
+                    <label class="a-field__label a-label--required">السبب / البيان</label>
+                    <input type="text" name="reason" maxlength="500" class="form-control" placeholder="مثلاً: مصروفات تشغيلية شهرية" required />
+                </div>
+                <div class="a-field a-field--full">
+                    <button type="submit" class="btn btn-danger"
+                            onclick="return confirm('تأكيد سحب المبلغ من الصندوق العام؟');">
+                        <i class="bi bi-dash-circle"></i> سحب
+                    </button>
+                    <p class="a-hint mt-2 mb-0">الصندوق المتاح للسحب الآن: <strong>@fundRemaining.ToString("N0")</strong> @Currency.Symbol</p>
+                </div>
+            </form>
+        }
+        else
+        {
+            <p class="text-muted mb-0"><i class="bi bi-lock" aria-hidden="true"></i> عرض فقط — السحب من الصندوق يتطلب صلاحية «إدارة الصندوق الرئيسي والسحب منه».</p>
+        }
     </div>
 </div>
 

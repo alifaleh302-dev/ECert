@@ -20,11 +20,12 @@ public class CategoriesManageController : Controller
 
     public async Task<IActionResult> Index(string? search)
     {
-        if (!HasPermission(AdminPermissions.ManageCategories)) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.ManageCategories, AdminPermissions.ViewCategories)) return Forbid();
         var query = _db.Categories.Include(c => c.Courses).AsQueryable();
         if (!string.IsNullOrEmpty(search))
             query = query.Where(c => c.CategoryName.Contains(search));
         ViewBag.Search = search;
+        ViewBag.CanManage = HasPermission(AdminPermissions.ManageCategories);
         var categories = await query.OrderBy(c => c.CategoryName).ToListAsync();
         return View(categories);
     }

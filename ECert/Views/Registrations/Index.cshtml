@@ -8,6 +8,7 @@
 
     var registrations = ViewBag.Registrations as List<Registration> ?? new();
     var isSuperAdmin = User.IsSuperAdmin();
+    bool canManage = ViewBag.CanManage is bool cm && cm;
     var activeStatus = (string?)ViewBag.Status ?? string.Empty;
     var activeSearch = (string?)ViewBag.Search ?? string.Empty;
     var selectedCourseId = (int?)ViewBag.CourseId;
@@ -65,9 +66,12 @@
                 <i class="bi bi-arrow-left-short" aria-hidden="true"></i><span>بحث</span>
             </button>
 
-            <a asp-action="Import" class="btn btn-outline-primary registration-export-button" title="استيراد متدربين من Excel">
-                <i class="bi bi-cloud-arrow-up" aria-hidden="true"></i><span>استيراد</span>
-            </a>
+            @if (canManage)
+            {
+                <a asp-action="Import" class="btn btn-outline-primary registration-export-button" title="استيراد متدربين من Excel">
+                    <i class="bi bi-cloud-arrow-up" aria-hidden="true"></i><span>استيراد</span>
+                </a>
+            }
 
             <a asp-action="ExportXlsx" asp-route-status="@activeStatus" asp-route-search="@activeSearch" asp-route-courseId="@selectedCourseId" asp-route-dateFrom="@(activeDateFrom?.ToString("yyyy-MM-dd"))" asp-route-dateTo="@(activeDateTo?.ToString("yyyy-MM-dd"))" class="btn btn-outline-success registration-export-button" title="تصدير النتائج الحالية إلى Excel">
                 <i class="bi bi-file-earmark-excel" aria-hidden="true"></i><span>Excel</span>
@@ -119,7 +123,7 @@
                     <small class="text-muted"><strong>@registrations.Count</strong> نتيجة ظاهرة <span class="mx-1">•</span> <strong class="text-warning-emphasis">@pendingCount</strong> معلقة قابلة للمعالجة</small>
                 </div>
             </div>
-            @if (pendingCount > 0)
+            @if (pendingCount > 0 && canManage)
             {
                 <button type="button" class="btn btn-sm btn-outline-primary selection-helper" id="selectAllPending">
                     <i class="bi bi-check2-square" aria-hidden="true"></i><span>تحديد المعلقة الظاهرة</span>
@@ -214,7 +218,7 @@
 
                             <tr class="@(isPending ? "registration-row-pending" : "registration-row-processed")">
                                 <td data-label="تحديد" class="selection-cell">
-                                    @if (isPending)
+                                    @if (isPending && canManage)
                                     {
                                         <input form="bulkRegistrationsForm" type="checkbox" name="ids" value="@registration.RegistrationId" class="form-check-input registration-checkbox" aria-label="تحديد الطلب المعلق @registration.RequestNumber" />
                                     }
@@ -237,7 +241,7 @@
                                 <td data-label="الحالة"><span class="status-chip @statusClass">@statusLabel</span></td>
                                 <td data-label="إجراءات" class="actions-cell">
                                     <div class="row-action-buttons">
-                                        @if (isPending)
+                                        @if (isPending && canManage)
                                         {
                                             <form asp-action="Accept" asp-route-id="@registration.RegistrationId" asp-route-returnUrl="@returnUrl" method="post" class="d-inline">
                                                 @Html.AntiForgeryToken()
@@ -249,7 +253,7 @@
                                                 <i class="bi bi-x-lg" aria-hidden="true"></i>
                                             </a>
                                         }
-                                        @if (registration.Status == "Rejected")
+                                        @if (registration.Status == "Rejected" && canManage)
                                         {
                                             <form asp-action="Reopen" asp-route-id="@registration.RegistrationId" asp-route-returnUrl="@returnUrl" method="post" class="d-inline">
                                                 @Html.AntiForgeryToken()
@@ -258,7 +262,7 @@
                                                 </button>
                                             </form>
                                         }
-                                        @if (registration.Status is "Accepted" or "Rejected")
+                                        @if ((registration.Status is "Accepted" or "Rejected") && canManage)
                                         {
                                             <form asp-action="Archive" asp-route-id="@registration.RegistrationId" asp-route-returnUrl="@returnUrl" method="post" class="d-inline">
                                                 @Html.AntiForgeryToken()
@@ -267,7 +271,7 @@
                                                 </button>
                                             </form>
                                         }
-                                        @if (registration.Status == "Archived")
+                                        @if (registration.Status == "Archived" && canManage)
                                         {
                                             <form asp-action="Restore" asp-route-id="@registration.RegistrationId" asp-route-returnUrl="@returnUrl" method="post" class="d-inline">
                                                 @Html.AntiForgeryToken()
