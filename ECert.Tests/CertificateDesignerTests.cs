@@ -164,6 +164,46 @@ public class CertificateDesignerTests
         Assert.DoesNotContain($"/CertificateDesigns/Delete/{publishedId}", html);
     }
 
+    [Fact]
+    public async Task Editor_exposes_professional_navigation_affordances()
+    {
+        // Phase 1 of the usability plan: the editor must behave like a professional canvas tool —
+        // zoom around the pointer with Ctrl+wheel, pan with space/middle-drag, fit/selection zoom,
+        // distance measurement guides, Ctrl to suspend snapping, and Shift to lock aspect ratio.
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/CertificateDesigns");
+
+        Assert.Contains("id=\"measureLayer\"", html);
+        Assert.Contains("id=\"zoomSelection\"", html);
+        Assert.Contains("id=\"zoomLabel\"", html);
+        Assert.Contains("wheel", html);
+        Assert.Contains("zoomAround(", html);
+        Assert.Contains("pan-ready", html);
+        Assert.Contains("renderMeasures(", html);
+        Assert.Contains("nearestEdges(", html);
+        // Ctrl/Cmd must be able to temporarily suspend snapping.
+        Assert.Contains("!ev.ctrlKey", html);
+        // Shift must lock the aspect ratio while resizing from a corner.
+        Assert.Contains("ev.shiftKey && orig.h > 0", html);
+
+        var css = await admin.GetStringAsync("/css/certificate-design-editor.css");
+        Assert.Contains(".ped-measure-badge", css);
+        Assert.Contains(".ped-measure-line", css);
+        Assert.Contains(".ped-canvas-area.panning", css);
+    }
+
+    [Fact]
+    public async Task Editor_bounds_zoom_to_a_sane_range()
+    {
+        // Zooming must stay inside a usable band; unbounded zoom either hides the artwork or
+        // pixelates it beyond recognition. The viewport helpers clamp to [0.25, 3].
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/CertificateDesigns");
+
+        Assert.Contains("zoomAround(zoom * factor", html);
+        Assert.Matches(@"clamp\(nextZoom, 0\.25, 3\)", html);
+    }
+
     private async Task<int> CreateDesignAsync(string name)
     {
         var id = await _fixture.Factory.WithDbAsync(async db =>
