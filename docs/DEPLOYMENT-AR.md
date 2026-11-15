@@ -14,6 +14,7 @@
 ## جدول المحتويات
 
 1. [نظرة عامة على متطلبات التشغيل](#1-نظرة-عامة-على-متطلبات-التشغيل)
+   - [ملخّص التنفيذ السريع (TL;DR)](#11-ملخّص-التنفيذ-السريع-tldr)
 2. [الموارد الموصى بها](#2-الموارد-الموصى-بها)
 3. [تحضير السيرفر](#3-تحضير-السيرفر)
 4. [تنصيب قاعدة البيانات MySQL/MariaDB](#4-تنصيب-قاعدة-البيانات-mysqlmariadb)
@@ -48,7 +49,47 @@
 - **`mysqldump`** — تستدعيه خدمة النسخ الاحتياطي (`DatabaseBackupService`) عبر `Process`.
 - **خطوط عربية مُضمَّنة** — بطاقات المشاركة تُرسم بـ SkiaSharp + HarfBuzzSharp مع خطوط مُدمجة
   في الحاوية (لا تعتمد على خطوط النظام).
+
 - **حزم SkiaSharp/Linux** مُضمَّنة عبر NuGet (`SkiaSharp.NativeAssets.Linux.NoDependencies`).
+
+---
+
+## 1.1 ملخّص التنفيذ السريع (TL;DR)
+
+للخبير الذي يريد المسار الأقصر (Docker مُوصى به):
+
+```bash
+# 1) المتطلبات: سيرفر Ubuntu 22.04/24.04 + Docker + نطاق مُوجَّه + شهادة TLS
+sudo apt-get update && sudo apt-get install -y git
+curl -fsSL https://get.docker.com | sudo sh
+
+# 2) جلب الكود
+sudo git clone https://github.com/alifaleh302-dev/ECert.git /opt/ecert
+cd /opt/ecert
+
+# 3) ولّد الأسرار واحفظها في .env (صلاحية 600)
+cat > .env <<EOF
+DB_ROOT_PASSWORD=$(openssl rand -base64 24)
+DB_PASSWORD=$(openssl rand -base64 24)
+CERT_HMAC_SECRET=$(openssl rand -hex 32)
+PUBLIC_BASE_URL=https://ecert.example.com
+BOOTSTRAP_PASSWORD=$(openssl rand -base64 18)
+EOF
+chmod 600 .env
+
+# 4) انسخ docker-compose.yml من القسم 6.3 ثم شغّل
+sudo docker build -t ecert:latest .
+sudo docker compose up -d
+sudo docker compose logs -f app          # انتظر رسالة الإقلاع الناجح
+
+# 5) تحقّق
+curl -s http://127.0.0.1:10000/health | jq .
+```
+
+ثم أكمل: **Nginx + TLS** (القسم 8) ← **الجدار الناري** (القسم 9) ← **إعدادات ما بعد أول دخول**
+(القسم 11) ← **النسخ الاحتياطي الخارجي** (القسم 12).
+
+> **الترتيب المُوصى به للقراءة الكاملة:** الأقسام 3 → 4 → 5 → 6 → 8 → 10 → 11 → 12.
 
 ---
 
