@@ -232,6 +232,53 @@ public class CertificateDesignsController : Controller
         return RedirectToAction(nameof(Index), new { id = design.CertificateDesignId });
     }
 
+    /// <summary>
+    /// Deletes a draft design. The published design and any design still assigned to a course are
+    /// protected: removing them would break certificate rendering or the public verification page.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(int id)
+    {
+        if (!await CanManageAsync()) return Forbid();
+
+        var design = await _db.CertificateDesigns
+            .Include(t => t.Elements)
+            .FirstOrDefaultAsync(t => t.CertificateDesignId == id);
+
+        if (design == null)
+            return NotFound();
+
+        if (design.IsPublished)
+        {
+            TempData["Error"] = "لا يمكن حذف التصميم المنشور. انشر تصميمًا آخر أولًا ثم أعد المحاولة.";
+            return RedirectToAction(nameof(Index), new { id });
+        }
+
+        if (await _db.Courses.AnyAsync(course => course.CertificateDesignId == id))
+        {
+            TempData["Error"] = "لا يمكن حذف تصميم مرتبط بدورة. أزل الربط من صفحة الدورة أولًا.";
+            return RedirectToAction(nameof(Index), new { id });
+        }
+
+        var name = design.Name;
+        DeleteBackgroundImage(design.BackgroundImageUrl);
+        _db.CertificateDesignElements.RemoveRange(design.Elements);
+        _db.CertificateDesigns.Remove(design);
+        await _db.SaveChangesAsync();
+        await _audit.LogAsync(
+            User.Identity?.Name ?? string.Empty,
+            "Delete",
+            "CertificateDesign",
+            id,
+            null,
+            $"Design: {name}",
+            HttpContext.Connection.RemoteIpAddress?.ToString());
+
+        TempData["Success"] = "تم حذف التصميم.";
+        return RedirectToAction(nameof(Index));
+    }
+
     private static List<CertificateDesignElement> ParseElements(string? json, int canvasWidth, int canvasHeight, out string? error)
     {
         error = null;
