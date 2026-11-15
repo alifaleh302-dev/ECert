@@ -25,4 +25,25 @@ public sealed class CertificateQrService
     /// <summary>Returns a base64 payload (without the data-URI prefix), e.g. for embedding in exports.</summary>
     public string BuildBase64(string content, int pixelsPerModule = 8)
         => Convert.ToBase64String(BuildPng(content, pixelsPerModule));
+
+    /// <summary>
+    /// Returns the QR module matrix as a square grid of <c>true</c> (dark) / <c>false</c> (light)
+    /// cells, including the quiet zone. Used to draw the QR as crisp vector squares in the PDF
+    /// export instead of a scaled bitmap.
+    /// </summary>
+    public bool[,] BuildMatrix(string content)
+    {
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(content ?? string.Empty, QRCodeGenerator.ECCLevel.Q);
+        var rows = data.ModuleMatrix;
+        var size = rows.Count;
+        var matrix = new bool[size, size];
+        for (var y = 0; y < size; y++)
+        {
+            var row = rows[y];
+            for (var x = 0; x < size; x++)
+                matrix[y, x] = row[x];
+        }
+        return matrix;
+    }
 }

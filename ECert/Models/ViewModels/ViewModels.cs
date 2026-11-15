@@ -252,6 +252,12 @@ public class PublicCertificateVerificationViewModel
     public DateTime? IssueDate { get; set; }
     public string? Status { get; set; }
 
+    /// <summary>Whether a SuperAdmin has enabled PDF download for the public page.</summary>
+    public bool AllowPublicDownload { get; set; }
+
+    /// <summary>Signed link to <c>Certificates/PublicPdf</c>; null when public download is off.</summary>
+    public string? PublicPdfUrl { get; set; }
+
     // القيم أدناه لا تمثل بيانات الشهادة الأصلية؛ هي إعدادات عرض مُطبّعة لخدمة التحقق العامة.
     public bool HasPublishedDesign { get; set; }
     public int DesignCanvasWidth { get; set; } = 1120;
@@ -308,6 +314,12 @@ public class PublicCertificateDesignElementViewModel
     public string Content { get; set; } = string.Empty;
     /// <summary>Populated for <c>qr</c> elements: a data-URI PNG of the verification link.</summary>
     public string? ImageSrc { get; set; }
+    /// <summary>
+    /// The plain value a <c>qr</c> or <c>barcode</c> element encodes (the verification URL or the
+    /// certificate number). Kept alongside <see cref="ImageSrc"/> so the PDF export can draw the
+    /// code as vectors instead of scaling the bitmap.
+    /// </summary>
+    public string? EncodedValue { get; set; }
     public int X { get; set; }
     public int Y { get; set; }
     public int Width { get; set; }

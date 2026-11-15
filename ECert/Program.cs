@@ -64,6 +64,8 @@ builder.Services.AddScoped<RegistrationInvoiceService>();
 builder.Services.AddScoped<InvoiceSchemaMigrationService>();
 builder.Services.AddScoped<FeeExemptionSchemaMigrationService>();
 builder.Services.AddScoped<CertificateDesignService>();
+builder.Services.AddScoped<CertificateRenderService>();
+builder.Services.AddScoped<CertificatePdfService>();
 builder.Services.AddScoped<LegacyCertificateImportService>();
 builder.Services.AddScoped<CertificateDesignSchemaMigrationService>();
 builder.Services.AddScoped<CertificatePartnerSlotRepairService>();
@@ -73,6 +75,8 @@ builder.Services.AddScoped<ExpenseInstallmentSchemaMigrationService>();
 builder.Services.AddScoped<FinancialLedgerService>();
 builder.Services.AddScoped<FinancialService>();
 builder.Services.AddScoped<SystemSettingsService>();
+builder.Services.AddScoped<CertificateExportSettingsService>();
+builder.Services.AddScoped<CertificateExportSettingsSchemaMigrationService>();
 builder.Services.AddScoped<PeriodLockService>();
 builder.Services.AddScoped<CashReconciliationService>();
 builder.Services.AddScoped<ExpenseService>();
@@ -286,6 +290,10 @@ using (var scope = app.Services.CreateScope())
         // new Telegram columns.
         var securityMigration = scope.ServiceProvider.GetRequiredService<SecuritySchemaMigrationService>();
         await securityMigration.EnsureAsync();
+        // Certificate-export settings: created here so the export service and its settings page can
+        // load the entity (EF selects every mapped column) and the singleton row is seeded.
+        var certificateExportSettingsMigration = scope.ServiceProvider.GetRequiredService<CertificateExportSettingsSchemaMigrationService>();
+        await certificateExportSettingsMigration.EnsureAsync();
         DbSeeder.Seed(db, bootstrapLogger);
         DbSeeder.SeedHomepageCms(db);
         // Unique invoice numbers are a data guarantee, applied after the tables are seeded.

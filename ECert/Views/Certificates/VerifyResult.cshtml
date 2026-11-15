@@ -138,6 +138,10 @@
 
         <div class="cv-report__actions">
             <button type="button" class="btn btn-outline-primary" onclick="window.print()"><i class="bi bi-printer"></i> طباعة الشهادة</button>
+            @if (Model.AllowPublicDownload && !string.IsNullOrWhiteSpace(Model.PublicPdfUrl))
+            {
+                <a href="@Model.PublicPdfUrl" class="btn btn-outline-danger"><i class="bi bi-file-earmark-pdf"></i> تحميل الشهادة PDF</a>
+            }
             <a asp-action="Verify" class="btn btn-primary"><i class="bi bi-search"></i> تحقق من شهادة أخرى</a>
         </div>
 

@@ -22,9 +22,10 @@ public class CertificatesController : Controller
     private readonly VerifyRequestGuardService _verifyGuard;
     private readonly IConfiguration _configuration;
     private readonly TurnstileService _turnstile;
-    private readonly CertificateDesignService _certificateDesignService;
+    private readonly CertificateRenderService _renderService;
+    private readonly CertificatePdfService _pdfService;
+    private readonly CertificateExportSettingsService _exportSettings;
     private readonly CertificateQrService _qrService;
-    private readonly CertificateBarcodeService _barcodeService;
 
     public CertificatesController(
         ECertDbContext db,
@@ -34,9 +35,10 @@ public class CertificatesController : Controller
         VerifyRequestGuardService verifyGuard,
         IConfiguration configuration,
         TurnstileService turnstile,
-        CertificateDesignService certificateDesignService,
-        CertificateQrService qrService,
-        CertificateBarcodeService barcodeService)
+        CertificateRenderService renderService,
+        CertificatePdfService pdfService,
+        CertificateExportSettingsService exportSettings,
+        CertificateQrService qrService)
     {
         _db = db;
         _audit = audit;
@@ -45,9 +47,10 @@ public class CertificatesController : Controller
         _verifyGuard = verifyGuard;
         _configuration = configuration;
         _turnstile = turnstile;
-        _certificateDesignService = certificateDesignService;
+        _renderService = renderService;
+        _pdfService = pdfService;
+        _exportSettings = exportSettings;
         _qrService = qrService;
-        _barcodeService = barcodeService;
     }
 
     private bool HasPermission(string perm) => User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
@@ -337,6 +340,166 @@ public class CertificatesController : Controller
         return BuildExcelExport(certificates, "filtered");
     }
 
+    /// <summary>
+    /// Renders the selected certificates as one print-ready PDF (one certificate per page) using
+    /// the linked template design. The batch ceiling comes from
+    /// <see cref="CertificateExportSettings"/> so a SuperAdmin can size it to the host's resources.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ExportSelectedPdf(int[] certificateIds)
+    {
+        if (!User.HasAnyPermission(AdminPermissions.IssueCertificates, AdminPermissions.ViewCertificates)) return Forbid();
+
+        var ids = certificateIds?.Where(id => id > 0).Distinct().ToList() ?? new List<int>();
+        if (ids.Count == 0)
+        {
+            TempData["Error"] = "الرجاء تحديد شهادة واحدة على الأقل للتصدير.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var settings = await _exportSettings.GetAsync();
+        if (ids.Count > settings.MaxCertificatesPerExport)
+        {
+            TempData["Error"] = $"لا يمكن تصدير أكثر من {settings.MaxCertificatesPerExport} شهادة في الملف الواحد. الرجاء تقليل التحديد.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var certificates = await LoadForExportAsync(ids);
+        if (certificates.Count == 0)
+        {
+            TempData["Error"] = "لم يتم العثور على شهادات مطابقة للتصدير.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        return await BuildPdfExportAsync(certificates, settings, "selected");
+    }
+
+    /// <summary>
+    /// Renders every certificate matching the current list filters as one PDF, bounded by the
+    /// configured batch ceiling.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> ExportFilteredPdf(string? search, int? courseId, DateTime? issueFrom, DateTime? issueTo)
+    {
+        if (!User.HasAnyPermission(AdminPermissions.IssueCertificates, AdminPermissions.ViewCertificates)) return Forbid();
+
+        var settings = await _exportSettings.GetAsync();
+        var query = ApplyCertificateFilters(
+            _db.Certificates.InScope(User).AsQueryable(), search, courseId, issueFrom, issueTo);
+
+        var certificates = await query
+            .OrderByDescending(c => c.IssueDate)
+            .ThenByDescending(c => c.CertificateId)
+            .Take(settings.MaxCertificatesPerExport)
+            .ToListAsync();
+
+        if (certificates.Count == 0)
+        {
+            TempData["Error"] = "لا توجد شهادات مطابقة للفلاتر الحالية للتصدير.";
+            return RedirectToAction(nameof(Index), new { search, courseId, issueFrom, issueTo });
+        }
+
+        return await BuildPdfExportAsync(certificates, settings, "filtered");
+    }
+
+    /// <summary>
+    /// Offers the certificate PDF on the public verification page, but only when a SuperAdmin has
+    /// allowed it. The signature check is the same one the page already passed, so only the holder
+    /// of the signed link can download.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpGet]
+    [EnableRateLimiting("public-verification")]
+    public async Task<IActionResult> PublicPdf(string publicId, string? sig)
+    {
+        if (!IsVerifyRequestAllowed())
+            return StatusCode(StatusCodes.Status429TooManyRequests);
+
+        if (string.IsNullOrWhiteSpace(publicId) || !_certificateSecurity.VerifySignature(publicId, sig))
+            return NotFound();
+
+        var settings = await _exportSettings.GetAsync();
+        if (!settings.AllowPublicDownload) return NotFound();
+
+        var normalizedPublicId = publicId.Trim();
+        var certificate = await _db.Certificates
+            .AsNoTracking()
+            .Include(c => c.Registration)
+            .ThenInclude(r => r!.Course)
+            .ThenInclude(course => course!.Partners)
+            .FirstOrDefaultAsync(c => c.PublicId == normalizedPublicId);
+
+        if (certificate == null) return NotFound();
+
+        return await BuildPdfExportAsync(new List<Certificate> { certificate }, settings, "public", download: true);
+    }
+
+    private async Task<List<Certificate>> LoadForExportAsync(List<int> ids)
+        => await _db.Certificates
+            .InScope(User)
+            .Include(c => c.Registration)
+            .ThenInclude(r => r!.Course)
+            .ThenInclude(course => course!.Partners)
+            .Where(c => ids.Contains(c.CertificateId))
+            .OrderByDescending(c => c.IssueDate)
+            .ThenByDescending(c => c.CertificateId)
+            .ToListAsync();
+
+    private static IQueryable<Certificate> ApplyCertificateFilters(
+        IQueryable<Certificate> query, string? search, int? courseId, DateTime? issueFrom, DateTime? issueTo)
+    {
+        query = query.Include(c => c.Registration).ThenInclude(r => r!.Course).ThenInclude(course => course!.Partners);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var trimmedSearch = search.Trim();
+            query = query.Where(c =>
+                c.TraineeName.Contains(trimmedSearch) ||
+                (c.CourseNameEnglish != null && c.CourseNameEnglish.Contains(trimmedSearch)) ||
+                (c.CourseNameArabic != null && c.CourseNameArabic.Contains(trimmedSearch)) ||
+                c.CourseName.Contains(trimmedSearch) ||
+                c.CertificateNumber.Contains(trimmedSearch) ||
+                c.PublicId.Contains(trimmedSearch));
+        }
+
+        if (courseId.HasValue)
+            query = query.Where(c => c.Registration != null && c.Registration.CourseId == courseId.Value);
+
+        if (issueFrom.HasValue)
+        {
+            var start = issueFrom.Value.Date;
+            query = query.Where(c => c.IssueDate >= start);
+        }
+
+        if (issueTo.HasValue)
+        {
+            var end = issueTo.Value.Date.AddDays(1);
+            query = query.Where(c => c.IssueDate < end);
+        }
+
+        return query;
+    }
+
+    private async Task<IActionResult> BuildPdfExportAsync(
+        List<Certificate> certificates, CertificateExportSettings settings, string scope, bool download = false)
+    {
+        var bytes = await _pdfService.BuildAsync(certificates, BuildVerificationUrl, settings);
+
+        var prefix = string.IsNullOrWhiteSpace(settings.FileNamePrefix) ? "certificates" : settings.FileNamePrefix!.Trim();
+        var fileName = $"{prefix}-{scope}-{DateTime.Now:yyyyMMdd-HHmm}.pdf";
+
+        await _audit.LogAsync(
+            User.Identity?.Name ?? "Public",
+            "Export",
+            "Certificates",
+            null,
+            null,
+            $"PDF export ({scope}): {certificates.Count} certificate(s)");
+
+        return File(bytes, "application/pdf", fileName);
+    }
+
     [AllowAnonymous]
     [HttpGet]
     public IActionResult Verify()
@@ -451,8 +614,8 @@ public class CertificatesController : Controller
         model.IssueDate = certificate.IssueDate;
         model.Status = MapCertificateStatus(certificate.Status);
 
-        var design = await _certificateDesignService.GetForCourseAsync(certificate.Registration?.CourseId);
-        if (design != null)
+        var design = await _renderService.BuildAsync(certificate, BuildVerificationUrl(certificate));
+        if (design.HasDesign)
         {
             model.HasPublishedDesign = true;
             model.DesignCanvasWidth = design.CanvasWidth;
@@ -462,44 +625,20 @@ public class CertificatesController : Controller
             model.DesignBorderWidth = design.BorderWidth;
             model.DesignBorderRadius = design.BorderRadius;
             model.DesignBackgroundImageUrl = design.BackgroundImageUrl;
-            var verificationUrl = BuildVerificationUrl(certificate);
-            var partners = certificate.Registration?.Course?.Partners
-                .OrderBy(p => p.SortOrder)
-                .ThenBy(p => p.CoursePartnerId)
-                .ToList() ?? new List<CoursePartner>();
-            var signatureUrl = await ResolveSignatureUrlAsync(certificate.Registration?.Course);
-            model.DesignElements = design.Elements
-                .Where(e => e.IsVisible)
-                .OrderBy(e => e.SortOrder)
-                .Select(e => new PublicCertificateDesignElementViewModel
-                {
-                    ElementType = e.ElementType,
-                    Content = string.Equals(e.ElementType, "field", StringComparison.OrdinalIgnoreCase)
-                        ? CertificateDesignService.ResolveFieldValue(e.FieldKey, certificate, verificationUrl)
-                        : e.Content,
-                    ImageSrc = string.Equals(e.ElementType, "qr", StringComparison.OrdinalIgnoreCase)
-                        ? _qrService.BuildDataUri(verificationUrl, QrModulePixels(e))
-                        : string.Equals(e.ElementType, "barcode", StringComparison.OrdinalIgnoreCase)
-                            ? _barcodeService.BuildDataUri(
-                                CertificateDesignService.ResolveBarcodeValue(e.FieldKey, certificate, verificationUrl),
-                                BarcodeModuleWidth(e), BarcodeHeight(e))
-                            : ResolvePartnerArtwork(e, partners)
-                                ?? (string.Equals(e.ElementType, "instructor_signature", StringComparison.OrdinalIgnoreCase)
-                                    ? signatureUrl
-                                    : null),
-                    X = e.X,
-                    Y = e.Y,
-                    Width = e.Width,
-                    Height = e.Height,
-                    FontSize = e.FontSize,
-                    FontFamily = e.FontFamily,
-                    FontColor = e.FontColor,
-                    FontWeight = e.FontWeight,
-                    TextAlign = e.TextAlign,
-                    ZIndex = e.ZIndex,
-                    Rotation = e.Rotation
-                })
-                .ToList();
+            model.DesignElements = design.Elements.ToList();
+        }
+
+        // Public PDF download is opt-in per deployment; expose the signed link only when enabled.
+        var exportSettings = await _exportSettings.GetAsync();
+        if (exportSettings.AllowPublicDownload && !string.IsNullOrWhiteSpace(certificate.PublicId))
+        {
+            model.AllowPublicDownload = true;
+            var signature = _certificateSecurity.ComputeSignature(certificate.PublicId);
+            model.PublicPdfUrl = Url.Action(nameof(PublicPdf), new
+            {
+                publicId = certificate.PublicId,
+                sig = signature
+            });
         }
 
         return View("VerifyResult", model);
@@ -551,67 +690,6 @@ public class CertificatesController : Controller
         if (!string.IsNullOrWhiteSpace(trainee) || !string.IsNullOrWhiteSpace(course))
             ViewData["OgDescription"] = $"شهادة صادرة عن {course} للمتدرب {trainee} — رقم {certificate.CertificateNumber}.";
     }
-
-    /// <summary>
-    /// Returns the signature image of the first active instructor assigned to the course, or null
-    /// when none of them has one. Used by the <c>instructor_signature</c> design element.
-    /// Falls back to the course's primary instructor because legacy courses may have no
-    /// <c>CourseInstructors</c> join row.
-    /// </summary>
-    private async Task<string?> ResolveSignatureUrlAsync(Course? course)
-    {
-        if (course == null) return null;
-
-        var signature = await _db.CourseInstructors
-            .AsNoTracking()
-            .Where(ci => ci.CourseId == course.CourseId
-                && ci.Instructor != null
-                && ci.Instructor.IsActive
-                && ci.Instructor.SignatureImageUrl != null)
-            .OrderBy(ci => ci.SortOrder)
-            .ThenBy(ci => ci.CourseInstructorId)
-            .Select(ci => ci.Instructor!.SignatureImageUrl)
-            .FirstOrDefaultAsync();
-
-        if (signature != null) return signature;
-
-        if (course.InstructorId == 0) return null;
-
-        return await _db.Instructors
-            .AsNoTracking()
-            .Where(i => i.InstructorId == course.InstructorId && i.IsActive && i.SignatureImageUrl != null)
-            .Select(i => i.SignatureImageUrl)
-            .FirstOrDefaultAsync();
-    }
-
-    /// <summary>
-    /// Resolves the artwork for a partner element. The element's field key selects which partner
-    /// slot it renders (0 = first partner), so a template can show several organisations.
-    /// </summary>
-    private static string? ResolvePartnerArtwork(CertificateDesignElement element, IReadOnlyList<CoursePartner> partners)
-    {
-        var type = element.ElementType?.Trim().ToLowerInvariant();
-        if (type != "partner_logo" && type != "partner_signature") return null;
-
-        var slot = CertificateDesignService.ParsePartnerSlot(element.FieldKey);
-        if (slot >= partners.Count) return null;
-
-        return type == "partner_logo" ? partners[slot].LogoUrl : partners[slot].SignatureUrl;
-    }
-
-    /// <summary>Chooses a module size that keeps the rendered QR crisp without producing a huge PNG.</summary>
-    private static int QrModulePixels(CertificateDesignElement element)
-        => Math.Clamp(Math.Max(element.Width, element.Height) / 25, 3, 14);
-
-    /// <summary>
-    /// Code 128's width depends on the encoded text length, so the bar width is derived from the
-    /// element's pixel width; the SVG scales the bars to fill the element box regardless.
-    /// </summary>
-    private static int BarcodeModuleWidth(CertificateDesignElement element)
-        => Math.Clamp(element.Width / 60, 1, 4);
-
-    private static int BarcodeHeight(CertificateDesignElement element)
-        => Math.Clamp(element.Height, 24, 200);
 
     /// <summary>
     /// Serves the verification QR as a PNG. Used by the certificate list and by the old-system

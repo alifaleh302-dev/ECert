@@ -52,6 +52,7 @@ public static class AdminPermissions
     public const string ManagePhoneCountries = "manage-phone-countries";
     public const string ViewSecurityAudit = "view-security-audit";
     public const string ManageSecuritySettings = "manage-security-settings";
+    public const string ManageCertificateExportSettings = "manage-certificate-export-settings";
 
     public sealed record PermissionDefinition(string Name, string Description, string Group);
 
@@ -102,6 +103,7 @@ public static class AdminPermissions
         new(ManagePhoneCountries, "إدارة مفاتيح الهواتف", "النظام"),
         new(ViewSecurityAudit, "مراجعة سجلات العمليات والتدقيق (قراءة فقط)", "النظام"),
         new(ManageSecuritySettings, "إعدادات الأمان والنسخ الاحتياطي", "النظام"),
+        new(ManageCertificateExportSettings, "إعدادات تصدير الشهادات", "النظام"),
     };
 
     /// <summary>
@@ -142,6 +144,7 @@ public static class AdminPermissions
             ["AcademicCatalog"] = new[] { ManageAcademicCatalog },
             ["PhoneCountries"] = new[] { ManagePhoneCountries },
             ["SecuritySettings"] = new[] { ManageSecuritySettings },
+            ["CertificateExportSettings"] = new[] { ManageCertificateExportSettings },
         };
 
     /// <summary>
@@ -184,6 +187,7 @@ public static class AdminPermissions
             ["Roles"] = "الأدوار والصلاحيات",
             ["AuditLog"] = "سجل العمليات",
             ["SecuritySettings"] = "الأمان والنسخ الاحتياطي",
+            ["CertificateExportSettings"] = "إعدادات تصدير الشهادات",
             ["AcademicCatalog"] = "البيانات الجامعية",
             ["PhoneCountries"] = "مفاتيح الهواتف",
         };
@@ -209,7 +213,7 @@ public static class AdminPermissions
     /// own privileges or weaken the system. Only the built-in SuperAdmin holds them.
     /// </summary>
     public static readonly IReadOnlySet<string> SuperAdminOnly =
-        new HashSet<string>(StringComparer.Ordinal) { ManageRoles, ManageFinanceSettings, ManageSecuritySettings };
+        new HashSet<string>(StringComparer.Ordinal) { ManageRoles, ManageFinanceSettings, ManageSecuritySettings, ManageCertificateExportSettings };
 
     /// <summary>
     /// One row of the permission matrix: a feature (resource) and the permission that governs each

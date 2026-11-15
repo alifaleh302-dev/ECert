@@ -55,6 +55,7 @@ public class ECertDbContext : DbContext, IDataProtectionKeyContext
     public DbSet<InstallmentPlan> InstallmentPlans => Set<InstallmentPlan>();
     public DbSet<Installment> Installments => Set<Installment>();
     public DbSet<SecuritySettings> SecuritySettings => Set<SecuritySettings>();
+    public DbSet<CertificateExportSettings> CertificateExportSettings => Set<CertificateExportSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
