@@ -346,8 +346,10 @@ public class CertificateDesignsController : Controller
                 FontWeight = CertificateDesignService.NormalizeFontWeight(payload.FontWeight),
                 TextAlign = CertificateDesignService.NormalizeTextAlign(payload.TextAlign),
                 IsVisible = payload.IsVisible,
+                IsLocked = payload.IsLocked,
                 ZIndex = Math.Clamp(payload.ZIndex, -100, 100),
                 Rotation = Math.Clamp(payload.Rotation, -180, 180),
+                Opacity = Math.Clamp(payload.Opacity <= 0 ? 100 : payload.Opacity, 10, 100),
                 SortOrder = result.Count
             };
 
@@ -381,7 +383,9 @@ public class CertificateDesignsController : Controller
         public string? FontWeight { get; set; }
         public string? TextAlign { get; set; }
         public bool IsVisible { get; set; } = true;
+        public bool IsLocked { get; set; }
         public int ZIndex { get; set; }
         public int Rotation { get; set; }
+        public int Opacity { get; set; } = 100;
     }
 }

@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS `CertificateDesignElements` (
     `FontWeight` VARCHAR(20) NOT NULL,
     `TextAlign` VARCHAR(10) NOT NULL,
     `IsVisible` TINYINT(1) NOT NULL DEFAULT 1,
+    `IsLocked` TINYINT(1) NOT NULL DEFAULT 0,
+    `Opacity` INT NOT NULL DEFAULT 100,
     `ZIndex` INT NOT NULL DEFAULT 1,
     `SortOrder` INT NOT NULL DEFAULT 0,
     PRIMARY KEY (`CertificateDesignElementId`),
@@ -67,6 +69,11 @@ CREATE TABLE IF NOT EXISTS `CertificateDesignElements` (
         {
             await _db.Database.ExecuteSqlRawAsync("ALTER TABLE `CertificateDesignElements` ADD COLUMN `Rotation` INT NOT NULL DEFAULT 0");
         }
+
+        // Phase 3/4 of the designer plan: element locking and opacity are additive columns, so
+        // existing designs keep working with the documented defaults (unlocked, fully opaque).
+        await EnsureColumnAsync("CertificateDesignElements", "IsLocked", "TINYINT(1) NOT NULL DEFAULT 0");
+        await EnsureColumnAsync("CertificateDesignElements", "Opacity", "INT NOT NULL DEFAULT 100");
 
         var backgroundImageColumnExists = await _db.Database
             .SqlQueryRaw<int>("SELECT COUNT(*) AS `Value` FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'CertificateDesigns' AND COLUMN_NAME = 'BackgroundImageUrl'")

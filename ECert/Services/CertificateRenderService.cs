@@ -88,7 +88,8 @@ public sealed class CertificateRenderService
                     FontWeight = e.FontWeight,
                     TextAlign = e.TextAlign,
                     ZIndex = e.ZIndex,
-                    Rotation = e.Rotation
+                    Rotation = e.Rotation,
+                    Opacity = e.Opacity
                 };
             })
             .ToList();

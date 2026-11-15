@@ -239,6 +239,70 @@ public class CertificateDesignerTests
         Assert.Contains("if (maxY > canvasH) ddy -= (maxY - canvasH);", html);
     }
 
+    [Fact]
+    public async Task Editor_supports_alignment_distribution_and_layer_management()
+    {
+        // Phase 3: a professional editor aligns elements to the canvas or to each other, distributes
+        // them evenly, reorders layers by drag, and can lock/hide/rename an element from the panel.
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/CertificateDesigns");
+
+        Assert.Contains("function alignWithinSelection(", html);
+        Assert.Contains("function distribute(", html);
+        Assert.Contains("function tidyUp(", html);
+        // Selection-relative tools are wired to the toolbar and the layers panel is reorderable.
+        Assert.Contains("id=\"distributeH\"", html);
+        Assert.Contains("id=\"tidyBtn\"", html);
+        Assert.Contains("row.draggable = true", html);
+        Assert.Contains("function beginRename(", html);
+        Assert.Contains("id=\"selectedLocked\"", html);
+        // Alt shortcuts mirror the toolbar.
+        Assert.Contains("alignWithinSelection('hcenter')", html);
+        Assert.Contains("distribute('h')", html);
+
+        var css = await admin.GetStringAsync("/css/certificate-design-editor.css");
+        Assert.Contains(".ped-layer.drop-target", css);
+        Assert.Contains(".ped-layer .ly-rename", css);
+    }
+
+    [Fact]
+    public async Task Saving_persists_element_lock_and_opacity()
+    {
+        // The lock flag and opacity are part of the element contract: they must survive a save and
+        // come back through the editor's serialized payload, and the public page must honour them.
+        var admin = await SignInAdminAsync();
+        var designId = await CreateDesignAsync("مسودة قفل وشفافية");
+
+        var elementsJson =
+            "[{\"elementType\":\"text\",\"content\":\"عنصر مقفل\",\"x\":40,\"y\":60,\"width\":300,\"height\":50," +
+            "\"fontSize\":24,\"fontFamily\":\"Tajawal\",\"fontColor\":\"#172033\",\"fontWeight\":\"600\"," +
+            "\"textAlign\":\"center\",\"isVisible\":true,\"isLocked\":true,\"zIndex\":1,\"rotation\":0,\"opacity\":42}]";
+
+        var response = await admin.PostFormAsync("/CertificateDesigns", "/CertificateDesigns/Save", new Dictionary<string, string>
+        {
+            ["CertificateDesignId"] = designId.ToString(),
+            ["Name"] = "مسودة قفل وشفافية",
+            ["CanvasWidth"] = "1120",
+            ["CanvasHeight"] = "792",
+            ["BackgroundColor"] = "#fffdf7",
+            ["BorderColor"] = "#c9a227",
+            ["BorderWidth"] = "12",
+            ["BorderRadius"] = "8",
+            ["ElementsJson"] = elementsJson,
+            ["Publish"] = "false"
+        });
+        response.EnsureSuccessStatusCode();
+
+        var saved = await _fixture.Factory.WithDbAsync(db =>
+            Task.FromResult(db.CertificateDesignElements.Single(e => e.CertificateDesignId == designId)));
+        Assert.True(saved.IsLocked);
+        Assert.Equal(42, saved.Opacity);
+
+        var html = await admin.GetStringAsync($"/CertificateDesigns?id={designId}");
+        Assert.Contains("\"isLocked\":true", html);
+        Assert.Contains("\"opacity\":42", html);
+    }
+
     private async Task<int> CreateDesignAsync(string name)
     {
         var id = await _fixture.Factory.WithDbAsync(async db =>

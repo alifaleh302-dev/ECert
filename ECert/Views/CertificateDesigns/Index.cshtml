@@ -24,8 +24,10 @@
             e.FontWeight,
             e.TextAlign,
             e.IsVisible,
+            e.IsLocked,
             e.ZIndex,
             e.Rotation,
+            e.Opacity,
             e.SortOrder
         }), new JsonSerializerOptions
     {
@@ -84,12 +86,21 @@
         </div>
 
         <div class="tb-group">
-            <button type="button" class="ped-tbtn" id="alignLeft" title="محاذاة لليمين"><i class="bi bi-arrow-bar-right"></i></button>
+            <button type="button" class="ped-tbtn" id="alignLeft" title="محاذاة لليمين (Alt+Shift+سهم)"><i class="bi bi-arrow-bar-right"></i></button>
             <button type="button" class="ped-tbtn" id="alignHCenter" title="توسيط أفقي"><i class="bi bi-hr"></i></button>
             <button type="button" class="ped-tbtn" id="alignRight" title="محاذاة لليسار"><i class="bi bi-arrow-bar-left"></i></button>
             <button type="button" class="ped-tbtn" id="alignTop" title="محاذاة للأعلى"><i class="bi bi-arrow-bar-up"></i></button>
             <button type="button" class="ped-tbtn" id="alignVCenter" title="توسيط عمودي"><i class="bi bi-vr"></i></button>
             <button type="button" class="ped-tbtn" id="alignBottom" title="محاذاة للأسفل"><i class="bi bi-arrow-bar-down"></i></button>
+        </div>
+
+        <div class="tb-group">
+            <button type="button" class="ped-tbtn" id="alignSelLeft" title="محاذاة العناصر لبعضها يميناً"><i class="bi bi-distribute-vertical"></i></button>
+            <button type="button" class="ped-tbtn" id="alignSelHCenter" title="توسيط العناصر أفقياً لبعضها"><i class="bi bi-align-center"></i></button>
+            <button type="button" class="ped-tbtn" id="alignSelTop" title="محاذاة العناصر لبعضها أعلى"><i class="bi bi-distribute-horizontal"></i></button>
+            <button type="button" class="ped-tbtn" id="distributeH" title="توزيع أفقي متساوٍ"><i class="bi bi-arrows-expand"></i></button>
+            <button type="button" class="ped-tbtn" id="distributeV" title="توزيع عمودي متساوٍ"><i class="bi bi-arrows-expand-vertical"></i></button>
+            <button type="button" class="ped-tbtn" id="tidyBtn" title="ترتيب أنيق للتحديد"><i class="bi bi-magic"></i></button>
         </div>
 
         <div class="tb-group">
@@ -292,17 +303,22 @@
                     <label>التدوير <span class="pv" id="rotationLabel">0°</span></label>
                     <input class="ped-input" type="range" id="selectedRotation" min="-180" max="180" step="1" style="padding:0;" />
                 </div>
+                <div class="ped-prop">
+                    <label>الشفافية <span class="pv" id="opacityLabel">100%</span></label>
+                    <input class="ped-input" type="range" id="selectedOpacity" min="10" max="100" step="1" style="padding:0;" />
+                </div>
                 <div class="ped-grid-2">
                     <div class="ped-prop"><label>س X</label><input class="ped-input" type="number" id="selectedX" /></div>
                     <div class="ped-prop"><label>ص Y</label><input class="ped-input" type="number" id="selectedY" /></div>
                     <div class="ped-prop"><label>العرض</label><input class="ped-input" type="number" id="selectedWidth" min="20" /></div>
                     <div class="ped-prop"><label>الارتفاع</label><input class="ped-input" type="number" id="selectedHeight" min="20" /></div>
                 </div>
-                <div class="ped-prop" style="display:flex;align-items:center;justify-content:space-between;">
+                <div class="ped-prop" style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;">
                     <label class="ped-switch" style="margin:0;"><input type="checkbox" id="selectedVisible" checked /> إظهار العنصر</label>
+                    <label class="ped-switch" style="margin:0;"><input type="checkbox" id="selectedLocked" /> قفل العنصر</label>
                 </div>
                 <div class="ped-help mt-2 pt-2" style="border-top:1px dashed var(--ped-line);">
-                    <i class="bi bi-keyboard"></i> اختصارات: <span class="ped-kbd">Del</span> حذف · <span class="ped-kbd">Ctrl+Z</span> تراجع · <span class="ped-kbd">Ctrl+D</span> تكرار · <span class="ped-kbd">أسهم</span> تحريك دقيق
+                    <i class="bi bi-keyboard"></i> اختصارات: <span class="ped-kbd">Del</span> حذف · <span class="ped-kbd">Ctrl+Z</span> تراجع · <span class="ped-kbd">Ctrl+D</span> تكرار · <span class="ped-kbd">Ctrl+A</span> تحديد الكل · <span class="ped-kbd">Alt+Shift+سهم</span> محاذاة · <span class="ped-kbd">Alt+Ctrl+سهم</span> توزيع · <span class="ped-kbd">Alt+T</span> ترتيب أنيق · <span class="ped-kbd">Shift+1/2</span> عرض · <span class="ped-kbd">أسهم</span> تحريك دقيق
                 </div>
             </div>
         </aside>
@@ -415,6 +431,13 @@
         ['duplicateBtn', 'deleteBtn', 'alignLeft', 'alignHCenter', 'alignRight', 'alignTop', 'alignVCenter', 'alignBottom', 'toFront', 'forward', 'backward', 'toBack'].forEach(id => {
             document.getElementById(id).disabled = !hasSel;
         });
+        // Selection-relative tools need at least two (align/tidy) or three (distribute) elements.
+        ['alignSelLeft', 'alignSelHCenter', 'alignSelTop', 'tidyBtn'].forEach(id => {
+            document.getElementById(id).disabled = selection.length < 2;
+        });
+        ['distributeH', 'distributeV'].forEach(id => {
+            document.getElementById(id).disabled = selection.length < 3;
+        });
     }
 
     // ---------- Helpers ----------
@@ -459,6 +482,7 @@
             fontSize: el.fontSize + 'px', color: el.fontColor || '#172033',
             fontFamily: '"' + (el.fontFamily || 'Tajawal') + '", Arial, sans-serif',
             fontWeight: el.fontWeight || '600', zIndex: el.zIndex || 1,
+            opacity: (el.opacity === undefined ? 100 : el.opacity) / 100,
             transform: 'rotate(' + (el.rotation || 0) + 'deg)'
         };
         if (el.elementType === 'divider') {
@@ -723,6 +747,8 @@
         if (previewMode || e.button !== 0) return;
         // Space-drag pans the viewport, so it must not also move the element underneath.
         if (spaceDown || panning) return;
+        // A locked element ignores direct manipulation; it is still selectable from the layers panel.
+        if (elements[index] && elements[index].isLocked) return;
         e.preventDefault();
         const additive = e.shiftKey;
         // Shift toggles membership; a plain click on an unselected element selects just it, while a
@@ -732,7 +758,8 @@
             return;
         }
         if (selection.indexOf(index) < 0) select(index);
-        const group = selection.slice();
+        // Locked members are dropped from the drag set; the rest still move together.
+        const group = selection.filter(i => elements[i] && !elements[i].isLocked);
         if (!group.length) return;
         pushHistory();
         const startX = e.clientX, startY = e.clientY;
@@ -808,7 +835,9 @@
         if (!b) return;
         pushHistory();
         const startX = e.clientX, startY = e.clientY;
-        const orig = selection.map(i => ({ i, x: elements[i].x, y: elements[i].y, w: elements[i].width, h: elements[i].height }));
+        const orig = selection.filter(i => elements[i] && !elements[i].isLocked)
+            .map(i => ({ i, x: elements[i].x, y: elements[i].y, w: elements[i].width, h: elements[i].height }));
+        if (!orig.length) return;
         const s = () => scale();
         const MIN = 24;
         const move = ev => {
@@ -1121,7 +1150,7 @@
             width: w, height: h,
             fontSize: type === 'text' ? 22 : 28,
             fontFamily: 'Tajawal', fontColor: '#172033', fontWeight: '600',
-            textAlign: 'center', isVisible: true, zIndex: count, rotation: 0
+            textAlign: 'center', isVisible: true, zIndex: count, rotation: 0, opacity: 100, isLocked: false
         };
         elements.push(el);
         selected = elements.length - 1;
@@ -1131,10 +1160,12 @@
         updateToolbarState();
     }
     function deleteSelected() {
-        if (!selection.length) return;
+        // Locked elements survive a delete; unlock them from the layers panel first.
+        const removable = selection.filter(i => elements[i] && !elements[i].isLocked);
+        if (!removable.length) return;
         pushHistory();
         // Delete from the highest index down so earlier splices do not shift later ones.
-        selection.slice().sort((a, b) => b - a).forEach(i => elements.splice(i, 1));
+        removable.sort((a, b) => b - a).forEach(i => elements.splice(i, 1));
         selected = -1;
         selection = [];
         normalizeZ();
@@ -1190,11 +1221,12 @@
         refreshPropsPanel();
         updateToolbarState();
     }
+    // ---------- Align / Distribute / Tidy ----------
+    // Align to the canvas for a single element; align the group's bounds to the canvas when several
+    // elements are selected (Figma: align to parent vs. to selection).
     function alignElement(kind) {
         if (!selection.length) return;
         pushHistory();
-        // Align to the canvas for a single element; align the group's bounds to the canvas when
-        // several elements are selected (Figma: align to parent vs. to selection).
         if (selection.length === 1) {
             const el = elements[selection[0]];
             if (kind === 'left') el.x = 0;
@@ -1224,7 +1256,89 @@
         updateToolbarState();
     }
 
+    // Align the selected elements to each other: the extreme edges form the reference, and every
+    // other element is brought to it (Figma: align to selection).
+    function alignWithinSelection(kind) {
+        if (selection.length < 2) return;
+        pushHistory();
+        const items = selection.map(i => ({ i, el: elements[i] }));
+        if (kind === 'left') {
+            const ref = Math.min(...items.map(o => o.el.x));
+            items.forEach(o => { o.el.x = ref; });
+        } else if (kind === 'right') {
+            const ref = Math.max(...items.map(o => o.el.x + o.el.width));
+            items.forEach(o => { o.el.x = ref - o.el.width; });
+        } else if (kind === 'hcenter') {
+            const ref = Math.round(items.reduce((s, o) => s + o.el.x + o.el.width / 2, 0) / items.length);
+            items.forEach(o => { o.el.x = Math.round(ref - o.el.width / 2); });
+        } else if (kind === 'top') {
+            const ref = Math.min(...items.map(o => o.el.y));
+            items.forEach(o => { o.el.y = ref; });
+        } else if (kind === 'bottom') {
+            const ref = Math.max(...items.map(o => o.el.y + o.el.height));
+            items.forEach(o => { o.el.y = ref - o.el.height; });
+        } else if (kind === 'vcenter') {
+            const ref = Math.round(items.reduce((s, o) => s + o.el.y + o.el.height / 2, 0) / items.length);
+            items.forEach(o => { o.el.y = Math.round(ref - o.el.height / 2); });
+        }
+        render();
+        renderSelectionOverlays();
+        refreshPropsPanel();
+        refreshLayers();
+        updateToolbarState();
+    }
+
+    // Even spacing between elements: the outermost two anchor the run and the rest are distributed
+    // with equal gaps (Figma: distribute horizontal/vertical spacing).
+    function distribute(kind) {
+        if (selection.length < 3) return;
+        pushHistory();
+        const items = selection.map(i => ({ i, el: elements[i] }));
+        if (kind === 'h') {
+            items.sort((a, b) => a.el.x - b.el.x);
+            const totalW = items.reduce((s, o) => s + o.el.width, 0);
+            const span = (items[items.length - 1].el.x + items[items.length - 1].el.width) - items[0].el.x;
+            const gap = (span - totalW) / (items.length - 1);
+            let cursor = items[0].el.x;
+            items.forEach(o => { o.el.x = Math.round(cursor); cursor += o.el.width + gap; });
+        } else {
+            items.sort((a, b) => a.el.y - b.el.y);
+            const totalH = items.reduce((s, o) => s + o.el.height, 0);
+            const span = (items[items.length - 1].el.y + items[items.length - 1].el.height) - items[0].el.y;
+            const gap = (span - totalH) / (items.length - 1);
+            let cursor = items[0].el.y;
+            items.forEach(o => { o.el.y = Math.round(cursor); cursor += o.el.height + gap; });
+        }
+        render();
+        renderSelectionOverlays();
+        refreshPropsPanel();
+        refreshLayers();
+        updateToolbarState();
+    }
+
+    // Tidy up: pack the selection into an evenly spaced column and align it to the canvas centre —
+    // the one-click "make this look deliberate" action (Figma: Tidy up).
+    function tidyUp() {
+        if (selection.length < 2) return;
+        pushHistory();
+        const items = selection.map(i => ({ i, el: elements[i] })).sort((a, b) => a.el.y - b.el.y);
+        const gap = 24;
+        const totalH = items.reduce((s, o) => s + o.el.height, 0) + gap * (items.length - 1);
+        let y = Math.max(0, Math.round((canvasH - totalH) / 2));
+        items.forEach(o => {
+            o.el.x = Math.round((canvasW - o.el.width) / 2);
+            o.el.y = y;
+            y += o.el.height + gap;
+        });
+        render();
+        renderSelectionOverlays();
+        refreshPropsPanel();
+        refreshLayers();
+        updateToolbarState();
+    }
+
     // ---------- Layers Panel ----------
+    let layerDragFrom = -1;
     function refreshLayers() {
         const list = $('layersList');
         $('layerCount').textContent = elements.length + ' عنصر';
@@ -1236,30 +1350,107 @@
         for (let i = elements.length - 1; i >= 0; i--) {
             const el = elements[i];
             const row = document.createElement('div');
-            row.className = 'ped-layer' + (selection.indexOf(i) >= 0 ? ' active' : '');
+            row.className = 'ped-layer' + (selection.indexOf(i) >= 0 ? ' active' : '') + (el.isLocked ? ' locked' : '') + (el.isVisible === false ? ' hidden' : '');
+            row.draggable = true;
+            row.dataset.index = String(i);
             const icon = el.elementType === 'field' ? '<i class="bi bi-link-45deg"></i>' : el.elementType === 'divider' ? '<i class="bi bi-dash-lg"></i>' : el.elementType === 'qr' ? '<i class="bi bi-qr-code"></i>' : el.elementType === 'barcode' ? '<i class="bi bi-upc-scan"></i>' : el.elementType === 'partner_logo' ? '<i class="bi bi-building"></i>' : el.elementType === 'partner_signature' ? '<i class="bi bi-vector-pen"></i>' : el.elementType === 'instructor_signature' ? '<i class="bi bi-person-check"></i>' : '<i class="bi bi-type"></i>';
             row.innerHTML =
+                '<i class="bi bi-grip-vertical ly-grip" aria-hidden="true"></i>' +
                 '<div class="ly-icon">' + icon + '</div>' +
                 '<div class="ly-name"></div>' +
+                '<button type="button" class="ly-btn ly-lock' + (el.isLocked ? ' on' : '') + '" title="قفل/فتح"><i class="bi ' + (el.isLocked ? 'bi-lock-fill' : 'bi-unlock') + '"></i></button>' +
                 '<button type="button" class="ly-btn ly-eye' + (el.isVisible ? '' : ' off') + '" title="إظهار/إخفاء"><i class="bi ' + (el.isVisible ? 'bi-eye' : 'bi-eye-slash') + '"></i></button>' +
-                '<button type="button" class="ly-btn" title="أعلى"><i class="bi bi-chevron-up"></i></button>' +
-                '<button type="button" class="ly-btn" title="أسفل"><i class="bi bi-chevron-down"></i></button>' +
                 '<button type="button" class="ly-btn danger" title="حذف"><i class="bi bi-x-lg"></i></button>';
             // Assign as text: the label is derived from user-editable element content.
             row.querySelector('.ly-name').textContent = labelFor(el);
+            // Double-click renames a plain text element in place (Figma: Enter/double-click to rename).
+            row.querySelector('.ly-name').addEventListener('dblclick', e => {
+                e.stopPropagation();
+                if (el.elementType !== 'text') return;
+                beginRename(row, i, el);
+            });
             row.addEventListener('click', e => {
                 e.stopPropagation();
-                if (e.target.closest('.ly-eye')) {
+                if (e.target.closest('.ly-lock')) {
+                    pushHistory();
+                    el.isLocked = !el.isLocked;
+                    if (el.isLocked) {
+                        // A locked element must not stay selected, or a stray drag would still move it.
+                        selection = selection.filter(idx => idx !== i);
+                        if (selected === i) selected = selection.length ? selection[selection.length - 1] : -1;
+                    }
+                    render(); renderSelection(); updateToolbarState();
+                } else if (e.target.closest('.ly-eye')) {
                     pushHistory();
                     el.isVisible = !el.isVisible;
                     render(); refreshLayers(); updateToolbarState();
-                } else if (e.target.closest('.ly-btn:nth-of-type(2)')) { select(i); moveOrder(1); }
-                else if (e.target.closest('.ly-btn:nth-of-type(3)')) { select(i); moveOrder(-1); }
-                else if (e.target.closest('.ly-btn.danger')) { select(i); deleteSelected(); }
+                } else if (e.target.closest('.ly-btn.danger')) { select(i); deleteSelected(); }
                 else select(i, e.shiftKey);
+            });
+            row.addEventListener('dragstart', e => {
+                layerDragFrom = i;
+                e.dataTransfer.effectAllowed = 'move';
+                try { e.dataTransfer.setData('text/plain', String(i)); } catch (_) { }
+            });
+            row.addEventListener('dragover', e => {
+                if (layerDragFrom < 0) return;
+                e.preventDefault();
+                row.classList.add('drop-target');
+            });
+            row.addEventListener('dragleave', () => row.classList.remove('drop-target'));
+            row.addEventListener('drop', e => {
+                e.preventDefault();
+                row.classList.remove('drop-target');
+                if (layerDragFrom < 0 || layerDragFrom === i) return;
+                pushHistory();
+                const moved = elements.splice(layerDragFrom, 1)[0];
+                elements.splice(i, 0, moved);
+                layerDragFrom = -1;
+                normalizeZ();
+                render();
+                select(elements.indexOf(moved));
+                refreshLayers();
+                refreshPropsPanel();
+                updateToolbarState();
+            });
+            row.addEventListener('dragend', () => {
+                layerDragFrom = -1;
+                list.querySelectorAll('.drop-target').forEach(n => n.classList.remove('drop-target'));
             });
             list.appendChild(row);
         }
+    }
+
+    function beginRename(row, index, el) {
+        const nameEl = row.querySelector('.ly-name');
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'ly-rename';
+        input.maxLength = 1000;
+        input.value = el.content || '';
+        nameEl.replaceWith(input);
+        input.focus();
+        input.select();
+        let done = false;
+        const commit = apply => {
+            if (done) return;
+            done = true;
+            if (apply) {
+                pushHistory();
+                el.content = input.value;
+                updateNode(el, index);
+                refreshPropsPanel();
+            }
+            refreshLayers();
+        };
+        input.addEventListener('keydown', e => {
+            e.stopPropagation();
+            if (e.key === 'Enter') commit(true);
+            if (e.key === 'Escape') commit(false);
+        });
+        input.addEventListener('blur', () => commit(true));
+        input.addEventListener('click', e => e.stopPropagation());
+        input.addEventListener('dblclick', e => e.stopPropagation());
     }
 
     // ---------- Properties Panel ----------
@@ -1291,6 +1482,9 @@
         document.querySelectorAll('#alignSeg button').forEach(b => b.classList.toggle('on', b.dataset.align === (el.textAlign || 'center')));
         $('selectedRotation').value = el.rotation || 0;
         $('rotationLabel').textContent = (el.rotation || 0) + '°';
+        $('selectedOpacity').value = el.opacity === undefined ? 100 : el.opacity;
+        $('opacityLabel').textContent = (el.opacity === undefined ? 100 : el.opacity) + '%';
+        $('selectedLocked').checked = !!el.isLocked;
         $('selectedX').value = el.x; $('selectedY').value = el.y;
         $('selectedWidth').value = el.width; $('selectedHeight').value = el.height;
         $('selectedVisible').checked = el.isVisible !== false;
@@ -1356,6 +1550,7 @@
         if (prop === 'height') el.height = clamp(el.height, 20, canvasH);
         if (prop === 'fontSize') el.fontSize = clamp(el.fontSize, 8, 96);
         if (prop === 'rotation') el.rotation = clamp(el.rotation, -180, 180);
+        if (prop === 'opacity') el.opacity = clamp(el.opacity, 10, 100);
         if (el.elementType === 'divider') el.height = 4;
         updateNode(el, selected);
         refreshLayers();
@@ -1434,6 +1629,11 @@
     $('deleteBtn').addEventListener('click', deleteSelected);
     [['alignLeft', 'left'], ['alignHCenter', 'hcenter'], ['alignRight', 'right'], ['alignTop', 'top'], ['alignVCenter', 'vcenter'], ['alignBottom', 'bottom']]
         .forEach(([id, kind]) => $(id).addEventListener('click', () => alignElement(kind)));
+    [['alignSelLeft', 'left'], ['alignSelHCenter', 'hcenter'], ['alignSelTop', 'top']]
+        .forEach(([id, kind]) => $(id).addEventListener('click', () => alignWithinSelection(kind)));
+    $('distributeH').addEventListener('click', () => distribute('h'));
+    $('distributeV').addEventListener('click', () => distribute('v'));
+    $('tidyBtn').addEventListener('click', tidyUp);
     $('toFront').addEventListener('click', () => toExtreme(true));
     $('toBack').addEventListener('click', () => toExtreme(false));
     $('forward').addEventListener('click', () => moveOrder(1));
@@ -1521,6 +1721,20 @@
     }));
     $('selectedRotation').addEventListener('input', e => { updateSelected('rotation', e.target.value, false); $('rotationLabel').textContent = (Number(e.target.value) || 0) + '°'; });
     $('selectedRotation').addEventListener('change', e => updateSelected('rotation', e.target.value, true));
+    $('selectedOpacity').addEventListener('input', e => { updateSelected('opacity', e.target.value, false); $('opacityLabel').textContent = (Number(e.target.value) || 100) + '%'; });
+    $('selectedOpacity').addEventListener('change', e => updateSelected('opacity', e.target.value, true));
+    $('selectedLocked').addEventListener('change', e => {
+        const el = elements[selected];
+        if (!el) return;
+        pushHistory();
+        el.isLocked = e.target.checked;
+        if (el.isLocked) {
+            selection = selection.filter(idx => idx !== selected);
+            selected = selection.length ? selection[selection.length - 1] : -1;
+        }
+        render();
+        renderSelection();
+    });
     $('selectedX').addEventListener('change', e => updateSelected('x', e.target.value, true));
     $('selectedY').addEventListener('change', e => updateSelected('y', e.target.value, true));
     $('selectedWidth').addEventListener('change', e => updateSelected('width', e.target.value, true));
@@ -1553,6 +1767,26 @@
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); selectAll(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key === '0') { e.preventDefault(); resetZoom(); return; }
         if (typing) return;
+        // Alt shortcuts mirror the align/distribute/tidy toolbar without stealing plain letters.
+        if (e.altKey && !e.ctrlKey && !e.metaKey) {
+            const k = e.key.toLowerCase();
+            if (e.shiftKey && ['arrowleft', 'arrowright', 'arrowup', 'arrowdown'].includes(k)) {
+                e.preventDefault();
+                // RTL canvas: the "left" button sits on the right, so map the visual arrow directly.
+                if (k === 'arrowleft') alignWithinSelection('right');
+                if (k === 'arrowright') alignWithinSelection('left');
+                if (k === 'arrowup') alignWithinSelection('top');
+                if (k === 'arrowdown') alignWithinSelection('bottom');
+                return;
+            }
+            if (k === 'h') { e.preventDefault(); alignWithinSelection('hcenter'); return; }
+            if (k === 'v') { e.preventDefault(); alignWithinSelection('vcenter'); return; }
+            if (k === 't') { e.preventDefault(); tidyUp(); return; }
+        }
+        if (e.altKey && (e.ctrlKey || e.metaKey)) {
+            if (e.key.toLowerCase() === 'h') { e.preventDefault(); distribute('h'); return; }
+            if (e.key.toLowerCase() === 'v') { e.preventDefault(); distribute('v'); return; }
+        }
         // Shift+1 fits the canvas, Shift+2 zooms to the selection — the familiar viewport keys.
         if (e.shiftKey && e.key === '!') { e.preventDefault(); zoomFit(); return; }
         if (e.shiftKey && e.key === '@@') { e.preventDefault(); zoomToSelection(); return; }
@@ -1561,6 +1795,9 @@
         if (panning) return;
         if (selection.length && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
             e.preventDefault();
+            // Locked elements are excluded from keyboard nudges just like they are from dragging.
+            const movable = selection.filter(i => elements[i] && !elements[i].isLocked);
+            if (!movable.length) return;
             pushHistory();
             const step = e.shiftKey ? 10 : 1;
             let dx = 0, dy = 0;
@@ -1570,7 +1807,7 @@
             if (e.key === 'ArrowDown') dy = step;
             // Clamp the whole group so nudging never pushes an element off-canvas.
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            selection.forEach(i => {
+            movable.forEach(i => {
                 const el = elements[i];
                 minX = Math.min(minX, el.x + dx); minY = Math.min(minY, el.y + dy);
                 maxX = Math.max(maxX, el.x + dx + el.width); maxY = Math.max(maxY, el.y + dy + el.height);
@@ -1579,7 +1816,7 @@
             if (minY < 0) dy -= minY;
             if (maxX > canvasW) dx -= (maxX - canvasW);
             if (maxY > canvasH) dy -= (maxY - canvasH);
-            selection.forEach(i => {
+            movable.forEach(i => {
                 elements[i].x += dx;
                 elements[i].y += dy;
                 updateNode(elements[i], i);
