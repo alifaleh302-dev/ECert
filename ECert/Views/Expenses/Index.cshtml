@@ -30,14 +30,6 @@
     </div>
 </div>
 
-@if (TempData["Success"] != null)
-{
-    <div class="a-note a-note--success mb-4" role="status"><i class="bi bi-check-circle" aria-hidden="true"></i> <div>@TempData["Success"]</div></div>
-}
-@if (TempData["Error"] != null)
-{
-    <div class="a-note a-note--danger mb-4" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> <div>@TempData["Error"]</div></div>
-}
 
 <section class="a-kpis mb-4" aria-label="ملخص المصروفات">
     <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المصروفات المعتمدة", Value = approvedTotal.ToString("N2"), Icon = "bi-cart-dash", Tone = "danger", Hint = Currency.Symbol })" />

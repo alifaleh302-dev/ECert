@@ -14,20 +14,6 @@
     </div>
 </div>
 
-@if (TempData["Success"] is string success)
-{
-    <div class="a-note a-note--success mb-3" role="status">
-        <i class="bi bi-check-circle" aria-hidden="true"></i>
-        <div>@success</div>
-    </div>
-}
-@if (TempData["Error"] is string error)
-{
-    <div class="a-note a-note--danger mb-3" role="alert">
-        <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
-        <div>@error</div>
-    </div>
-}
 
 <div class="a-grid-2">
     <section class="a-card">

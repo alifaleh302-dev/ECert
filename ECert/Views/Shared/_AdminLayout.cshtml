@@ -209,28 +209,14 @@
             </header>
 
             <main class="admin-content" id="adminContent">
-                @if (TempData["Success"] != null)
-                {
-                    <div class="alert alert-success alert-dismissible fade show" role="status">
-                        <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
-                        <div class="flex-grow-1">@TempData["Success"]</div>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="إغلاق"></button>
-                    </div>
-                }
-                @if (TempData["Error"] != null)
-                {
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
-                        <div class="flex-grow-1">@TempData["Error"]</div>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="إغلاق"></button>
-                    </div>
-                }
+                <partial name="_Flash" />
                 @RenderBody()
             </main>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/notify.js" asp-append-version="true"></script>
     <script src="~/js/api.js"></script>
     <script src="~/js/site.js"></script>
     <script src="~/js/admin.js" asp-append-version="true"></script>

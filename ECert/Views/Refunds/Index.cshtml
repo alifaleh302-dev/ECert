@@ -13,14 +13,6 @@
     <partial name="_PageHeader" />
 </div>
 
-@if (TempData["Success"] != null)
-{
-    <div class="a-note a-note--success mb-4" role="status"><i class="bi bi-check-circle" aria-hidden="true"></i> <div>@TempData["Success"]</div></div>
-}
-@if (TempData["Error"] != null)
-{
-    <div class="a-note a-note--danger mb-4" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> <div>@TempData["Error"]</div></div>
-}
 
 @if (canApprove && pending.Any())
 {
