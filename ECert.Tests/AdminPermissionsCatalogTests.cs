@@ -112,35 +112,52 @@ public class AdminPermissionsCatalogTests
     }
 
     [Fact]
-    public void The_finance_preset_grants_the_new_financial_permissions()
+    public void Matrix_covers_every_grantable_permission_exactly_once()
     {
-        var finance = AdminPermissions.Presets.Single(p => p.Key == "finance");
-        Assert.Contains(AdminPermissions.ViewCustody, finance.Permissions);
-        Assert.Contains(AdminPermissions.ManageRefunds, finance.Permissions);
-        Assert.Contains(AdminPermissions.ViewReceivables, finance.Permissions);
-        Assert.Contains(AdminPermissions.ViewFinancialAudit, finance.Permissions);
+        var grantable = AdminPermissions.Catalog
+            .Where(d => !AdminPermissions.SuperAdminOnly.Contains(d.Name))
+            .Select(d => d.Name)
+            .ToList();
+        var inMatrix = AdminPermissions.MatrixPermissions.ToList();
+
+        Assert.Equal(grantable.Count, inMatrix.Count);
+        Assert.Empty(grantable.Except(inMatrix, StringComparer.Ordinal));
+        Assert.Empty(inMatrix.Except(grantable, StringComparer.Ordinal));
+        Assert.Equal(inMatrix.Count, inMatrix.Distinct(StringComparer.Ordinal).Count());
     }
 
     [Fact]
-    public void The_cashier_preset_manages_and_approves_but_stays_non_system()
+    public void Every_matrix_cell_matches_its_column_level()
     {
-        var cashier = AdminPermissions.Presets.Single(p => p.Key == "cashier");
-        Assert.Contains(AdminPermissions.ManageCashbox, cashier.Permissions);
-        Assert.Contains(AdminPermissions.ApproveExpenses, cashier.Permissions);
-        Assert.Contains(AdminPermissions.ApproveRefunds, cashier.Permissions);
-        Assert.Contains(AdminPermissions.ApproveCustody, cashier.Permissions);
-        Assert.DoesNotContain(AdminPermissions.ManageUsers, cashier.Permissions);
-        Assert.DoesNotContain(AdminPermissions.ManageRoles, cashier.Permissions);
-    }
-
-    [Fact]
-    public void The_read_only_presets_grant_no_write_permission()
-    {
-        foreach (var key in new[] { "finance_readonly", "hr_readonly" })
+        // A permission placed in the wrong column would offer the wrong access level in the editor.
+        foreach (var group in AdminPermissions.Matrix)
         {
-            var preset = AdminPermissions.Presets.Single(p => p.Key == key);
-            Assert.All(preset.Permissions, name => Assert.StartsWith("view-", name));
+            foreach (var row in group.Rows)
+            {
+                if (row.View is not null) Assert.Equal("view", AdminPermissions.LevelOf(row.View));
+                if (row.Manage is not null) Assert.Equal("manage", AdminPermissions.LevelOf(row.Manage));
+                if (row.Approve is not null) Assert.Equal("approve", AdminPermissions.LevelOf(row.Approve));
+            }
         }
+    }
+
+    [Fact]
+    public void Matrix_never_exposes_a_super_admin_only_permission()
+    {
+        var leaked = AdminPermissions.MatrixPermissions
+            .Where(AdminPermissions.SuperAdminOnly.Contains)
+            .ToList();
+
+        Assert.True(leaked.Count == 0,
+            "The matrix would let a custom role escalate its own privileges: " + string.Join(", ", leaked));
+    }
+
+    [Fact]
+    public void Matrix_group_titles_are_unique_and_non_empty()
+    {
+        var titles = AdminPermissions.Matrix.Select(group => group.Title).ToList();
+        Assert.All(titles, title => Assert.False(string.IsNullOrWhiteSpace(title)));
+        Assert.Equal(titles.Count, titles.Distinct(StringComparer.Ordinal).Count());
     }
 
     [Fact]
@@ -163,39 +180,6 @@ public class AdminPermissionsCatalogTests
     {
         var user = Principal(AdminPrincipalExtensions.PermissionClaimType, AdminPermissions.ManageRegistrations);
         Assert.False(user.CanAccessSection("SomeFutureController"));
-    }
-
-    [Fact]
-    public void Every_preset_only_grants_known_permissions()
-    {
-        var catalogNames = AdminPermissions.Catalog.Select(d => d.Name).ToHashSet(StringComparer.Ordinal);
-        var unknown = AdminPermissions.Presets
-            .SelectMany(preset => preset.Permissions)
-            .Where(name => !catalogNames.Contains(name))
-            .Distinct()
-            .ToList();
-
-        Assert.True(unknown.Count == 0,
-            "Role presets reference permissions missing from the catalog: " + string.Join(", ", unknown));
-    }
-
-    [Fact]
-    public void Presets_never_hand_out_super_admin_only_permissions()
-    {
-        var leaked = AdminPermissions.Presets
-            .Where(preset => preset.Permissions.Any(AdminPermissions.SuperAdminOnly.Contains))
-            .Select(preset => preset.Key)
-            .ToList();
-
-        Assert.True(leaked.Count == 0,
-            "These presets would let a custom role escalate its own privileges: " + string.Join(", ", leaked));
-    }
-
-    [Fact]
-    public void Preset_keys_are_unique()
-    {
-        var keys = AdminPermissions.Presets.Select(preset => preset.Key).ToList();
-        Assert.Equal(keys.Count, keys.Distinct(StringComparer.Ordinal).Count());
     }
 
     [Fact]

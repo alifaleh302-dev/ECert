@@ -104,13 +104,14 @@ public class FinanceIntegrityTests
     }
 
     [Fact]
-    public async Task The_role_form_offers_permission_presets()
+    public async Task The_role_form_renders_the_permission_matrix_without_templates()
     {
         var admin = await SignInAdminAsync();
         var html = await admin.GetStringAsync("/Roles/Create");
 
-        foreach (var preset in ECert.Services.AdminPermissions.Presets)
-            Assert.Contains($"data-perm-preset=\"{preset.Key}\"", html);
+        Assert.Contains("data-perm-editor", html);
+        Assert.DoesNotContain("data-perm-preset", html);
+        Assert.DoesNotContain("__rpPresets", html);
     }
 
     private async Task<AppClient> SignInAdminAsync()

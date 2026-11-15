@@ -1,33 +1,21 @@
 @model RoleFormViewModel
 @{
     var permissions = ViewBag.Permissions as List<Permission> ?? new();
+    var idByName = permissions.ToDictionary(p => p.PermissionName, p => p.PermissionId, StringComparer.Ordinal);
 
-    // Render in catalog order so groups and items keep a stable, meaningful order rather than
-    // whatever order the database returned.
-    var ordered = AdminPermissions.Catalog
-        .Select(definition => permissions.FirstOrDefault(p => p.PermissionName == definition.Name))
-        .Where(p => p != null)
-        .Select(p => p!)
-        .ToList();
+    // Only render cells whose permission is actually offered to the caller (SuperAdmin-only
+    // permissions are filtered out upstream), so the matrix can never reference a hidden id.
+    int? IdOf(string? name) =>
+        name is not null && idByName.TryGetValue(name, out var id) ? id : null;
 
-    var permissionGroups = ordered
-        .GroupBy(p => AdminPermissions.Catalog.FirstOrDefault(d => d.Name == p.PermissionName)?.Group ?? "صلاحيات أخرى")
-        .ToList();
-
-    var totalPermissions = ordered.Count;
-
-    var presetPayload = AdminPermissions.Presets.ToDictionary(
-        preset => preset.Key,
-        preset => preset.Permissions
-            .Select(name => permissions.FirstOrDefault(p => p.PermissionName == name)?.PermissionId)
-            .Where(id => id.HasValue)
-            .Select(id => id!.Value)
-            .ToArray());
+    var totalPermissions = AdminPermissions.MatrixPermissions
+        .Select(IdOf)
+        .Count(id => id.HasValue);
 }
 
 <div asp-validation-summary="ModelOnly" class="a-error mb-3"></div>
 
-<div class="a-form__grid a-form__grid--2 mb-5">
+<div class="a-form__grid a-form__grid--2 mb-4">
     <div class="a-field">
         <label asp-for="RoleName" class="a-field__label"></label>
         <input asp-for="RoleName" class="form-control" maxlength="50" placeholder="مثال: مشرف التسجيلات" />
@@ -44,123 +32,115 @@
     <div class="rp__layout">
         <div class="rp__main">
 
-            <div class="rp-presets">
-                <div class="rp-presets__title"><i class="bi bi-magic" aria-hidden="true"></i> ابدأ من قالب جاهز</div>
-                <p class="rp-presets__hint">القالب يضبط الصلاحيات الشائعة لهذا الدور، ويمكنك تعديل كل صلاحية بعده.</p>
-                <div class="rp-presets__row">
-                    @foreach (var preset in AdminPermissions.Presets)
-                    {
-                        var count = presetPayload[preset.Key].Length;
-                        <button type="button" class="rp-preset" data-perm-preset="@preset.Key"
-                                aria-pressed="false" title="@preset.Description">
-                            <i class="bi bi-shield-check" aria-hidden="true"></i>
-                            @preset.Name
-                            <span class="rp-preset__count">@count</span>
-                        </button>
-                    }
-                </div>
-            </div>
-
             <div class="rp-toolbar">
                 <div class="rp-search">
                     <i class="bi bi-search rp-search__icon" aria-hidden="true"></i>
-                    <label class="visually-hidden" for="permSearch">ابحث في الصلاحيات</label>
+                    <label class="visually-hidden" for="permSearch">بحث في الميزات</label>
                     <input id="permSearch" type="search" class="form-control" data-perm-search
-                           placeholder="ابحث باسم الصلاحية أو رمزها (مثال: الصندوق، view-cashbox)" autocomplete="off" />
+                           placeholder="بحث في الميزات" autocomplete="off" />
                 </div>
                 <div class="rp-toolbar__actions">
-                    <button type="button" class="btn btn-sm btn-outline-primary" data-perm-select-all>
-                        <i class="bi bi-check2-all" aria-hidden="true"></i> تحديد الظاهر
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-perm-clear-all>
-                        <i class="bi bi-x-circle" aria-hidden="true"></i> مسح الكل
-                    </button>
+                    <button type="button" class="rp-btn" data-perm-select-all">تحديد الكل</button>
+                    <button type="button" class="rp-btn rp-btn--muted" data-perm-clear-all">مسح الكل</button>
                 </div>
             </div>
 
             <span asp-validation-for="PermissionIds" class="a-error d-block"></span>
 
-            @foreach (var group in permissionGroups)
-            {
-                <section class="rp-group" data-perm-group>
-                    <div class="rp-group__head">
-                        <label class="rp-group__toggle">
-                            <input type="checkbox" class="form-check-input" data-perm-group-toggle
-                                   aria-label="تحديد كل صلاحيات @group.Key" />
-                            <span class="rp-group__name"><i class="bi bi-folder2-open" aria-hidden="true"></i> @group.Key</span>
-                        </label>
-                        <span class="rp-group__count" data-perm-group-count>0/@group.Count()</span>
-                    </div>
-                    <div class="rp-group__grid">
-                        @foreach (var permission in group)
-                        {
-                            var selected = Model.PermissionIds.Contains(permission.PermissionId);
-                            var level = AdminPermissions.LevelOf(permission.PermissionName);
-                            var levelLabel = level switch { "view" => "قراءة", "approve" => "اعتماد", _ => "إدارة" };
-                            var sections = string.Join("|", AdminPermissions.SectionLabelsFor(permission.PermissionName));
-                            var searchText = $"{permission.Description} {permission.PermissionName}";
-                            <label class="rp-perm" data-perm-item data-perm-search="@searchText">
-                                <input class="form-check-input rp-perm__check" type="checkbox" name="PermissionIds"
-                                       value="@permission.PermissionId" checked="@selected"
-                                       data-perm-check data-perm-level="@level" data-perm-sections="@sections" />
-                                <span class="rp-perm__body">
-                                    <span class="rp-perm__title">@permission.Description</span>
-                                    <span class="rp-perm__code">@permission.PermissionName</span>
-                                </span>
-                                <span class="rp-badge rp-badge--@level">@levelLabel</span>
-                            </label>
-                        }
-                    </div>
-                </section>
-            }
+            <div class="rp-matrix">
+                <table class="rp-table">
+                    <caption class="visually-hidden">مصفوفة الصلاحيات: الصفوف ميزات والأعمدة مستويات الوصول</caption>
+                    <colgroup>
+                        <col class="rp-col--feature" />
+                        <col class="rp-col--level" />
+                        <col class="rp-col--level" />
+                        <col class="rp-col--level" />
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th scope="col" class="rp-th--feature">الميزة</th>
+                            <th scope="col" class="rp-th--level">مشاهدة</th>
+                            <th scope="col" class="rp-th--level">إدارة</th>
+                            <th scope="col" class="rp-th--level">اعتماد</th>
+                        </tr>
+                    </thead>
+                    @foreach (var group in AdminPermissions.Matrix)
+                    {
+                        var rows = group.Rows
+                            .Select(row => new
+                            {
+                                row.Label,
+                                ViewName = row.View,
+                                ManageName = row.Manage,
+                                ApproveName = row.Approve,
+                                View = IdOf(row.View),
+                                Manage = IdOf(row.Manage),
+                                Approve = IdOf(row.Approve)
+                            })
+                            .Where(row => row.View.HasValue || row.Manage.HasValue || row.Approve.HasValue)
+                            .ToList();
+                        if (rows.Count == 0) { continue; }
+
+                        <tbody data-perm-group>
+                            <tr class="rp-group-row">
+                                <th scope="colgroup" colspan="4">
+                                    <label class="rp-group">
+                                        <input type="checkbox" class="rp-check rp-check--group" data-perm-group-toggle
+                                               aria-label="تحديد كل صلاحيات @group.Title" />
+                                        <span class="rp-group__title">@group.Title</span>
+                                    </label>
+                                </th>
+                            </tr>
+                            @foreach (var row in rows)
+                            {
+                                <tr class="rp-row" data-perm-item data-perm-search="@row.Label">
+                                    <th scope="row" class="rp-cell--feature">@row.Label</th>
+                                    @foreach (var (name, id, level) in new[] { (row.ViewName, row.View, "view"), (row.ManageName, row.Manage, "manage"), (row.ApproveName, row.Approve, "approve") })
+                                    {
+                                        <td class="rp-cell--level">
+                                            @if (id.HasValue)
+                                            {
+                                                var selected = Model.PermissionIds.Contains(id.Value);
+                                                var sections = string.Join("|", AdminPermissions.SectionLabelsFor(name!));
+                                                <label class="rp-cell">
+                                                    <input type="checkbox" class="rp-check" name="PermissionIds"
+                                                           value="@id.Value" checked="@(selected ? "checked" : null)"
+                                                           data-perm-check data-perm-level="@level" data-perm-sections="@sections"
+                                                           aria-label="@($"{row.Label} — {level}")" />
+                                                </label>
+                                            }
+                                            else
+                                            {
+                                                <span class="rp-cell__none" aria-hidden="true">—</span>
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    }
+                </table>
+            </div>
 
             <div class="rp-empty" data-perm-empty hidden>
                 <i class="bi bi-search" aria-hidden="true"></i>
-                <span>لا توجد صلاحية تطابق بحثك. جرّب كلمة أخرى.</span>
+                <span>لا توجد ميزة تطابق بحثك.</span>
             </div>
         </div>
 
         <aside class="rp__aside" aria-label="ملخص الصلاحيات">
             <div class="rp-summary">
                 <div class="rp-summary__head">
-                    <span class="rp-summary__big" data-summary-total>0</span>
-                    <span class="rp-summary__of">من @totalPermissions صلاحية مختارة</span>
+                    <span class="rp-summary__label">الصلاحيات المحددة</span>
+                    <span class="rp-summary__value" data-summary-total>0</span>
+                    <span class="rp-summary__of">/ @totalPermissions</span>
                 </div>
-
-                <div class="rp-levels">
-                    <div class="rp-level rp-level--view">
-                        <div class="rp-level__head">
-                            <span><i class="bi bi-eye" aria-hidden="true"></i> قراءة</span>
-                            <span class="rp-level__count" data-level-count="view">0/0</span>
-                        </div>
-                        <div class="rp-level__bar"><div class="rp-level__fill" data-level-fill="view"></div></div>
-                    </div>
-                    <div class="rp-level rp-level--manage">
-                        <div class="rp-level__head">
-                            <span><i class="bi bi-pencil-square" aria-hidden="true"></i> إدارة</span>
-                            <span class="rp-level__count" data-level-count="manage">0/0</span>
-                        </div>
-                        <div class="rp-level__bar"><div class="rp-level__fill" data-level-fill="manage"></div></div>
-                    </div>
-                    <div class="rp-level rp-level--approve">
-                        <div class="rp-level__head">
-                            <span><i class="bi bi-patch-check" aria-hidden="true"></i> اعتماد</span>
-                            <span class="rp-level__count" data-level-count="approve">0/0</span>
-                        </div>
-                        <div class="rp-level__bar"><div class="rp-level__fill" data-level-fill="approve"></div></div>
-                    </div>
-                </div>
-
-                <div class="rp-sections">
-                    <div class="rp-sections__title"><i class="bi bi-window-stack" aria-hidden="true"></i> الأقسام التي سيفتحها الدور</div>
-                    <div class="rp-sections__list" data-summary-sections></div>
-                    <p class="rp-sections__empty" data-summary-sections-empty>لم تُحدَّد أي صلاحية بعد.</p>
+                <div class="rp-summary__sections">
+                    <span class="rp-summary__sections-title">الأقسام المتاحة</span>
+                    <div class="rp-summary__list" data-summary-sections></div>
+                    <p class="rp-summary__empty" data-summary-sections-empty>لم تُحدَّد أي صلاحية بعد.</p>
                 </div>
             </div>
         </aside>
     </div>
 </div>
-
-<script>
-    window.__rpPresets = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(presetPayload));
-</script>
