@@ -234,6 +234,12 @@ const Notify = (() => {
         confirm: confirmDialog, alert: alertDialog, dismiss, flush };
 })();
 
+// A top-level `const` does not create a window property, but site.js/api.js probe
+// `window.Notify` to decide whether the shared dialog owns [data-confirm]. Without this
+// they fall through to their native confirm()/toast fallbacks, so a click on a
+// destructive action fired BOTH the on-brand dialog and the browser confirm.
+window.Notify = Notify;
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => Notify.flush());
 } else {
