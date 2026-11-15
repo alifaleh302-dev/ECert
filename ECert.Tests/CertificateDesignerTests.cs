@@ -303,6 +303,44 @@ public class CertificateDesignerTests
         Assert.Contains("\"opacity\":42", html);
     }
 
+    [Fact]
+    public async Task Editor_exposes_speed_and_access_affordances()
+    {
+        // Phase 4: clipboard, inline text editing, a right-click menu, a command palette, a
+        // shortcuts sheet and rulers — the tools that make a designer fast rather than merely pretty.
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/CertificateDesigns");
+
+        // Clipboard.
+        Assert.Contains("function copySelected(", html);
+        Assert.Contains("function cutSelected(", html);
+        Assert.Contains("function pasteClipboard(", html);
+        // Inline text editing.
+        Assert.Contains("function beginInlineEdit(", html);
+        Assert.Contains("id=\"inlineEdit\"", html);
+        // Context menu + command palette + shortcuts sheet.
+        Assert.Contains("id=\"ctxMenu\"", html);
+        Assert.Contains("function showContextMenu(", html);
+        Assert.Contains("id=\"cmdk\"", html);
+        Assert.Contains("const COMMANDS = [", html);
+        Assert.Contains("function openCommandPalette(", html);
+        Assert.Contains("id=\"shortcutsSheet\"", html);
+        // Rulers.
+        Assert.Contains("id=\"rulerH\"", html);
+        Assert.Contains("id=\"rulerV\"", html);
+        Assert.Contains("function renderRulers(", html);
+        // The clipboard and lock keys must be bound.
+        Assert.Contains("e.key.toLowerCase() === 'c'", html);
+        Assert.Contains("e.key.toLowerCase() === 'v'", html);
+        Assert.Contains("e.key.toLowerCase() === 'l'", html);
+
+        var css = await admin.GetStringAsync("/css/certificate-design-editor.css");
+        Assert.Contains(".ped-ruler", css);
+        Assert.Contains(".ped-menu-item", css);
+        Assert.Contains(".ped-cmdk-item", css);
+        Assert.Contains(".ped-sheet-row", css);
+    }
+
     private async Task<int> CreateDesignAsync(string name)
     {
         var id = await _fixture.Factory.WithDbAsync(async db =>

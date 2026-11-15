@@ -113,6 +113,12 @@
         <div class="tb-group">
             <button type="button" class="ped-tbtn" id="gridToggle" title="إظهار الشبكة"><i class="bi bi-grid-3x3-gap"></i></button>
             <button type="button" class="ped-tbtn on" id="snapToggle" title="الالتقاط الذكي"><i class="bi bi-magnet"></i></button>
+            <button type="button" class="ped-tbtn on" id="rulerToggle" title="إظهار المساطر"><i class="bi bi-rulers"></i></button>
+        </div>
+
+        <div class="tb-group">
+            <button type="button" class="ped-tbtn" id="cmdkBtn" title="لوحة الأوامر (Ctrl+K)"><i class="bi bi-command"></i></button>
+            <button type="button" class="ped-tbtn" id="shortcutsBtn" title="الاختصارات (؟)"><i class="bi bi-question-lg"></i></button>
         </div>
 
         <div class="tb-group">
@@ -163,6 +169,9 @@
 
         <!-- Canvas -->
         <main class="ped-canvas-area" id="canvasArea">
+            <div class="ped-ruler ped-ruler-h" id="rulerH"></div>
+            <div class="ped-ruler ped-ruler-v" id="rulerV"></div>
+            <div class="ped-ruler-corner"></div>
             <div class="ped-stage" id="canvasStage">
                 <div class="ped-canvas" id="certificateCanvas">
                     <div class="ped-grid" id="gridOverlay"></div>
@@ -170,8 +179,12 @@
                     <div class="ped-marquee" id="marqueeBox"></div>
                     <div class="ped-guide g-x" id="guideX"></div>
                     <div class="ped-guide g-y" id="guideY"></div>
+                    <div class="ped-inline-edit" id="inlineEditWrap" style="display:none;">
+                        <textarea class="ped-inline-input" id="inlineEdit" rows="1"></textarea>
+                    </div>
                 </div>
             </div>
+            <div class="ped-cursor" id="cursorTag" style="display:none;"></div>
         </main>
 
         <!-- Properties -->
@@ -318,10 +331,36 @@
                     <label class="ped-switch" style="margin:0;"><input type="checkbox" id="selectedLocked" /> قفل العنصر</label>
                 </div>
                 <div class="ped-help mt-2 pt-2" style="border-top:1px dashed var(--ped-line);">
-                    <i class="bi bi-keyboard"></i> اختصارات: <span class="ped-kbd">Del</span> حذف · <span class="ped-kbd">Ctrl+Z</span> تراجع · <span class="ped-kbd">Ctrl+D</span> تكرار · <span class="ped-kbd">Ctrl+A</span> تحديد الكل · <span class="ped-kbd">Alt+Shift+سهم</span> محاذاة · <span class="ped-kbd">Alt+Ctrl+سهم</span> توزيع · <span class="ped-kbd">Alt+T</span> ترتيب أنيق · <span class="ped-kbd">Shift+1/2</span> عرض · <span class="ped-kbd">أسهم</span> تحريك دقيق
+                    <i class="bi bi-keyboard"></i> اختصارات: <span class="ped-kbd">Ctrl+K</span> لوحة الأوامر · <span class="ped-kbd">Ctrl+C/V/X</span> نسخ/لصق/قص · <span class="ped-kbd">F2</span> تسمية · <span class="ped-kbd">Ctrl+L</span> قفل · <span class="ped-kbd">Del</span> حذف · <span class="ped-kbd">Alt+Shift+سهم</span> محاذاة · <span class="ped-kbd">Alt+T</span> ترتيب أنيق · <span class="ped-kbd">؟</span> كل الاختصارات
                 </div>
             </div>
         </aside>
+    </div>
+
+    <!-- context menu -->
+    <div class="ped-menu" id="ctxMenu" style="display:none;"></div>
+
+    <!-- command palette -->
+    <div class="ped-cmdk" id="cmdk" style="display:none;">
+        <div class="ped-cmdk-box" role="dialog" aria-label="لوحة الأوامر">
+            <div class="ped-cmdk-head">
+                <i class="bi bi-command"></i>
+                <input class="ped-cmdk-input" id="cmdkInput" type="text" placeholder="اكتب أمراً… (محاذاة، توزيع، قفل، تكرار)" autocomplete="off" />
+                <span class="ped-kbd">Esc</span>
+            </div>
+            <div class="ped-cmdk-list" id="cmdkList"></div>
+        </div>
+    </div>
+
+    <!-- shortcuts sheet -->
+    <div class="ped-sheet" id="shortcutsSheet" style="display:none;">
+        <div class="ped-sheet-box" role="dialog" aria-label="الاختصارات">
+            <div class="ped-sheet-head">
+                <span><i class="bi bi-keyboard"></i> اختصارات لوحة المفاتيح</span>
+                <button type="button" class="ly-btn" id="shortcutsClose" title="إغلاق"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="ped-sheet-body" id="shortcutsBody"></div>
+        </div>
     </div>
 
     <!-- form -->
@@ -357,6 +396,12 @@
     const guideY = document.getElementById('guideY');
     const measureLayer = document.getElementById('measureLayer');
     const marqueeBox = document.getElementById('marqueeBox');
+    const rulerH = document.getElementById('rulerH');
+    const rulerV = document.getElementById('rulerV');
+    const ctxMenu = document.getElementById('ctxMenu');
+    const cmdk = document.getElementById('cmdk');
+    const inlineEdit = document.getElementById('inlineEdit');
+    const inlineEditWrap = document.getElementById('inlineEditWrap');
 
     let canvasW = @Model.Design.CanvasWidth;
     let canvasH = @Model.Design.CanvasHeight;
@@ -371,6 +416,8 @@
     let selection = [];
     let gridOn = true;
     let snapOn = true;
+    let rulersOn = true;
+    let clipboard = [];
     let previewMode = false;
     let panning = false;
     let backgroundImageUrl = @Html.Raw(JsonSerializer.Serialize(Model.Design.BackgroundImageUrl));
@@ -540,6 +587,18 @@
     }
     function clearGuides() { guideX.style.display = 'none'; guideY.style.display = 'none'; }
 
+    // A small coordinate read-out that trails the pointer while dragging, so the user can place an
+    // element precisely without reading the properties panel.
+    const cursorTag = document.getElementById('cursorTag');
+    function showCursorTag(ev, x, y) {
+        const rect = areaEl.getBoundingClientRect();
+        cursorTag.textContent = Math.round(x) + ' , ' + Math.round(y);
+        cursorTag.style.left = (ev.clientX - rect.left + 14) + 'px';
+        cursorTag.style.top = (ev.clientY - rect.top + 16) + 'px';
+        cursorTag.style.display = 'block';
+    }
+    function hideCursorTag() { cursorTag.style.display = 'none'; }
+
     // ---------- Smart measurement ----------
     // Distance read-outs to the nearest sibling edges, mirroring the red measurement
     // guides professional editors show while you drag (Figma: "Measure distances between layers").
@@ -696,6 +755,7 @@
             Object.assign(node.style, styleFor(o.el));
             node.textContent = contentFor(o.el);
             node.addEventListener('pointerdown', e => startDrag(e, o.i));
+            node.addEventListener('dblclick', e => { e.preventDefault(); select(o.i); beginInlineEdit(o.i); });
             canvasEl.appendChild(node);
         }
 
@@ -703,6 +763,7 @@
         else if (selected >= 0 && elements[selected] && elements[selected].isVisible) drawOverlay(selected);
         $('zoomLabel').textContent = Math.round(zoom * 100) + '%';
         if (previewMode) document.querySelectorAll('.ped-el').forEach(n => n.style.cursor = 'default');
+        renderRulers();
     }
 
     function drawOverlay(index) {
@@ -799,12 +860,14 @@
                 clearGuides();
             }
             renderSelectionOverlays();
+            showCursorTag(ev, elements[group[0]].x, elements[group[0]].y);
         };
         const up = () => {
             window.removeEventListener('pointermove', move);
             window.removeEventListener('pointerup', up);
             clearGuides();
             clearMeasures();
+            hideCursorTag();
             refreshLayers();
             updateToolbarState();
         };
@@ -914,11 +977,13 @@
             if (el.elementType === 'divider') el.height = 4;
             updateNode(el, selected);
             renderGuides(snapping ? r.gx : null, snapping ? r.gy : null);
+            showCursorTag(ev, el.width, el.height);
         };
         const up = () => {
             window.removeEventListener('pointermove', move);
             window.removeEventListener('pointerup', up);
             clearGuides();
+            hideCursorTag();
             refreshLayers();
             updateToolbarState();
         };
@@ -1195,6 +1260,36 @@
     function normalizeZ() {
         elements.forEach((el, i) => { el.zIndex = i; el.sortOrder = i; });
     }
+    function copySelected() {
+        if (!selection.length) return;
+        // Snapshot deep copies so later edits to the originals do not mutate the clipboard.
+        clipboard = selection.slice().sort((a, b) => a - b).map(i => JSON.parse(JSON.stringify(elements[i])));
+    }
+    function cutSelected() {
+        const removable = selection.filter(i => elements[i] && !elements[i].isLocked);
+        if (!removable.length) return;
+        copySelected();
+        deleteSelected();
+    }
+    function pasteClipboard() {
+        if (!clipboard.length) return;
+        pushHistory();
+        // Paste as a new, offset batch so the copies are visible and land on top of the stack.
+        const copies = clipboard.map(src => {
+            const copy = JSON.parse(JSON.stringify(src));
+            copy.x = clamp(copy.x + 24, 0, canvasW - 20);
+            copy.y = clamp(copy.y + 24, 0, canvasH - 20);
+            copy.isLocked = false;
+            elements.push(copy);
+            return elements.length - 1;
+        });
+        normalizeZ();
+        render();
+        selectMany(copies);
+        refreshLayers();
+        refreshPropsPanel();
+        updateToolbarState();
+    }
     function moveOrder(dir) {
         if (selected < 0) return;
         pushHistory();
@@ -1453,6 +1548,58 @@
         input.addEventListener('dblclick', e => e.stopPropagation());
     }
 
+    // ---------- Inline text editing ----------
+    // Double-clicking a text element on the canvas edits it in place, the way a designer expects,
+    // instead of forcing a trip to the properties panel.
+    let inlineEditIndex = -1;
+    function beginInlineEdit(index) {
+        const el = elements[index];
+        if (!el || el.elementType !== 'text' || el.isLocked || previewMode) return;
+        inlineEditIndex = index;
+        const s = styleFor(el);
+        Object.assign(inlineEditWrap.style, {
+            left: el.x + 'px',
+            top: el.y + 'px',
+            width: el.width + 'px',
+            height: (el.elementType === 'divider' ? 4 : el.height) + 'px',
+            transform: 'rotate(' + (el.rotation || 0) + 'deg)',
+            transformOrigin: 'center',
+            zIndex: 10001
+        });
+        Object.assign(inlineEdit.style, {
+            fontSize: s.fontSize,
+            color: s.color,
+            fontFamily: s.fontFamily,
+            fontWeight: s.fontWeight,
+            textAlign: el.textAlign || 'center'
+        });
+        inlineEdit.value = el.content || '';
+        inlineEditWrap.style.display = 'block';
+        inlineEdit.focus();
+        inlineEdit.select();
+    }
+    function commitInlineEdit(apply) {
+        if (inlineEditIndex < 0) return;
+        const el = elements[inlineEditIndex];
+        const index = inlineEditIndex;
+        inlineEditIndex = -1;
+        inlineEditWrap.style.display = 'none';
+        if (apply && el && inlineEdit.value !== el.content) {
+            pushHistory();
+            el.content = inlineEdit.value;
+            updateNode(el, index);
+            refreshLayers();
+            refreshPropsPanel();
+        }
+        inlineEdit.blur();
+    }
+    inlineEdit.addEventListener('keydown', e => {
+        e.stopPropagation();
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitInlineEdit(true); }
+        if (e.key === 'Escape') { e.preventDefault(); commitInlineEdit(false); }
+    });
+    inlineEdit.addEventListener('blur', () => { if (inlineEditIndex >= 0) commitInlineEdit(true); });
+
     // ---------- Properties Panel ----------
     function refreshPropsPanel() {
         const el = elements[selected];
@@ -1568,6 +1715,7 @@
     // ---------- Preview / Zoom ----------
     function setPreview(on) {
         previewMode = on;
+        if (on) { hideContextMenu(); closeCommandPalette(); hideShortcuts(); commitInlineEdit(false); }
         document.getElementById('pedApp').classList.toggle('preview-mode', on);
         document.getElementById('previewToggle').innerHTML = on
             ? '<i class="bi bi-pencil-square"></i><span class="txt">تعديل</span>'
@@ -1614,6 +1762,220 @@
         pushHistory();
     });
 
+    // ---------- Rulers ----------
+    // Ticks are drawn in canvas units but positioned in screen space so they stay put while the
+    // stage is scrolled; the selection band mirrors the element's span, like Figma's rulers.
+    function renderRulers() {
+        document.getElementById('pedApp').classList.toggle('rulers-on', rulersOn);
+        if (!rulersOn) return;
+        const tick = zoom >= 1.5 ? 20 : zoom >= 0.75 ? 50 : 100;
+        const sel = selection.length ? selectionBounds() : null;
+        drawRulerAxis(rulerH, 'h', canvasW, tick, sel ? [sel.x, sel.x + sel.width] : null);
+        drawRulerAxis(rulerV, 'v', canvasH, tick, sel ? [sel.y, sel.y + sel.height] : null);
+    }
+    function drawRulerAxis(host, axis, length, tick, selRange) {
+        // Measure the stage's on-screen origin relative to the viewport box; this already accounts
+        // for scroll and padding, so ticks line up with the canvas at any scroll position.
+        const areaRect = areaEl.getBoundingClientRect();
+        const stageRect = stageEl.getBoundingClientRect();
+        const origin = axis === 'h' ? (stageRect.left - areaRect.left) : (stageRect.top - areaRect.top);
+        const span = length * zoom;
+        const view = axis === 'h' ? areaEl.clientWidth : areaEl.clientHeight;
+        const parts = ['<div class="ped-ruler-band"></div>'];
+        for (let v = 0; v <= length; v += tick) {
+            const pos = origin + v * zoom;
+            if (pos < -40 || pos > view + 40) continue;
+            const major = v % (tick * 5) === 0;
+            parts.push('<div class="ped-ruler-tick' + (major ? ' major' : '') + '" style="' +
+                (axis === 'h' ? 'left:' : 'top:') + pos + 'px"></div>');
+            if (major) parts.push('<span class="ped-ruler-num" style="' +
+                (axis === 'h' ? 'left:' : 'top:') + (pos + 3) + 'px">' + v + '</span>');
+        }
+        if (selRange) {
+            const a = origin + selRange[0] * zoom;
+            const b = origin + selRange[1] * zoom;
+            parts.push('<div class="ped-ruler-sel" style="' +
+                (axis === 'h' ? 'left:' : 'top:') + a + 'px;' +
+                (axis === 'h' ? 'width:' : 'height:') + Math.max(2, b - a) + 'px"></div>');
+        }
+        // Keep the whole span available so the band reflects the real canvas extent.
+        host.style.setProperty('--ped-ruler-span', span + 'px');
+        host.innerHTML = parts.join('');
+    }
+
+    // ---------- Context menu ----------
+    let ctxIndex = -1;
+    function showContextMenu(x, y, index) {
+        ctxIndex = index;
+        if (index >= 0 && selection.indexOf(index) < 0) select(index);
+        const el = index >= 0 ? elements[index] : null;
+        const items = [];
+        if (el) {
+            items.push(['cut', 'قص', 'bi-scissors', 'Ctrl+X', false]);
+            items.push(['copy', 'نسخ', 'bi-clipboard', 'Ctrl+C', false]);
+            items.push(['duplicate', 'تكرار', 'bi-files', 'Ctrl+D', false]);
+            items.push(['sep']);
+            items.push(['front', 'إلى المقدمة', 'bi-layers', ']', false]);
+            items.push(['forward', 'تقديم للأمام', 'bi-arrow-up-short', '', false]);
+            items.push(['backward', 'إرجاع للخلف', 'bi-arrow-down-short', '', false]);
+            items.push(['back', 'إلى الخلف', 'bi-layers-half', '[', false]);
+            items.push(['sep']);
+            items.push(['rename', 'إعادة تسمية', 'bi-input-cursor-text', 'F2', el.elementType !== 'text' || el.isLocked]);
+            items.push(['lock', el.isLocked ? 'إلغاء القفل' : 'قفل', el.isLocked ? 'bi-unlock' : 'bi-lock', 'Ctrl+L', false]);
+            items.push(['hide', el.isVisible ? 'إخفاء' : 'إظهار', el.isVisible ? 'bi-eye-slash' : 'bi-eye', '', false]);
+            items.push(['sep']);
+            items.push(['delete', 'حذف', 'bi-trash3', 'Del', el.isLocked]);
+        }
+        if (clipboard.length) items.push(['paste', 'لصق', 'bi-clipboard-plus', 'Ctrl+V', false]);
+        if (!items.length) return;
+        ctxMenu.innerHTML = items.map(([act, label, icon, kbd, disabled]) => {
+            if (act === 'sep') return '<div class="ped-menu-sep"></div>';
+            return '<button type="button" class="ped-menu-item' + (disabled ? ' disabled' : '') + '" data-act="' + act + '"' +
+                (disabled ? ' disabled' : '') + '><i class="bi ' + icon + '"></i><span>' + label + '</span>' +
+                (kbd ? '<span class="ped-kbd">' + kbd + '</span>' : '') + '</button>';
+        }).join('');
+        ctxMenu.style.display = 'block';
+        const rect = areaEl.getBoundingClientRect();
+        const w = ctxMenu.offsetWidth, h = ctxMenu.offsetHeight;
+        ctxMenu.style.left = Math.min(x - rect.left, rect.width - w - 8) + 'px';
+        ctxMenu.style.top = Math.min(y - rect.top, rect.height - h - 8) + 'px';
+    }
+    function hideContextMenu() { ctxMenu.style.display = 'none'; ctxIndex = -1; }
+    function runContextAction(act) {
+        const i = ctxIndex;
+        hideContextMenu();
+        if (act === 'paste') { pasteClipboard(); return; }
+        if (i < 0) return;
+        const el = elements[i];
+        if (act === 'cut') cutSelected();
+        else if (act === 'copy') copySelected();
+        else if (act === 'duplicate') duplicateSelected();
+        else if (act === 'delete') { select(i); deleteSelected(); }
+        else if (act === 'rename') { if (el.elementType === 'text' && !el.isLocked) beginInlineEdit(i); }
+        else if (act === 'lock') toggleLock(i);
+        else if (act === 'hide') toggleVisibility(i);
+        else if (act === 'front') toExtreme(true);
+        else if (act === 'back') toExtreme(false);
+        else if (act === 'forward') moveOrder(1);
+        else if (act === 'backward') moveOrder(-1);
+    }
+    function toggleLock(index) {
+        const el = elements[index];
+        if (!el) return;
+        pushHistory();
+        el.isLocked = !el.isLocked;
+        if (el.isLocked) {
+            selection = selection.filter(idx => idx !== index);
+            if (selected === index) selected = selection.length ? selection[selection.length - 1] : -1;
+        }
+        render(); renderSelection(); updateToolbarState();
+    }
+    function toggleVisibility(index) {
+        const el = elements[index];
+        if (!el) return;
+        pushHistory();
+        el.isVisible = !el.isVisible;
+        render(); refreshLayers(); updateToolbarState();
+    }
+
+    // ---------- Command palette ----------
+    const COMMANDS = [
+        { id: 'undo', label: 'تراجع', kbd: 'Ctrl+Z', icon: 'bi-arrow-counterclockwise', run: undo },
+        { id: 'redo', label: 'إعادة', kbd: 'Ctrl+Y', icon: 'bi-arrow-clockwise', run: redo },
+        { id: 'copy', label: 'نسخ التحديد', kbd: 'Ctrl+C', icon: 'bi-clipboard', run: copySelected },
+        { id: 'cut', label: 'قص التحديد', kbd: 'Ctrl+X', icon: 'bi-scissors', run: cutSelected },
+        { id: 'paste', label: 'لصق', kbd: 'Ctrl+V', icon: 'bi-clipboard-plus', run: pasteClipboard },
+        { id: 'duplicate', label: 'تكرار التحديد', kbd: 'Ctrl+D', icon: 'bi-files', run: duplicateSelected },
+        { id: 'delete', label: 'حذف التحديد', kbd: 'Del', icon: 'bi-trash3', run: deleteSelected },
+        { id: 'selectAll', label: 'تحديد الكل', kbd: 'Ctrl+A', icon: 'bi-bounding-box', run: selectAll },
+        { id: 'align-left', label: 'محاذاة لليمين', icon: 'bi-arrow-bar-right', run: () => alignElement('left') },
+        { id: 'align-right', label: 'محاذاة لليسار', icon: 'bi-arrow-bar-left', run: () => alignElement('right') },
+        { id: 'align-hcenter', label: 'توسيط أفقي', icon: 'bi-hr', run: () => alignElement('hcenter') },
+        { id: 'align-top', label: 'محاذاة للأعلى', icon: 'bi-arrow-bar-up', run: () => alignElement('top') },
+        { id: 'align-bottom', label: 'محاذاة للأسفل', icon: 'bi-arrow-bar-down', run: () => alignElement('bottom') },
+        { id: 'align-vcenter', label: 'توسيط عمودي', icon: 'bi-vr', run: () => alignElement('vcenter') },
+        { id: 'align-sel-left', label: 'محاذاة العناصر لبعضها يميناً', icon: 'bi-distribute-vertical', run: () => alignWithinSelection('left') },
+        { id: 'align-sel-hcenter', label: 'توسيط العناصر أفقياً لبعضها', icon: 'bi-align-center', run: () => alignWithinSelection('hcenter') },
+        { id: 'align-sel-top', label: 'محاذاة العناصر لبعضها أعلى', icon: 'bi-distribute-horizontal', run: () => alignWithinSelection('top') },
+        { id: 'distribute-h', label: 'توزيع أفقي متساوٍ', kbd: 'Alt+Ctrl+H', icon: 'bi-arrows-expand', run: () => distribute('h') },
+        { id: 'distribute-v', label: 'توزيع عمودي متساوٍ', kbd: 'Alt+Ctrl+V', icon: 'bi-arrows-expand-vertical', run: () => distribute('v') },
+        { id: 'tidy', label: 'ترتيب أنيق للتحديد', kbd: 'Alt+T', icon: 'bi-magic', run: tidyUp },
+        { id: 'front', label: 'إلى المقدمة', icon: 'bi-layers', run: () => toExtreme(true) },
+        { id: 'back', label: 'إلى الخلف', icon: 'bi-layers-half', run: () => toExtreme(false) },
+        { id: 'forward', label: 'تقديم للأمام', icon: 'bi-arrow-up-short', run: () => moveOrder(1) },
+        { id: 'backward', label: 'إرجاع للخلف', icon: 'bi-arrow-down-short', run: () => moveOrder(-1) },
+        { id: 'lock', label: 'قفل/فتح العنصر', kbd: 'Ctrl+L', icon: 'bi-lock', run: () => { if (selected >= 0) toggleLock(selected); } },
+        { id: 'hide', label: 'إظهار/إخفاء العنصر', icon: 'bi-eye-slash', run: () => { if (selected >= 0) toggleVisibility(selected); } },
+        { id: 'zoom-fit', label: 'ملاءمة العرض', kbd: 'Shift+1', icon: 'bi-arrows-fullscreen', run: zoomFit },
+        { id: 'zoom-sel', label: 'تكبير على التحديد', kbd: 'Shift+2', icon: 'bi-bounding-box-circles', run: zoomToSelection },
+        { id: 'zoom-100', label: 'إعادة التكبير إلى 100%', kbd: 'Ctrl+0', icon: 'bi-zoom-in', run: resetZoom },
+        { id: 'grid', label: 'إظهار/إخفاء الشبكة', icon: 'bi-grid-3x3-gap', run: () => { gridOn = !gridOn; $('pedApp').classList.toggle('grid-on', gridOn); $('gridToggle').classList.toggle('on', gridOn); $('optGrid').checked = gridOn; } },
+        { id: 'snap', label: 'الالتقاط الذكي', icon: 'bi-magnet', run: () => { snapOn = !snapOn; $('snapToggle').classList.toggle('on', snapOn); $('optSnap').checked = snapOn; } },
+        { id: 'rulers', label: 'إظهار/إخفاء المساطر', icon: 'bi-rulers', run: () => { rulersOn = !rulersOn; $('rulerToggle').classList.toggle('on', rulersOn); renderRulers(); } },
+        { id: 'preview', label: 'معاينة/تحرير', icon: 'bi-eye', run: () => setPreview(!previewMode) },
+        { id: 'save-draft', label: 'حفظ كمسودة', icon: 'bi-save2', run: () => submitForm(false) },
+        { id: 'publish', label: 'حفظ ونشر', icon: 'bi-broadcast', run: () => submitForm(true) },
+        { id: 'shortcuts', label: 'عرض الاختصارات', kbd: '؟', icon: 'bi-keyboard', run: showShortcuts }
+    ];
+    let cmdkActive = 0, cmdkFiltered = COMMANDS;
+    function openCommandPalette() {
+        cmdk.style.display = 'flex';
+        $('cmdkInput').value = '';
+        cmdkActive = 0;
+        filterCommands('');
+        $('cmdkInput').focus();
+    }
+    function closeCommandPalette() { cmdk.style.display = 'none'; }
+    function filterCommands(q) {
+        const needle = (q || '').trim().toLowerCase();
+        cmdkFiltered = needle ? COMMANDS.filter(c => c.label.toLowerCase().includes(needle) || c.id.includes(needle)) : COMMANDS;
+        cmdkActive = Math.min(cmdkActive, Math.max(0, cmdkFiltered.length - 1));
+        $('cmdkList').innerHTML = cmdkFiltered.length
+            ? cmdkFiltered.map((c, i) => '<button type="button" class="ped-cmdk-item' + (i === cmdkActive ? ' active' : '') + '" data-i="' + i + '"><i class="bi ' + c.icon + '"></i><span>' + c.label + '</span>' + (c.kbd ? '<span class="ped-kbd">' + c.kbd + '</span>' : '') + '</button>').join('')
+            : '<div class="ped-empty">لا توجد أوامر مطابقة</div>';
+    }
+    function runCommand(i) {
+        const cmd = cmdkFiltered[i];
+        if (!cmd) return;
+        closeCommandPalette();
+        cmd.run();
+    }
+
+    // ---------- Shortcuts sheet ----------
+    const SHORTCUT_GROUPS = [
+        ['تحرير', [
+            ['Ctrl+Z / Ctrl+Y', 'تراجع / إعادة'],
+            ['Ctrl+C / Ctrl+X / Ctrl+V', 'نسخ / قص / لصق'],
+            ['Ctrl+D', 'تكرار'],
+            ['Del', 'حذف'],
+            ['Ctrl+A', 'تحديد الكل'],
+            ['F2', 'إعادة تسمية النص']
+        ]],
+        ['ترتيب ومحاذاة', [
+            ['Alt+Shift+أسهم', 'محاذاة لبعضها'],
+            ['Alt+Ctrl+H / V', 'توزيع أفقي / عمودي'],
+            ['Alt+T', 'ترتيب أنيق'],
+            ['[ / ]', 'إلى الخلف / المقدمة']
+        ]],
+        ['عرض وتحكم', [
+            ['Ctrl+K', 'لوحة الأوامر'],
+            ['Ctrl+عجلة', 'تكبير حول المؤشر'],
+            ['مسافة + سحب', 'تحريك اللوحة'],
+            ['Shift+1 / Shift+2', 'ملاءمة / تكبير على التحديد'],
+            ['Ctrl+0', 'تكبير 100%'],
+            ['Ctrl+L', 'قفل/فتح العنصر'],
+            ['أسهم', 'تحريك دقيق (Shift = 10px)']
+        ]]
+    ];
+    function showShortcuts() {
+        $('shortcutsBody').innerHTML = SHORTCUT_GROUPS.map(([title, rows]) =>
+            '<div class="ped-sheet-group"><div class="ped-group-title">' + title + '</div>' +
+            rows.map(([k, d]) => '<div class="ped-sheet-row"><span class="ped-kbd">' + k + '</span><span>' + d + '</span></div>').join('') +
+            '</div>').join('');
+        $('shortcutsSheet').style.display = 'flex';
+    }
+    function hideShortcuts() { $('shortcutsSheet').style.display = 'none'; }
+
     // ---------- Bindings ----------
     $('designsToggle').addEventListener('click', e => {
         e.stopPropagation();
@@ -1621,6 +1983,7 @@
     });
     document.addEventListener('click', e => {
         if (!e.target.closest('.ped-designs')) $('designsMenu').classList.remove('open');
+        if (!e.target.closest('.ped-menu')) hideContextMenu();
     });
 
     $('undoBtn').addEventListener('click', undo);
@@ -1640,6 +2003,35 @@
     $('backward').addEventListener('click', () => moveOrder(-1));
     $('gridToggle').addEventListener('click', () => { gridOn = !gridOn; document.getElementById('pedApp').classList.toggle('grid-on', gridOn); $('gridToggle').classList.toggle('on', gridOn); $('optGrid').checked = gridOn; });
     $('snapToggle').addEventListener('click', () => { snapOn = !snapOn; $('snapToggle').classList.toggle('on', snapOn); $('optSnap').checked = snapOn; });
+    $('rulerToggle').addEventListener('click', () => { rulersOn = !rulersOn; $('rulerToggle').classList.toggle('on', rulersOn); renderRulers(); });
+    $('cmdkBtn').addEventListener('click', openCommandPalette);
+    $('shortcutsBtn').addEventListener('click', showShortcuts);
+    $('shortcutsClose').addEventListener('click', hideShortcuts);
+    $('shortcutsSheet').addEventListener('click', e => { if (e.target === $('shortcutsSheet')) hideShortcuts(); });
+    $('cmdk').addEventListener('click', e => { if (e.target === cmdk) closeCommandPalette(); });
+    $('cmdkInput').addEventListener('input', e => { cmdkActive = 0; filterCommands(e.target.value); });
+    $('cmdkInput').addEventListener('keydown', e => {
+        e.stopPropagation();
+        if (e.key === 'ArrowDown') { e.preventDefault(); cmdkActive = Math.min(cmdkActive + 1, cmdkFiltered.length - 1); filterCommands(e.target.value); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); cmdkActive = Math.max(cmdkActive - 1, 0); filterCommands(e.target.value); }
+        else if (e.key === 'Enter') { e.preventDefault(); runCommand(cmdkActive); }
+        else if (e.key === 'Escape') { e.preventDefault(); closeCommandPalette(); }
+    });
+    $('cmdkList').addEventListener('click', e => {
+        const btn = e.target.closest('.ped-cmdk-item');
+        if (btn) runCommand(Number(btn.dataset.i));
+    });
+    // Right-click opens the element context menu; a right-click on empty canvas offers paste.
+    areaEl.addEventListener('contextmenu', e => {
+        if (previewMode) return;
+        const node = e.target.closest('.ped-el');
+        e.preventDefault();
+        showContextMenu(e.clientX, e.clientY, node ? Number(node.dataset.index) : -1);
+    });
+    ctxMenu.addEventListener('click', e => {
+        const btn = e.target.closest('.ped-menu-item');
+        if (btn && !btn.disabled) runContextAction(btn.dataset.act);
+    });
     $('zoomIn').addEventListener('click', () => applyZoom(zoom + 0.1));
     $('zoomOut').addEventListener('click', () => applyZoom(zoom - 0.1));
     $('zoomFit').addEventListener('click', zoomFit);
@@ -1761,12 +2153,23 @@
     // keyboard shortcuts
     document.addEventListener('keydown', e => {
         const typing = isTypingTarget(document.activeElement);
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openCommandPalette(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
         if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelected(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); selectAll(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key === '0') { e.preventDefault(); resetZoom(); return; }
         if (typing) return;
+        // Clipboard and lock keys must not hijack native text editing, so they run only outside inputs.
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') { e.preventDefault(); copySelected(); return; }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x') { e.preventDefault(); cutSelected(); return; }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') { e.preventDefault(); pasteClipboard(); return; }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') { e.preventDefault(); if (selected >= 0) toggleLock(selected); return; }
+        if (e.key === 'F2') { e.preventDefault(); if (selected >= 0) beginInlineEdit(selected); return; }
+        if (e.key === '?' || (e.shiftKey && e.key === '/')) { e.preventDefault(); showShortcuts(); return; }
+        // Bracket keys send the element to the back/front, matching the layers toolbar.
+        if (e.key === '[') { e.preventDefault(); toExtreme(false); return; }
+        if (e.key === ']') { e.preventDefault(); toExtreme(true); return; }
         // Alt shortcuts mirror the align/distribute/tidy toolbar without stealing plain letters.
         if (e.altKey && !e.ctrlKey && !e.metaKey) {
             const k = e.key.toLowerCase();
@@ -1791,7 +2194,7 @@
         if (e.shiftKey && e.key === '!') { e.preventDefault(); zoomFit(); return; }
         if (e.shiftKey && e.key === '@@') { e.preventDefault(); zoomToSelection(); return; }
         if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); return; }
-        if (e.key === 'Escape') { deselect(); return; }
+        if (e.key === 'Escape') { hideContextMenu(); closeCommandPalette(); hideShortcuts(); deselect(); return; }
         if (panning) return;
         if (selection.length && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
             e.preventDefault();
@@ -1828,6 +2231,9 @@
     });
 
     // ---------- Init ----------
+    // Rulers must follow the viewport, so repaint them whenever the canvas area scrolls or resizes.
+    areaEl.addEventListener('scroll', renderRulers, { passive: true });
+    window.addEventListener('resize', renderRulers);
     elements.forEach((el, i) => { el.rotation = el.rotation || 0; el.zIndex = (el.zIndex === undefined || el.zIndex === null) ? i : el.zIndex; });
     normalizeZ();
     pushHistory();
@@ -1837,5 +2243,7 @@
     refreshPropsPanel();
     updateToolbarState();
     document.getElementById('pedApp').classList.toggle('grid-on', gridOn);
+    document.getElementById('pedApp').classList.toggle('rulers-on', rulersOn);
+    renderRulers();
 })();
 </script>
