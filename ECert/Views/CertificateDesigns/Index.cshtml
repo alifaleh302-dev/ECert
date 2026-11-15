@@ -156,6 +156,7 @@
                 <div class="ped-canvas" id="certificateCanvas">
                     <div class="ped-grid" id="gridOverlay"></div>
                     <div class="ped-measure" id="measureLayer"></div>
+                    <div class="ped-marquee" id="marqueeBox"></div>
                     <div class="ped-guide g-x" id="guideX"></div>
                     <div class="ped-guide g-y" id="guideY"></div>
                 </div>
@@ -339,6 +340,7 @@
     const guideX = document.getElementById('guideX');
     const guideY = document.getElementById('guideY');
     const measureLayer = document.getElementById('measureLayer');
+    const marqueeBox = document.getElementById('marqueeBox');
 
     let canvasW = @Model.Design.CanvasWidth;
     let canvasH = @Model.Design.CanvasHeight;
@@ -350,6 +352,7 @@
     };
     let zoom = 0.7;
     let selected = -1;
+    let selection = [];
     let gridOn = true;
     let snapOn = true;
     let previewMode = false;
@@ -399,6 +402,7 @@
         canvasW = s.canvasW; canvasH = s.canvasH; cProps = s.cProps; elements = s.elements;
         backgroundImageUrl = s.backgroundImageUrl || null;
         selected = -1;
+        selection = [];
         syncCanvasInputs();
         render();
         refreshLayers();
@@ -407,7 +411,7 @@
     function updateToolbarState() {
         document.getElementById('undoBtn').disabled = historyIndex <= 0;
         document.getElementById('redoBtn').disabled = historyIndex >= history.length - 1;
-        const hasSel = selected >= 0 && elements[selected];
+        const hasSel = selection.length > 0;
         ['duplicateBtn', 'deleteBtn', 'alignLeft', 'alignHCenter', 'alignRight', 'alignTop', 'alignVCenter', 'alignBottom', 'toFront', 'forward', 'backward', 'toBack'].forEach(id => {
             document.getElementById(id).disabled = !hasSel;
         });
@@ -657,6 +661,7 @@
         canvasEl.appendChild(guideY);
         clearMeasures();
         canvasEl.appendChild(measureLayer);
+        canvasEl.appendChild(marqueeBox);
 
         // order by array position (zIndex normalized)
         const ordered = elements.map((el, i) => ({ el, i })).filter(o => o.el.isVisible);
@@ -670,7 +675,8 @@
             canvasEl.appendChild(node);
         }
 
-        if (selected >= 0 && elements[selected] && elements[selected].isVisible) drawOverlay(selected);
+        if (selection.length > 1) renderSelectionOverlays();
+        else if (selected >= 0 && elements[selected] && elements[selected].isVisible) drawOverlay(selected);
         $('zoomLabel').textContent = Math.round(zoom * 100) + '%';
         if (previewMode) document.querySelectorAll('.ped-el').forEach(n => n.style.cursor = 'default');
     }
@@ -718,32 +724,118 @@
         // Space-drag pans the viewport, so it must not also move the element underneath.
         if (spaceDown || panning) return;
         e.preventDefault();
-        select(index);
-        const el = elements[index];
+        const additive = e.shiftKey;
+        // Shift toggles membership; a plain click on an unselected element selects just it, while a
+        // plain click inside an existing multi-selection keeps the group so it can be dragged whole.
+        if (additive) {
+            select(index, true);
+            return;
+        }
+        if (selection.indexOf(index) < 0) select(index);
+        const group = selection.slice();
+        if (!group.length) return;
         pushHistory();
-        const startX = e.clientX, startY = e.clientY, origX = el.x, origY = el.y;
+        const startX = e.clientX, startY = e.clientY;
+        const origins = group.map(i => ({ i, x: elements[i].x, y: elements[i].y }));
         const s = () => scale();
-        // Holding Ctrl temporarily suspends snapping, the same escape hatch professional
-        // editors provide (Figma: "click and hold ... to temporarily disable snapping").
         let snapNow = snapOn && !e.ctrlKey && !e.metaKey;
         const move = ev => {
             const snapping = snapNow && !ev.ctrlKey && !ev.metaKey;
-            const nx = origX + (ev.clientX - startX) / s();
-            const ny = origY + (ev.clientY - startY) / s();
-            const r = snapping
-                ? computeSnap(nx, ny, el.width, el.height)
-                : { x: nx, y: ny, gx: null, gy: null };
-            el.x = clamp(Math.round(r.x), 0, canvasW - 10);
-            el.y = clamp(Math.round(r.y), 0, canvasH - 10);
-            updateNode(el, index);
-            renderGuides(snapping ? r.gx : null, snapping ? r.gy : null);
-            renderMeasures(el.x, el.y, el.width, el.height);
+            const dx = (ev.clientX - startX) / s();
+            const dy = (ev.clientY - startY) / s();
+            if (group.length === 1) {
+                const el = elements[group[0]];
+                const nx = origins[0].x + dx, ny = origins[0].y + dy;
+                const r = snapping
+                    ? computeSnap(nx, ny, el.width, el.height)
+                    : { x: nx, y: ny, gx: null, gy: null };
+                el.x = clamp(Math.round(r.x), 0, canvasW - 10);
+                el.y = clamp(Math.round(r.y), 0, canvasH - 10);
+                renderGuides(snapping ? r.gx : null, snapping ? r.gy : null);
+                renderMeasures(el.x, el.y, el.width, el.height);
+            } else {
+                // Group move: every element shifts by the same delta, and the bounds clamp the
+                // whole cluster so nothing is pushed off-canvas.
+                let ddx = Math.round(dx), ddy = Math.round(dy);
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                origins.forEach(o => {
+                    const el = elements[o.i];
+                    minX = Math.min(minX, o.x + ddx); minY = Math.min(minY, o.y + ddy);
+                    maxX = Math.max(maxX, o.x + ddx + el.width); maxY = Math.max(maxY, o.y + ddy + el.height);
+                });
+                if (minX < 0) ddx -= minX;
+                if (minY < 0) ddy -= minY;
+                if (maxX > canvasW) ddx -= (maxX - canvasW);
+                if (maxY > canvasH) ddy -= (maxY - canvasH);
+                origins.forEach(o => { elements[o.i].x = o.x + ddx; elements[o.i].y = o.y + ddy; });
+                renderSelectionNodes(group);
+                clearGuides();
+            }
+            renderSelectionOverlays();
         };
         const up = () => {
             window.removeEventListener('pointermove', move);
             window.removeEventListener('pointerup', up);
             clearGuides();
             clearMeasures();
+            refreshLayers();
+            updateToolbarState();
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+    }
+
+    function renderSelectionNodes(group) {
+        group.forEach(i => updateNode(elements[i], i));
+    }
+    function renderSelectionOverlays() {
+        canvasEl.querySelectorAll('.ped-overlay').forEach(o => o.remove());
+        if (selection.length > 1) {
+            const b = selectionBounds();
+            selection.forEach(i => drawBox(i, false));
+            if (b) drawGroupBox(b);
+        } else if (selection.length === 1) {
+            drawOverlay(selection[0]);
+        }
+    }
+
+    // Group resize scales every selected element proportionally inside the new bounds.
+    function startGroupResize(e, pos) {
+        if (previewMode || e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const b = selectionBounds();
+        if (!b) return;
+        pushHistory();
+        const startX = e.clientX, startY = e.clientY;
+        const orig = selection.map(i => ({ i, x: elements[i].x, y: elements[i].y, w: elements[i].width, h: elements[i].height }));
+        const s = () => scale();
+        const MIN = 24;
+        const move = ev => {
+            const dx = (ev.clientX - startX) / s();
+            const dy = (ev.clientY - startY) / s();
+            let nx = b.x, ny = b.y, nw = b.width, nh = b.height;
+            if (pos.includes('e')) nw = b.width + dx;
+            if (pos.includes('s')) nh = b.height + dy;
+            if (pos.includes('w')) { nw = b.width - dx; nx = b.x + dx; }
+            if (pos.includes('n')) { nh = b.height - dy; ny = b.y + dy; }
+            if (nw < MIN) { if (pos.includes('w')) nx = b.x + b.width - MIN; nw = MIN; }
+            if (nh < MIN) { if (pos.includes('n')) ny = b.y + b.height - MIN; nh = MIN; }
+            const sx = nw / b.width, sy = nh / b.height;
+            orig.forEach(o => {
+                const el = elements[o.i];
+                el.x = Math.round(nx + (o.x - b.x) * sx);
+                el.y = Math.round(ny + (o.y - b.y) * sy);
+                el.width = Math.max(20, Math.round(o.w * sx));
+                el.height = Math.max(20, Math.round(o.h * sy));
+                if (el.elementType === 'divider') el.height = 4;
+                updateNode(el, o.i);
+            });
+            renderSelectionOverlays();
+        };
+        const up = () => {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
             refreshLayers();
             updateToolbarState();
         };
@@ -843,28 +935,166 @@
             n.textContent = contentFor(el);
         });
         canvasEl.querySelectorAll('.ped-overlay').forEach(o => o.remove());
-        if (selected >= 0 && elements[selected]) drawOverlay(selected);
+        if (selection.length > 1) renderSelectionOverlays();
+        else if (selected >= 0 && elements[selected]) drawOverlay(selected);
     }
 
     // ---------- Selection ----------
-    function select(index) {
-        selected = index;
+    // `selected` stays the primary (last-clicked) element for the properties panel; `selection`
+    // holds every element the user has picked so group move/resize/rotate can act on all of them.
+    function selectionBounds() {
+        if (!selection.length) return null;
+        let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+        selection.forEach(i => {
+            const el = elements[i];
+            if (!el) return;
+            x1 = Math.min(x1, el.x); y1 = Math.min(y1, el.y);
+            x2 = Math.max(x2, el.x + el.width); y2 = Math.max(y2, el.y + el.height);
+        });
+        return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
+    }
+    function renderSelection() {
         canvasEl.querySelectorAll('.ped-overlay').forEach(o => o.remove());
-        if (elements[index]) drawOverlay(index);
+        if (selection.length > 1) {
+            const b = selectionBounds();
+            selection.forEach(i => drawBox(i, false));
+            if (b) drawGroupBox(b);
+        } else if (selection.length === 1 && elements[selection[0]]) {
+            drawOverlay(selection[0]);
+        }
         refreshPropsPanel();
         refreshLayers();
         updateToolbarState();
+    }
+    function select(index, additive) {
+        if (additive) {
+            const at = selection.indexOf(index);
+            if (at >= 0) {
+                selection.splice(at, 1);
+                selected = selection.length ? selection[selection.length - 1] : -1;
+            } else {
+                selection.push(index);
+                selected = index;
+            }
+        } else {
+            selection = [index];
+            selected = index;
+        }
+        renderSelection();
+    }
+    function selectMany(indices) {
+        selection = indices.slice();
+        selected = selection.length ? selection[selection.length - 1] : -1;
+        renderSelection();
+    }
+    function selectAll() {
+        selectMany(elements.map((el, i) => i).filter(i => elements[i].isVisible));
     }
     function deselect() {
         selected = -1;
-        canvasEl.querySelectorAll('.ped-overlay').forEach(o => o.remove());
-        refreshPropsPanel();
-        refreshLayers();
-        updateToolbarState();
+        selection = [];
+        renderSelection();
+    }
+    function drawBox(index, withHandles) {
+        const el = elements[index];
+        if (!el) return;
+        const ov = document.createElement('div');
+        ov.className = 'ped-overlay ped-overlay-multi';
+        ov.style.left = el.x + 'px';
+        ov.style.top = el.y + 'px';
+        ov.style.width = el.width + 'px';
+        ov.style.height = (el.elementType === 'divider' ? 4 : el.height) + 'px';
+        ov.style.transform = 'rotate(' + (el.rotation || 0) + 'deg)';
+        ov.style.transformOrigin = 'center';
+        const box = document.createElement('div');
+        box.className = 'ped-box';
+        ov.appendChild(box);
+        if (withHandles) {
+            const handles = [['nw'], ['n'], ['ne'], ['e'], ['se'], ['s'], ['sw'], ['w']];
+            handles.forEach(([pos]) => {
+                const h = document.createElement('div');
+                h.className = 'ped-handle h-' + pos;
+                h.addEventListener('pointerdown', e => startResize(e, pos));
+                ov.appendChild(h);
+            });
+        }
+        canvasEl.appendChild(ov);
+    }
+    function drawGroupBox(b) {
+        const ov = document.createElement('div');
+        ov.className = 'ped-overlay ped-group';
+        ov.style.left = b.x + 'px';
+        ov.style.top = b.y + 'px';
+        ov.style.width = b.width + 'px';
+        ov.style.height = b.height + 'px';
+        const box = document.createElement('div');
+        box.className = 'ped-group-box';
+        ov.appendChild(box);
+        const handles = [['nw'], ['n'], ['ne'], ['e'], ['se'], ['s'], ['sw'], ['w']];
+        handles.forEach(([pos]) => {
+            const h = document.createElement('div');
+            h.className = 'ped-handle h-' + pos;
+            h.addEventListener('pointerdown', e => startGroupResize(e, pos));
+            ov.appendChild(h);
+        });
+        const dim = document.createElement('div');
+        dim.className = 'ped-dim';
+        dim.textContent = selection.length + ' عناصر';
+        ov.appendChild(dim);
+        canvasEl.appendChild(ov);
+    }
+    function marqueeSelect(x1, y1, x2, y2, additive) {
+        const left = Math.min(x1, x2), right = Math.max(x1, x2);
+        const top = Math.min(y1, y2), bottom = Math.max(y1, y2);
+        const hits = elements.map((el, i) => i).filter(i => {
+            const el = elements[i];
+            if (!el || !el.isVisible) return false;
+            // Intersection test: an element is selected when it overlaps the rubber band.
+            return el.x < right && el.x + el.width > left && el.y < bottom && el.y + el.height > top;
+        });
+        const merged = additive ? Array.from(new Set(selection.concat(hits))) : hits;
+        selectMany(merged);
     }
     canvasEl.addEventListener('pointerdown', e => {
-        if (e.target === canvasEl || e.target.classList.contains('ped-grid') || e.target.classList.contains('ped-guide')) deselect();
+        if (e.target === canvasEl || e.target.classList.contains('ped-grid') || e.target.classList.contains('ped-guide') || e.target.classList.contains('ped-measure')) {
+            startMarquee(e);
+        }
     });
+
+    // ---------- Marquee ----------
+    function startMarquee(e) {
+        if (previewMode || e.button !== 0 || spaceDown) return;
+        e.preventDefault();
+        const r = canvasEl.getBoundingClientRect();
+        const s = scale();
+        const toCanvas = ev => ({
+            x: (ev.clientX - r.left) / s,
+            y: (ev.clientY - r.top) / s
+        });
+        const start = toCanvas(e);
+        const additive = e.shiftKey;
+        let moved = false;
+        marqueeBox.style.display = 'block';
+        const move = ev => {
+            const p = toCanvas(ev);
+            const x = Math.min(start.x, p.x), y = Math.min(start.y, p.y);
+            const w = Math.abs(p.x - start.x), h = Math.abs(p.y - start.y);
+            if (w > 2 || h > 2) moved = true;
+            Object.assign(marqueeBox.style, {
+                left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px'
+            });
+        };
+        const up = ev => {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+            marqueeBox.style.display = 'none';
+            const p = toCanvas(ev);
+            if (moved) marqueeSelect(start.x, start.y, p.x, p.y, additive);
+            else if (!additive) deselect();
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+    }
 
     // ---------- Add / Remove / Order ----------
     function addElement(type, fieldKey) {
@@ -901,10 +1131,12 @@
         updateToolbarState();
     }
     function deleteSelected() {
-        if (selected < 0 || !elements[selected]) return;
+        if (!selection.length) return;
         pushHistory();
-        elements.splice(selected, 1);
+        // Delete from the highest index down so earlier splices do not shift later ones.
+        selection.slice().sort((a, b) => b - a).forEach(i => elements.splice(i, 1));
         selected = -1;
+        selection = [];
         normalizeZ();
         render();
         refreshLayers();
@@ -912,16 +1144,19 @@
         updateToolbarState();
     }
     function duplicateSelected() {
-        if (selected < 0 || !elements[selected]) return;
+        if (!selection.length) return;
         pushHistory();
-        const src = elements[selected];
-        const copy = JSON.parse(JSON.stringify(src));
-        copy.x = clamp(copy.x + 28, 0, canvasW - 20);
-        copy.y = clamp(copy.y + 28, 0, canvasH - 20);
-        elements.push(copy);
-        selected = elements.length - 1;
+        const copies = [];
+        selection.slice().sort((a, b) => a - b).forEach(i => {
+            const copy = JSON.parse(JSON.stringify(elements[i]));
+            copy.x = clamp(copy.x + 28, 0, canvasW - 20);
+            copy.y = clamp(copy.y + 28, 0, canvasH - 20);
+            elements.push(copy);
+            copies.push(elements.length - 1);
+        });
         normalizeZ();
         render();
+        selectMany(copies);
         refreshLayers();
         refreshPropsPanel();
         updateToolbarState();
@@ -956,18 +1191,34 @@
         updateToolbarState();
     }
     function alignElement(kind) {
-        if (selected < 0) return;
+        if (!selection.length) return;
         pushHistory();
-        const el = elements[selected];
-        if (kind === 'left') el.x = 0;
-        if (kind === 'hcenter') el.x = Math.round((canvasW - el.width) / 2);
-        if (kind === 'right') el.x = canvasW - el.width;
-        if (kind === 'top') el.y = 0;
-        if (kind === 'vcenter') el.y = Math.round((canvasH - el.height) / 2);
-        if (kind === 'bottom') el.y = canvasH - el.height;
-        el.x = clamp(el.x, 0, canvasW - 20);
-        el.y = clamp(el.y, 0, canvasH - 20);
-        updateNode(el, selected);
+        // Align to the canvas for a single element; align the group's bounds to the canvas when
+        // several elements are selected (Figma: align to parent vs. to selection).
+        if (selection.length === 1) {
+            const el = elements[selection[0]];
+            if (kind === 'left') el.x = 0;
+            if (kind === 'hcenter') el.x = Math.round((canvasW - el.width) / 2);
+            if (kind === 'right') el.x = canvasW - el.width;
+            if (kind === 'top') el.y = 0;
+            if (kind === 'vcenter') el.y = Math.round((canvasH - el.height) / 2);
+            if (kind === 'bottom') el.y = canvasH - el.height;
+            el.x = clamp(el.x, 0, canvasW - 20);
+            el.y = clamp(el.y, 0, canvasH - 20);
+            updateNode(el, selection[0]);
+        } else {
+            const b = selectionBounds();
+            let dx = 0, dy = 0;
+            if (kind === 'left') dx = -b.x;
+            if (kind === 'hcenter') dx = Math.round((canvasW - b.width) / 2) - b.x;
+            if (kind === 'right') dx = (canvasW - b.width) - b.x;
+            if (kind === 'top') dy = -b.y;
+            if (kind === 'vcenter') dy = Math.round((canvasH - b.height) / 2) - b.y;
+            if (kind === 'bottom') dy = (canvasH - b.height) - b.y;
+            selection.forEach(i => { elements[i].x += dx; elements[i].y += dy; });
+            render();
+            renderSelectionOverlays();
+        }
         refreshPropsPanel();
         refreshLayers();
         updateToolbarState();
@@ -985,7 +1236,7 @@
         for (let i = elements.length - 1; i >= 0; i--) {
             const el = elements[i];
             const row = document.createElement('div');
-            row.className = 'ped-layer' + (i === selected ? ' active' : '');
+            row.className = 'ped-layer' + (selection.indexOf(i) >= 0 ? ' active' : '');
             const icon = el.elementType === 'field' ? '<i class="bi bi-link-45deg"></i>' : el.elementType === 'divider' ? '<i class="bi bi-dash-lg"></i>' : el.elementType === 'qr' ? '<i class="bi bi-qr-code"></i>' : el.elementType === 'barcode' ? '<i class="bi bi-upc-scan"></i>' : el.elementType === 'partner_logo' ? '<i class="bi bi-building"></i>' : el.elementType === 'partner_signature' ? '<i class="bi bi-vector-pen"></i>' : el.elementType === 'instructor_signature' ? '<i class="bi bi-person-check"></i>' : '<i class="bi bi-type"></i>';
             row.innerHTML =
                 '<div class="ly-icon">' + icon + '</div>' +
@@ -1005,7 +1256,7 @@
                 } else if (e.target.closest('.ly-btn:nth-of-type(2)')) { select(i); moveOrder(1); }
                 else if (e.target.closest('.ly-btn:nth-of-type(3)')) { select(i); moveOrder(-1); }
                 else if (e.target.closest('.ly-btn.danger')) { select(i); deleteSelected(); }
-                else select(i);
+                else select(i, e.shiftKey);
             });
             list.appendChild(row);
         }
@@ -1299,6 +1550,7 @@
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
         if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelected(); return; }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); selectAll(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key === '0') { e.preventDefault(); resetZoom(); return; }
         if (typing) return;
         // Shift+1 fits the canvas, Shift+2 zooms to the selection — the familiar viewport keys.
@@ -1307,16 +1559,32 @@
         if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); return; }
         if (e.key === 'Escape') { deselect(); return; }
         if (panning) return;
-        if (selected >= 0 && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+        if (selection.length && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
             e.preventDefault();
             pushHistory();
-            const el = elements[selected];
             const step = e.shiftKey ? 10 : 1;
-            if (e.key === 'ArrowLeft') el.x = clamp(el.x - step, 0, canvasW - 20);
-            if (e.key === 'ArrowRight') el.x = clamp(el.x + step, 0, canvasW - 20);
-            if (e.key === 'ArrowUp') el.y = clamp(el.y - step, 0, canvasH - 20);
-            if (e.key === 'ArrowDown') el.y = clamp(el.y + step, 0, canvasH - 20);
-            updateNode(el, selected);
+            let dx = 0, dy = 0;
+            if (e.key === 'ArrowLeft') dx = -step;
+            if (e.key === 'ArrowRight') dx = step;
+            if (e.key === 'ArrowUp') dy = -step;
+            if (e.key === 'ArrowDown') dy = step;
+            // Clamp the whole group so nudging never pushes an element off-canvas.
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            selection.forEach(i => {
+                const el = elements[i];
+                minX = Math.min(minX, el.x + dx); minY = Math.min(minY, el.y + dy);
+                maxX = Math.max(maxX, el.x + dx + el.width); maxY = Math.max(maxY, el.y + dy + el.height);
+            });
+            if (minX < 0) dx -= minX;
+            if (minY < 0) dy -= minY;
+            if (maxX > canvasW) dx -= (maxX - canvasW);
+            if (maxY > canvasH) dy -= (maxY - canvasH);
+            selection.forEach(i => {
+                elements[i].x += dx;
+                elements[i].y += dy;
+                updateNode(elements[i], i);
+            });
+            renderSelectionOverlays();
             refreshPropsPanel();
             updateToolbarState();
         }

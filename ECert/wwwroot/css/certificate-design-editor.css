@@ -133,6 +133,11 @@
     .ped-measure-line.v { width: 1px; }
     .ped-measure-badge { position: absolute; transform: translate(-50%, -50%); background: #e0575b; color: #fff; font-size: .64rem; font-weight: 700; line-height: 1; padding: .16rem .34rem; border-radius: 2px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
+    /* multi-select marquee + group bounds */
+    .ped-marquee { position: absolute; display: none; border: 1px solid var(--ped-accent); background: rgba(59, 110, 240, .14); pointer-events: none; z-index: 9996; }
+    .ped-overlay-multi .ped-box { border-color: var(--ped-accent); opacity: .75; }
+    .ped-group-box { position: absolute; inset: -6px; border: 1px dashed var(--ped-accent); border-radius: 2px; pointer-events: none; }
+
     /* library */
     .ped-field-chip { display: flex; align-items: center; gap: .5rem; width: 100%; text-align: start; border: 1px solid var(--ped-line); background: var(--ped-panel-2); border-radius: var(--ped-r); padding: .42rem .6rem; font-size: .78rem; color: var(--ped-ink); cursor: pointer; margin-bottom: .35rem; transition: .12s ease; }
     .ped-field-chip:hover { background: #1d2942; border-color: rgba(59,110,240,.5); color: #fff; }
