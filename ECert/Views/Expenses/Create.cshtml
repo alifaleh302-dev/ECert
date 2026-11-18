@@ -28,7 +28,7 @@
 {
     <div class="a-note a-note--warning mb-4" role="alert">
         <i class="bi bi-exclamation-circle" aria-hidden="true"></i>
-        <div>لا توجد بنود مصروفات. أضف بنداً من <a asp-action="Categories">بنود المصروفات</a> أولاً.</div>
+        <div>لا توجد بنود مصروفات. أضف بنداً من <a asp-controller="ExpenseCategories" asp-action="Index">بنود المصروفات</a> أولاً.</div>
     </div>
 }
 
@@ -67,9 +67,15 @@
                 <input id="expDoc" type="text" name="documentNumber" maxlength="80" class="form-control" placeholder="اختياري" />
             </div>
             <div class="a-field a-field--full">
-                <label class="a-field__label" for="expFile">المرفق (صورة الفاتورة)</label>
-                <input id="expFile" type="file" name="attachment" accept=".jpg,.jpeg,.png,.gif,.webp" class="form-control" />
-                <p class="a-hint">صيغ مسموحة: JPG, PNG, GIF, WEBP بحجم أقصى 5 ميغابايت.</p>
+                <label class="a-field__label" for="expFiles">المرفقات (صور الفاتورة) — حتى @ECert.Models.ExpenseAttachment.MaxPerExpense صور</label>
+                <input id="expFiles" type="file" name="attachments" accept=".jpg,.jpeg,.png,.gif,.webp" class="form-control" multiple data-attachment-input />
+                <p class="a-hint">صيغ مسموحة: JPG, PNG, GIF, WEBP بحجم أقصى 5 ميغابايت للصورة، و@ECert.Models.ExpenseAttachment.MaxPerExpense صور كحد أقصى.</p>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-camera-open>
+                        <i class="bi bi-camera"></i> التقاط صورة بالكاميرا
+                    </button>
+                </div>
+                <div class="exp-thumbs mt-3" data-attachment-preview></div>
             </div>
             <div class="a-field a-field--full">
                 <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ المصروف</button>
@@ -77,3 +83,9 @@
         </form>
     </div>
 </div>
+
+<partial name="_CameraCapture" />
+
+@section Scripts {
+    <script src="~/js/expense-attachments.js" asp-append-version="true"></script>
+}

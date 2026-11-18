@@ -31,11 +31,18 @@ public class ExpenseService
     public sealed record ExpenseResult(bool Success, string Message, Expense? Expense = null);
 
     /// <summary>Submits a new expense awaiting approval. The caller owns the transaction.</summary>
+    /// <param name="attachmentUrls">
+    /// Uploaded image URLs, in display order. At most <see cref="ExpenseAttachment.MaxPerExpense"/>.
+    /// </param>
     public async Task<ExpenseResult> SubmitAsync(int categoryId, string description, decimal amount,
-        DateTime expenseDate, string? documentNumber, string? attachmentUrl, string actor)
+        DateTime expenseDate, string? documentNumber, IReadOnlyList<string> attachmentUrls,
+        string actor, int? submittedByUserId)
     {
         if (string.IsNullOrWhiteSpace(description))
             return new ExpenseResult(false, "بيان المصروف مطلوب.");
+
+        if (attachmentUrls.Count > ExpenseAttachment.MaxPerExpense)
+            return new ExpenseResult(false, $"يمكن إرفاق {ExpenseAttachment.MaxPerExpense} صور كحد أقصى.");
 
         amount = Math.Round(amount, 2, MidpointRounding.AwayFromZero);
         if (amount <= 0)
@@ -66,14 +73,38 @@ public class ExpenseService
             Amount = amount,
             ExpenseDate = expenseDate.Date,
             DocumentNumber = string.IsNullOrWhiteSpace(documentNumber) ? null : documentNumber.Trim(),
-            AttachmentUrl = attachmentUrl,
             Status = ExpenseStatus.PendingApproval,
             SubmittedBy = actor,
+            SubmittedByUserId = submittedByUserId,
             SubmittedAt = DateTime.Now
         };
+        for (var i = 0; i < attachmentUrls.Count; i++)
+            expense.Attachments.Add(new ExpenseAttachment { Url = attachmentUrls[i], SortOrder = i });
+
         _db.Expenses.Add(expense);
         await _db.SaveChangesAsync();
         return new ExpenseResult(true, "تم تسجيل المصروف وهو بانتظار اعتماد مدير النظام.", expense);
+    }
+
+    /// <summary>
+    /// Withdraws a pending expense at the request of the employee who submitted it. Only the
+    /// submitter may cancel, and only while the expense is still pending approval; an approved or
+    /// rejected expense is untouched. Nothing was counted yet, so the fund and reports are unaffected.
+    /// </summary>
+    public async Task<ExpenseResult> CancelAsync(Expense expense, int userId, string actor)
+    {
+        if (expense.Status != ExpenseStatus.PendingApproval)
+            return new ExpenseResult(false, "لا يمكن إلغاء مصروف تمت مراجعته مسبقاً.");
+
+        if (expense.SubmittedByUserId != userId)
+            return new ExpenseResult(false, "يمكن لمقدّم الطلب فقط إلغاء المصروف قبل الاعتماد.");
+
+        expense.Status = ExpenseStatus.Cancelled;
+        expense.ReviewedBy = actor;
+        expense.ReviewedAt = DateTime.Now;
+        expense.ReviewNote = "أُلغي بواسطة مقدّم الطلب قبل الاعتماد.";
+        await _db.SaveChangesAsync();
+        return new ExpenseResult(true, "تم إلغاء المصروف.", expense);
     }
 
     /// <summary>Approves a pending expense; it now counts in the reports and is audited.</summary>
@@ -127,10 +158,11 @@ public class ExpenseService
 
     // ===== Category budget accounting =====
 
-    /// <summary>Sum of the amounts spent under a category. Rejected expenses are ignored.</summary>
+    /// <summary>Sum of the amounts spent under a category. Rejected and cancelled expenses are ignored.</summary>
     public async Task<decimal> GetCategorySpentAsync(int categoryId, int? excludeExpenseId = null)
     {
-        var query = _db.Expenses.Where(e => e.ExpenseCategoryId == categoryId && e.Status != ExpenseStatus.Rejected);
+        var query = _db.Expenses.Where(e => e.ExpenseCategoryId == categoryId
+            && e.Status != ExpenseStatus.Rejected && e.Status != ExpenseStatus.Cancelled);
         if (excludeExpenseId.HasValue) query = query.Where(e => e.ExpenseId != excludeExpenseId.Value);
         return await query.SumAsync(e => (decimal?)e.Amount) ?? 0m;
     }

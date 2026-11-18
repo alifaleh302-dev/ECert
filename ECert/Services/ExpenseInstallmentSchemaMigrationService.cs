@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS `Expenses` (
     `AttachmentUrl` VARCHAR(400) NULL,
     `Status` VARCHAR(40) NOT NULL,
     `SubmittedBy` VARCHAR(150) NOT NULL,
+    `SubmittedByUserId` INT NULL,
     `SubmittedAt` DATETIME(6) NOT NULL,
     `ReviewedBy` VARCHAR(150) NULL,
     `ReviewedAt` DATETIME(6) NULL,
@@ -52,9 +53,27 @@ CREATE TABLE IF NOT EXISTS `Expenses` (
     PRIMARY KEY (`ExpenseId`),
     KEY `IX_Expenses_Category_Date` (`ExpenseCategoryId`, `ExpenseDate`),
     KEY `IX_Expenses_Status` (`Status`),
+    KEY `IX_Expenses_SubmittedByUserId` (`SubmittedByUserId`),
     CONSTRAINT `FK_Expenses_ExpenseCategories_ExpenseCategoryId`
         FOREIGN KEY (`ExpenseCategoryId`) REFERENCES `ExpenseCategories` (`ExpenseCategoryId`)
         ON DELETE RESTRICT
+) CHARACTER SET utf8mb4;");
+
+        // An existing deployment predates the "submitter may withdraw their own request" column.
+        await EnsureColumnAsync("Expenses", "SubmittedByUserId", "INT NULL");
+        await EnsureIndexAsync("Expenses", "IX_Expenses_SubmittedByUserId", "`SubmittedByUserId`");
+
+        await _db.Database.ExecuteSqlRawAsync(@"
+CREATE TABLE IF NOT EXISTS `ExpenseAttachments` (
+    `ExpenseAttachmentId` INT NOT NULL AUTO_INCREMENT,
+    `ExpenseId` INT NOT NULL,
+    `Url` VARCHAR(400) NOT NULL,
+    `SortOrder` INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (`ExpenseAttachmentId`),
+    KEY `IX_ExpenseAttachments_ExpenseId` (`ExpenseId`),
+    CONSTRAINT `FK_ExpenseAttachments_Expenses_ExpenseId`
+        FOREIGN KEY (`ExpenseId`) REFERENCES `Expenses` (`ExpenseId`)
+        ON DELETE CASCADE
 ) CHARACTER SET utf8mb4;");
 
         await _db.Database.ExecuteSqlRawAsync(@"
@@ -116,5 +135,35 @@ WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @tableName AND COLUMN_NAME = @c
         }
 
         await _db.Database.ExecuteSqlRawAsync($"ALTER TABLE `{tableName}` ADD COLUMN `{columnName}` {definitionSql};");
+    }
+
+    /// <summary>
+    /// Adds a secondary index only when it is missing, guarding with INFORMATION_SCHEMA.STATISTICS
+    /// so a database upgraded from an older release (where the column may already exist) does not
+    /// fail on a duplicate key name.
+    /// </summary>
+    private async Task EnsureIndexAsync(string tableName, string indexName, string columnsSql)
+    {
+        var connection = _db.Database.GetDbConnection();
+        var close = connection.State != System.Data.ConnectionState.Open;
+        try
+        {
+            if (close) await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = @"
+SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @tableName AND INDEX_NAME = @indexName;";
+            var p1 = command.CreateParameter(); p1.ParameterName = "@tableName"; p1.Value = tableName; command.Parameters.Add(p1);
+            var p2 = command.CreateParameter(); p2.ParameterName = "@indexName"; p2.Value = indexName; command.Parameters.Add(p2);
+            var exists = Convert.ToInt32(await command.ExecuteScalarAsync()) > 0;
+            if (exists) return;
+        }
+        finally
+        {
+            if (close && connection.State == System.Data.ConnectionState.Open)
+                await connection.CloseAsync();
+        }
+
+        await _db.Database.ExecuteSqlRawAsync($"ALTER TABLE `{tableName}` ADD INDEX `{indexName}` ({columnsSql});");
     }
 }

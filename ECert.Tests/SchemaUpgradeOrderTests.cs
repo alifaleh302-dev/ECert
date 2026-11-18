@@ -37,17 +37,21 @@ ALTER TABLE `Users` DROP COLUMN `TelegramLinkedAt`;
 ALTER TABLE `AuditLogs` DROP COLUMN `PreviousHash`;
 ALTER TABLE `AuditLogs` DROP COLUMN `RowHash`;
 ALTER TABLE `ExpenseCategories` DROP COLUMN `MaxAmount`;
+ALTER TABLE `Expenses` DROP COLUMN `SubmittedByUserId`;
 DROP TABLE `SecuritySettings`;
 DROP TABLE `CoursePartners`;
 DROP TABLE `UserCategories`;
 DROP TABLE `CustodyEntries`;
 DROP TABLE `CustodyHandovers`;
-DROP TABLE `FinancialAuditEntries`;");
+DROP TABLE `FinancialAuditEntries`;
+DROP TABLE `ExpenseAttachments`;");
 
             Assert.False(await bootstrap.ColumnExistsAsync("Courses", "PartnerName"));
             Assert.False(await bootstrap.TableExistsAsync("UserCategories"));
             Assert.False(await bootstrap.TableExistsAsync("CustodyEntries"));
             Assert.False(await bootstrap.ColumnExistsAsync("ExpenseCategories", "MaxAmount"));
+            Assert.False(await bootstrap.ColumnExistsAsync("Expenses", "SubmittedByUserId"));
+            Assert.False(await bootstrap.TableExistsAsync("ExpenseAttachments"));
         }
         finally
         {
@@ -71,6 +75,8 @@ DROP TABLE `FinancialAuditEntries`;");
             Assert.True(await upgraded.ColumnExistsAsync("Users", "TelegramChatId"));
             Assert.True(await upgraded.ColumnExistsAsync("AuditLogs", "RowHash"));
             Assert.True(await upgraded.ColumnExistsAsync("ExpenseCategories", "MaxAmount"));
+            Assert.True(await upgraded.ColumnExistsAsync("Expenses", "SubmittedByUserId"));
+            Assert.True(await upgraded.TableExistsAsync("ExpenseAttachments"));
             Assert.True(await upgraded.TableExistsAsync("SecuritySettings"));
             Assert.True(await upgraded.TableExistsAsync("UserCategories"));
             Assert.True(await upgraded.TableExistsAsync("CustodyEntries"));

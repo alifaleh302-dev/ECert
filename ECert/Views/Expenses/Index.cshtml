@@ -10,15 +10,17 @@
     int pendingCount = ViewBag.PendingCount is int p ? p : 0;
     bool canManage = ViewBag.CanManage is bool cm && cm;
     bool canApprove = ViewBag.CanApprove is bool ca && ca;
+    bool canManageCategories = ViewBag.CanManageCategories is bool cc && cc;
+    int? currentUserId = ViewBag.CurrentUserId as int?;
     string statusLabel(string s) => ECert.Controllers.ExpensesController.StatusLabel(s);
 }
 
 <div class="page-header">
     <partial name="_PageHeader" />
     <div class="page-actions">
-        @if (canManage)
+        @if (canManageCategories)
         {
-            <a asp-action="Categories" class="btn btn-outline-secondary"><i class="bi bi-tags"></i> بنود المصروفات</a>
+            <a asp-controller="ExpenseCategories" asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-tags"></i> بنود المصروفات</a>
         }
         <a asp-action="ExportXlsx" asp-route-categoryId="@ViewBag.CategoryId" asp-route-status="@ViewBag.Status"
            asp-route-from="@ViewBag.From" asp-route-to="@ViewBag.To" class="btn btn-success">
@@ -56,6 +58,7 @@
             <option value="Approved" selected="@(ViewBag.Status == "Approved")">معتمد</option>
             <option value="PendingApproval" selected="@(ViewBag.Status == "PendingApproval")">بانتظار الاعتماد</option>
             <option value="Rejected" selected="@(ViewBag.Status == "Rejected")">مرفوض</option>
+            <option value="Cancelled" selected="@(ViewBag.Status == "Cancelled")">ملغى</option>
         </select>
     </div>
     <div class="a-toolbar__field">
@@ -93,7 +96,18 @@
                                 <td class="a-table__primary">@e.Description</td>
                                 <td class="a-amount a-amount--out">@e.Amount.ToString("N2") @Currency.Symbol</td>
                                 <td class="small">
-                                    @if (!string.IsNullOrWhiteSpace(e.AttachmentUrl))
+                                    @{
+                                        var attachments = e.Attachments.OrderBy(a => a.SortOrder).ToList();
+                                    }
+                                    @if (attachments.Any())
+                                    {
+                                        foreach (var att in attachments)
+                                        {
+                                            <a href="@att.Url" target="_blank" rel="noopener" class="me-1" title="عرض الصورة"><i class="bi bi-paperclip"></i></a>
+                                        }
+                                        <span class="text-muted small">(@attachments.Count)</span>
+                                    }
+                                    else if (!string.IsNullOrWhiteSpace(e.AttachmentUrl))
                                     {
                                         <a href="@e.AttachmentUrl" target="_blank" rel="noopener"><i class="bi bi-paperclip"></i> مرفق</a>
                                     }
@@ -101,7 +115,7 @@
                                 </td>
                                 <td class="small">@e.SubmittedBy</td>
                                 <td>
-                                    <span class="a-badge @(e.Status == "Approved" ? "a-badge--success" : e.Status == "Rejected" ? "a-badge--danger" : "a-badge--warning")">@statusLabel(e.Status)</span>
+                                    <span class="a-badge @(e.Status == "Approved" ? "a-badge--success" : e.Status == "Rejected" ? "a-badge--danger" : e.Status == "Cancelled" ? "a-badge--neutral" : "a-badge--warning")">@statusLabel(e.Status)</span>
                                 </td>
                                 <td>
                                     @if (canApprove && e.Status == "PendingApproval")
@@ -116,6 +130,13 @@
                                                 <button type="submit" class="btn btn-sm btn-outline-danger" data-confirm="رفض هذا المصروف؟" data-confirm-tone="danger"><i class="bi bi-x-lg"></i> رفض</button>
                                             </form>
                                         </div>
+                                    }
+                                    else if (e.Status == "PendingApproval" && currentUserId.HasValue && e.SubmittedByUserId == currentUserId)
+                                    {
+                                        <form asp-action="Cancel" asp-route-id="@e.ExpenseId" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary" data-confirm="إلغاء طلب المصروف؟ لا يمكن التراجع."><i class="bi bi-x-circle"></i> إلغاء الطلب</button>
+                                        </form>
                                     }
                                     else if (!string.IsNullOrWhiteSpace(e.ReviewedBy))
                                     {

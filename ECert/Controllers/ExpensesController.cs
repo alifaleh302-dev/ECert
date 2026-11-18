@@ -11,11 +11,12 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace ECert.Controllers;
 
 /// <summary>
-/// Expense management (إدارة المصروفات): categories, submission with an optional attachment, and the
-/// approval queue. Nothing here is course-scoped — an expense belongs to the institution — so the
-/// section opens for <c>manage-expenses</c>, <c>view-expenses</c> or <c>approve-expenses</c>.
-/// Submitting and editing categories need <c>manage-expenses</c>; deciding a pending expense needs
-/// <c>approve-expenses</c>, which is what lets a cashier approve without being a SuperAdmin.
+/// Expense management (إدارة المصروفات): submission with up to five images, and the approval queue.
+/// Nothing here is course-scoped — an expense belongs to the institution — so the section opens for
+/// <c>manage-expenses</c>, <c>view-expenses</c> or <c>approve-expenses</c>. Submitting needs
+/// <c>manage-expenses</c>; deciding a pending expense needs <c>approve-expenses</c>, which is what lets
+/// a cashier approve without being a SuperAdmin. The submitter may withdraw their own pending request
+/// (<see cref="Cancel"/>); the expense categories live in <see cref="ExpenseCategoriesController"/>.
 /// </summary>
 [Authorize]
 public class ExpensesController : Controller
@@ -38,11 +39,14 @@ public class ExpensesController : Controller
 
     private string Actor => User.Identity?.Name ?? "System";
 
+    private int? CurrentUserId =>
+        int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : null;
+
     public async Task<IActionResult> Index(int? categoryId, string? status, DateTime? from, DateTime? to)
     {
         if (!User.CanAccessSection("Expenses")) return Forbid();
 
-        var query = _db.Expenses.Include(e => e.Category).AsQueryable();
+        var query = _db.Expenses.Include(e => e.Category).Include(e => e.Attachments).AsQueryable();
         if (categoryId.HasValue) query = query.Where(e => e.ExpenseCategoryId == categoryId.Value);
         if (!string.IsNullOrWhiteSpace(status)) query = query.Where(e => e.Status == status);
         if (from.HasValue) query = query.Where(e => e.ExpenseDate >= from.Value.Date);
@@ -62,6 +66,8 @@ public class ExpensesController : Controller
         ViewBag.FundBalance = await _ledger.GetMainFundBalanceAsync();
         ViewBag.CanManage = User.HasPermission(AdminPermissions.ManageExpenses);
         ViewBag.CanApprove = User.HasPermission(AdminPermissions.ApproveExpenses);
+        ViewBag.CanManageCategories = User.CanAccessSection("ExpenseCategories");
+        ViewBag.CurrentUserId = CurrentUserId;
         return View();
     }
 
@@ -88,35 +94,96 @@ public class ExpensesController : Controller
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(int expenseCategoryId, string description, decimal amount,
-        DateTime? expenseDate, string? documentNumber, IFormFile? attachment)
+        DateTime? expenseDate, string? documentNumber, List<IFormFile>? attachments)
     {
         if (!User.HasPermission(AdminPermissions.ManageExpenses)) return Forbid();
 
-        string? attachmentUrl = null;
-        if (attachment != null && attachment.Length > 0)
+        var files = (attachments ?? new List<IFormFile>())
+            .Where(f => f != null && f.Length > 0)
+            .ToList();
+
+        if (files.Count > ExpenseAttachment.MaxPerExpense)
         {
-            var (valid, error) = await ImageUploadValidator.ValidateAsync(attachment);
+            TempData["Error"] = $"يمكن إرفاق {ExpenseAttachment.MaxPerExpense} صور كحد أقصى.";
+            return RedirectToAction(nameof(Create));
+        }
+
+        var uploadedUrls = new List<string>();
+        var uploadsDir = Path.Combine(_env.WebRootPath, "uploads", "expenses");
+        foreach (var file in files)
+        {
+            var (valid, error) = await ImageUploadValidator.ValidateAsync(file);
             if (!valid)
             {
+                DeleteUploads(uploadedUrls);
                 TempData["Error"] = error;
                 return RedirectToAction(nameof(Create));
             }
-            var uploadsDir = Path.Combine(_env.WebRootPath, "uploads", "expenses");
+
             Directory.CreateDirectory(uploadsDir);
-            var fileName = $"{Guid.NewGuid()}{Path.GetExtension(attachment.FileName)}";
+            var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
             using var stream = new FileStream(Path.Combine(uploadsDir, fileName), FileMode.Create);
-            await attachment.CopyToAsync(stream);
-            attachmentUrl = $"/uploads/expenses/{fileName}";
+            await file.CopyToAsync(stream);
+            uploadedUrls.Add($"/uploads/expenses/{fileName}");
         }
 
         var result = await _expenses.SubmitAsync(expenseCategoryId, description, amount,
-            expenseDate ?? DateTime.Now, documentNumber, attachmentUrl, Actor);
+            expenseDate ?? DateTime.Now, documentNumber, uploadedUrls, Actor, CurrentUserId);
 
-        TempData[result.Success ? "Success" : "Error"] = result.Message;
-        if (!result.Success) return RedirectToAction(nameof(Create));
+        if (!result.Success)
+        {
+            // The expense was not recorded, so the images just written would be orphaned.
+            DeleteUploads(uploadedUrls);
+            TempData["Error"] = result.Message;
+            return RedirectToAction(nameof(Create));
+        }
 
         await _audit.LogAsync(Actor, "Create", "Expense", result.Expense!.ExpenseId, null,
-            $"Expense: {amount:N2}; Category: {expenseCategoryId}");
+            $"Expense: {amount:N2}; Category: {expenseCategoryId}; Attachments: {uploadedUrls.Count}");
+        TempData["Success"] = result.Message;
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>Best-effort removal of already-written uploads when the submission is abandoned.</summary>
+    private void DeleteUploads(IEnumerable<string> urls)
+    {
+        foreach (var url in urls)
+        {
+            try
+            {
+                var path = Path.Combine(_env.WebRootPath, url.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+            }
+            catch
+            {
+                // A leftover file on disk is harmless; never fail the request over cleanup.
+            }
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Cancel(int id)
+    {
+        var userId = CurrentUserId;
+        if (userId == null) return Forbid();
+
+        await using var transaction = await _db.Database.BeginTransactionAsync();
+        await LockExpenseRowAsync(id);
+        var expense = await _db.Expenses.FirstOrDefaultAsync(e => e.ExpenseId == id);
+        if (expense == null) return NotFound();
+
+        var result = await _expenses.CancelAsync(expense, userId.Value, Actor);
+        if (!result.Success)
+        {
+            await transaction.RollbackAsync();
+            TempData["Error"] = result.Message;
+            return RedirectToAction(nameof(Index));
+        }
+
+        await _audit.LogAsync(Actor, "Cancel", "Expense", expense.ExpenseId, null, $"Cancelled expense: {expense.Amount:N2}");
+        await transaction.CommitAsync();
+        TempData["Success"] = result.Message;
         return RedirectToAction(nameof(Index));
     }
 
@@ -188,43 +255,7 @@ public class ExpensesController : Controller
         await command.ExecuteScalarAsync();
     }
 
-    // ===== Expense categories =====
-
-    public async Task<IActionResult> Categories()
-    {
-        if (!User.HasPermission(AdminPermissions.ManageExpenses)) return Forbid();
-        var categories = await _db.ExpenseCategories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToListAsync();
-        ViewBag.Categories = categories;
-        // Spent per category counts every non-rejected expense, matching the cap rule.
-        ViewBag.Spent = await _db.Expenses.Where(e => e.Status != ExpenseStatus.Rejected)
-            .GroupBy(e => e.ExpenseCategoryId)
-            .Select(g => new { CategoryId = g.Key, Total = g.Sum(e => e.Amount) })
-            .ToDictionaryAsync(x => x.CategoryId, x => x.Total);
-        return View();
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveCategory(int? expenseCategoryId, string name, int sortOrder,
-        bool isActive = true, decimal? maxAmount = null)
-    {
-        if (!User.HasPermission(AdminPermissions.ManageExpenses)) return Forbid();
-
-        var result = await _expenses.SaveCategoryAsync(expenseCategoryId, name, sortOrder, isActive, maxAmount);
-        TempData[result.Success ? "Success" : "Error"] = result.Message;
-        return RedirectToAction(nameof(Categories));
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteCategory(int expenseCategoryId)
-    {
-        if (!User.HasPermission(AdminPermissions.ManageExpenses)) return Forbid();
-
-        var result = await _expenses.DeleteCategoryAsync(expenseCategoryId);
-        TempData[result.Success ? "Success" : "Error"] = result.Message;
-        return RedirectToAction(nameof(Categories));
-    }
+    // ===== Expense categories have moved to ExpenseCategoriesController =====
 
     public async Task<IActionResult> ExportXlsx(int? categoryId, string? status, DateTime? from, DateTime? to)
     {
@@ -252,6 +283,7 @@ public class ExpensesController : Controller
         ExpenseStatus.Approved => "معتمد",
         ExpenseStatus.Rejected => "مرفوض",
         ExpenseStatus.PendingApproval => "بانتظار الاعتماد",
+        ExpenseStatus.Cancelled => "ملغى",
         _ => status
     };
 }

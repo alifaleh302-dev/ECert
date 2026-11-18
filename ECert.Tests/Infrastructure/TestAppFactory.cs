@@ -483,7 +483,8 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
 
     /// <summary>Creates an expense directly in the given status; returns its id.</summary>
     public async Task<int> CreateExpenseAsync(int categoryId, decimal amount,
-        string status = ECert.Models.ExpenseStatus.Approved, DateTime? expenseDate = null, string by = "seed")
+        string status = ECert.Models.ExpenseStatus.Approved, DateTime? expenseDate = null, string by = "seed",
+        int? submittedByUserId = null)
     {
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
@@ -495,6 +496,7 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
             ExpenseDate = expenseDate ?? DateTime.Now,
             Status = status,
             SubmittedBy = by,
+            SubmittedByUserId = submittedByUserId,
             SubmittedAt = DateTime.Now,
             ReviewedBy = status == ECert.Models.ExpenseStatus.PendingApproval ? null : by,
             ReviewedAt = status == ECert.Models.ExpenseStatus.PendingApproval ? null : DateTime.Now
@@ -503,6 +505,26 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
         await db.SaveChangesAsync();
         return expense.ExpenseId;
     }
+
+    /// <summary>Attaches images to an expense directly, for asserting the stored list.</summary>
+    public async Task AddExpenseAttachmentsAsync(int expenseId, params string[] urls)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        for (var i = 0; i < urls.Length; i++)
+            db.ExpenseAttachments.Add(new ECert.Models.ExpenseAttachment
+            {
+                ExpenseId = expenseId,
+                Url = urls[i],
+                SortOrder = i
+            });
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>The attachment URLs of an expense, in display order.</summary>
+    public Task<List<string>> ExpenseAttachmentUrlsAsync(int expenseId) =>
+        WithDbAsync(db => db.ExpenseAttachments.Where(a => a.ExpenseId == expenseId)
+            .OrderBy(a => a.SortOrder).Select(a => a.Url).ToListAsync());
 
     /// <summary>Adds a fund handover (توريد) directly, so the fund starts with a balance.</summary>
     public async Task AddFundTransferAsync(decimal amount)

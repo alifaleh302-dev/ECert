@@ -35,6 +35,8 @@ public static class AdminPermissions
     public const string ManageExpenses = "manage-expenses";
     public const string ApproveExpenses = "approve-expenses";
     public const string ViewExpenses = "view-expenses";
+    public const string ManageExpenseCategories = "manage-expense-categories";
+    public const string ViewExpenseCategories = "view-expense-categories";
     public const string ManageInstallments = "manage-installments";
     public const string ViewInstallments = "view-installments";
     public const string ViewFinanceDashboard = "view-finance-dashboard";
@@ -89,6 +91,8 @@ public static class AdminPermissions
         new(ManageExpenses, "إدارة المصروفات", "الإدارة المالية"),
         new(ApproveExpenses, "اعتماد المصروفات", "الإدارة المالية"),
         new(ViewExpenses, "مشاهدة المصروفات (قراءة فقط)", "الإدارة المالية"),
+        new(ManageExpenseCategories, "إدارة بنود المصروفات", "الإدارة المالية"),
+        new(ViewExpenseCategories, "مشاهدة بنود المصروفات (قراءة فقط)", "الإدارة المالية"),
         new(ManageInstallments, "إدارة الأقساط والخطة الدراسية", "الإدارة المالية"),
         new(ViewInstallments, "مشاهدة الأقساط (قراءة فقط)", "الإدارة المالية"),
         new(ViewFinanceDashboard, "لوحة المؤشرات المالية", "الإدارة المالية"),
@@ -130,6 +134,7 @@ public static class AdminPermissions
             ["Receivables"] = new[] { ViewReceivables },
             ["FinancialAudit"] = new[] { ViewFinancialAudit },
             ["Expenses"] = new[] { ManageExpenses, ViewExpenses, ApproveExpenses },
+            ["ExpenseCategories"] = new[] { ManageExpenseCategories, ViewExpenseCategories },
             ["Installments"] = new[] { ManageInstallments, ViewInstallments },
             ["Finance"] = new[] { ViewFinanceDashboard },
             ["FinanceSettings"] = new[] { ManageFinanceSettings },
@@ -176,6 +181,7 @@ public static class AdminPermissions
             ["Receivables"] = "المتأخرات",
             ["Refunds"] = "استرداد الرسوم",
             ["Expenses"] = "المصروفات",
+            ["ExpenseCategories"] = "بنود المصروفات",
             ["Cashbox"] = "الصندوق",
             ["Reports"] = "تقارير الإيرادات",
             ["FinancialAudit"] = "سجل التدقيق المالي",
@@ -254,6 +260,7 @@ public static class AdminPermissions
             new PermissionRow("الصندوق الرئيسي", ViewCashbox, ManageCashbox, null),
             new PermissionRow("استرداد الرسوم", null, ManageRefunds, ApproveRefunds),
             new PermissionRow("المصروفات", ViewExpenses, ManageExpenses, ApproveExpenses),
+            new PermissionRow("بنود المصروفات", ViewExpenseCategories, ManageExpenseCategories, null),
             new PermissionRow("المتأخرات وكشف الحساب", ViewReceivables, null, null),
             new PermissionRow("سجل التدقيق المالي", ViewFinancialAudit, null, null),
             new PermissionRow("لوحة المؤشرات المالية", ViewFinanceDashboard, null, null),
