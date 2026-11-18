@@ -35,19 +35,26 @@ public class FinancialLedgerService
 
     /// <summary>
     /// The main fund's balance: money that reached it (approved handovers) minus money that left it
-    /// (withdrawals and refunds paid directly from the fund). Every component is derived from a
+    /// (approved expenses and refunds paid directly from the fund). Every component is derived from a
     /// ledger, so the balance is always reproducible. The fund is fed <em>only</em> by custody
-    /// handovers — there is no per-course transfer.
+    /// handovers — there is no per-course transfer — and it is spent <em>only</em> through an approved
+    /// expense (مصروف معتمد) or a refund paid straight from the fund; the standalone withdrawal feature
+    /// is retired. This is the single definition every reader must use.
     /// </summary>
     public async Task<decimal> GetMainFundBalanceAsync()
     {
         var transferred = await _db.CashboxTransfers.SumAsync(t => (decimal?)t.Amount) ?? 0m;
-        var withdrawn = await _db.CashboxWithdrawals.SumAsync(w => (decimal?)w.Amount) ?? 0m;
         var refundedFromFund = await _db.Refunds
             .Where(r => r.PaidFromFund && r.Status == RefundStatus.Approved)
             .SumAsync(r => (decimal?)r.Amount) ?? 0m;
-        return transferred - withdrawn - refundedFromFund;
+        var spentOnExpenses = await GetApprovedExpensesTotalAsync();
+        return transferred - refundedFromFund - spentOnExpenses;
     }
+
+    /// <summary>Total of every approved expense — the fund's outflows through the expense module.</summary>
+    public async Task<decimal> GetApprovedExpensesTotalAsync() =>
+        await _db.Expenses.Where(e => e.Status == ExpenseStatus.Approved)
+            .SumAsync(e => (decimal?)e.Amount) ?? 0m;
 
     /// <summary>Adds a signed custody movement. Positive credits the employee, negative debits them.</summary>
     public CustodyEntry AddCustodyEntry(

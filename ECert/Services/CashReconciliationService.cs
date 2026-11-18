@@ -8,11 +8,12 @@ namespace ECert.Services;
 /// says is on hand against the cash the movements imply, and reports the difference so a day can be
 /// closed with confidence. Both sides are derived from the same ledgers:
 ///
-///   System balance  = main-fund balance (transfers − withdrawals) + total employee custody.
-///   Movement balance = collections − approved refunds − withdrawals.
+///   System balance  = main-fund balance (handovers − expenses − fund refunds) + custody.
+///   Movement balance = collections − approved refunds − expenses.
 ///
-/// They agree when every collection is either still in an employee's custody or already transferred
-/// to the fund, refunds have left custody, and no withdrawal exceeds the fund.
+/// They agree when every collection is either still in an employee's custody or already handed over
+/// to the fund, every refund has left custody or the fund, and every expense was paid from the fund.
+/// The standalone withdrawal feature is retired, so it no longer appears here.
 /// </summary>
 public class CashReconciliationService
 {
@@ -25,7 +26,7 @@ public class CashReconciliationService
         decimal TotalCollected,
         decimal TotalRefunded,
         decimal TotalTransferred,
-        decimal TotalWithdrawn,
+        decimal TotalExpenses,
         decimal TotalRefundedFromFund,
         decimal FundBalance,
         decimal CustodyBalance,
@@ -58,25 +59,27 @@ public class CashReconciliationService
             .Where(t => t.CreatedAt >= fromDate && t.CreatedAt < toExclusive)
             .SumAsync(t => (decimal?)t.Amount) ?? 0m;
 
-        var totalWithdrawn = await _db.CashboxWithdrawals
-            .Where(w => w.CreatedAt >= fromDate && w.CreatedAt < toExclusive)
-            .SumAsync(w => (decimal?)w.Amount) ?? 0m;
+        var totalExpenses = await _db.Expenses
+            .Where(e => e.Status == Models.ExpenseStatus.Approved && e.ExpenseDate >= fromDate && e.ExpenseDate < toExclusive)
+            .SumAsync(e => (decimal?)e.Amount) ?? 0m;
 
-        // Balances as of now: the fund is everything transferred, minus everything withdrawn, minus
+        // Balances as of now: the fund is everything handed over, minus approved expenses, minus
         // refunds paid straight out of the fund; custody is the signed sum of every custody entry.
         var allTransferred = await _db.CashboxTransfers.SumAsync(t => (decimal?)t.Amount) ?? 0m;
-        var allWithdrawn = await _db.CashboxWithdrawals.SumAsync(w => (decimal?)w.Amount) ?? 0m;
         var refundedFromFund = await _db.Refunds
             .Where(r => r.PaidFromFund && r.Status == Models.RefundStatus.Approved)
             .SumAsync(r => (decimal?)r.Amount) ?? 0m;
+        var allExpenses = await _db.Expenses
+            .Where(e => e.Status == Models.ExpenseStatus.Approved)
+            .SumAsync(e => (decimal?)e.Amount) ?? 0m;
         var custody = await _db.CustodyEntries.SumAsync(e => (decimal?)e.Amount) ?? 0m;
 
-        var fundBalance = allTransferred - allWithdrawn - refundedFromFund;
+        var fundBalance = allTransferred - refundedFromFund - allExpenses;
         var systemBalance = fundBalance + custody;
-        var movementBalance = totalCollected - totalRefunded - totalWithdrawn;
+        var movementBalance = totalCollected - totalRefunded - totalExpenses;
 
         return new ReconciliationResult(fromDate, toDate, totalCollected, totalRefunded,
-            totalTransferred, totalWithdrawn, refundedFromFund, fundBalance, custody,
+            totalTransferred, totalExpenses, refundedFromFund, fundBalance, custody,
             systemBalance, movementBalance);
     }
 }

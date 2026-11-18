@@ -44,7 +44,6 @@ public class ECertDbContext : DbContext, IDataProtectionKeyContext
     public DbSet<AcademicSpecialization> AcademicSpecializations => Set<AcademicSpecialization>();
     public DbSet<AcademicLevelOption> AcademicLevelOptions => Set<AcademicLevelOption>();
     public DbSet<CashboxTransfer> CashboxTransfers => Set<CashboxTransfer>();
-    public DbSet<CashboxWithdrawal> CashboxWithdrawals => Set<CashboxWithdrawal>();
     public DbSet<CustodyEntry> CustodyEntries => Set<CustodyEntry>();
     public DbSet<CustodyHandover> CustodyHandovers => Set<CustodyHandover>();
     public DbSet<Refund> Refunds => Set<Refund>();

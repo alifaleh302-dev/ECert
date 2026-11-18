@@ -15,7 +15,12 @@ namespace ECert.Services;
 public class FinanceReportService
 {
     private readonly ECertDbContext _db;
-    public FinanceReportService(ECertDbContext db) => _db = db;
+    private readonly FinancialLedgerService _ledger;
+    public FinanceReportService(ECertDbContext db, FinancialLedgerService ledger)
+    {
+        _db = db;
+        _ledger = ledger;
+    }
 
     public sealed record DashboardData(
         decimal CollectedToday,
@@ -28,9 +33,9 @@ public class FinanceReportService
         decimal NetThisMonth,
         int UnpaidInvoices);
 
-    public sealed record CashFlowRow(DateTime Day, decimal Collections, decimal Refunds, decimal Withdrawals, decimal Expenses)
+    public sealed record CashFlowRow(DateTime Day, decimal Collections, decimal Refunds, decimal Expenses)
     {
-        public decimal Net => Collections - Refunds - Withdrawals - Expenses;
+        public decimal Net => Collections - Refunds - Expenses;
     }
 
     public sealed record CustodyBalanceRow(int UserId, string FullName, string Username, decimal Balance);
@@ -77,9 +82,7 @@ public class FinanceReportService
             custodyTotal = await _db.CustodyEntries.SumAsync(e => (decimal?)e.Amount) ?? 0m;
         }
 
-        var allTransferred = await _db.CashboxTransfers.SumAsync(t => (decimal?)t.Amount) ?? 0m;
-        var allWithdrawn = await _db.CashboxWithdrawals.SumAsync(w => (decimal?)w.Amount) ?? 0m;
-        var fundBalance = allTransferred - allWithdrawn;
+        var fundBalance = await _ledger.GetMainFundBalanceAsync();
 
         return new DashboardData(collectedToday, collectedThisMonth, refundedThisMonth, expensesThisMonth,
             outstanding, custodyTotal, fundBalance,
@@ -104,12 +107,6 @@ public class FinanceReportService
             .Select(g => new { Day = g.Key, Total = g.Sum(r => r.Amount) })
             .ToListAsync();
 
-        var withdrawals = await _db.CashboxWithdrawals
-            .Where(w => w.CreatedAt >= fromDate && w.CreatedAt < toExclusive)
-            .GroupBy(w => w.CreatedAt.Date)
-            .Select(g => new { Day = g.Key, Total = g.Sum(w => w.Amount) })
-            .ToListAsync();
-
         var expenses = await _db.Expenses
             .Where(e => e.Status == ExpenseStatus.Approved && e.ExpenseDate >= fromDate && e.ExpenseDate < toExclusive)
             .GroupBy(e => e.ExpenseDate.Date)
@@ -118,18 +115,16 @@ public class FinanceReportService
 
         var days = collections.Select(c => c.Day)
             .Concat(refunds.Select(r => r.Day))
-            .Concat(withdrawals.Select(w => w.Day))
             .Concat(expenses.Select(e => e.Day))
             .Distinct().OrderBy(d => d);
 
         var cMap = collections.ToDictionary(x => x.Day, x => x.Total);
         var rMap = refunds.ToDictionary(x => x.Day, x => x.Total);
-        var wMap = withdrawals.ToDictionary(x => x.Day, x => x.Total);
         var eMap = expenses.ToDictionary(x => x.Day, x => x.Total);
 
         return days.Select(d => new CashFlowRow(d,
             cMap.GetValueOrDefault(d), rMap.GetValueOrDefault(d),
-            wMap.GetValueOrDefault(d), eMap.GetValueOrDefault(d))).ToList();
+            eMap.GetValueOrDefault(d))).ToList();
     }
 
     /// <summary>Ageing of outstanding receivables, bucketed by how far past due they are.</summary>

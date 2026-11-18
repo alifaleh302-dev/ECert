@@ -100,7 +100,7 @@ public class ReportsController : Controller
         return export.Build("course_revenue");
     }
 
-    /// <summary>Daily cash-flow report (التحصيل والاسترداد والسحب والمصروفات) over a date range.</summary>
+    /// <summary>Daily cash-flow report (التحصيل والاسترداد والمصروفات) over a date range.</summary>
     public async Task<IActionResult> CashFlow(DateTime? from, DateTime? to)
     {
         if (!User.HasPermission(AdminPermissions.ViewReports)) return Forbid();
@@ -115,7 +115,6 @@ public class ReportsController : Controller
         ViewBag.Rows = rows;
         ViewBag.Collections = rows.Sum(r => r.Collections);
         ViewBag.Refunds = rows.Sum(r => r.Refunds);
-        ViewBag.Withdrawals = rows.Sum(r => r.Withdrawals);
         ViewBag.Expenses = rows.Sum(r => r.Expenses);
         ViewBag.Net = rows.Sum(r => r.Net);
         return View();
@@ -131,11 +130,11 @@ public class ReportsController : Controller
 
         var rows = await _reports.GetCashFlowAsync(User, fromDate, toDate);
         using var export = new ExcelExport("التدفق النقدي",
-            "التاريخ", "التحصيل", "الاسترداد", "السحب", "المصروفات", "الصافي");
+            "التاريخ", "التحصيل", "الاسترداد", "المصروفات", "الصافي");
         foreach (var r in rows)
-            export.WriteRow(r.Day.ToString("yyyy-MM-dd"), r.Collections, r.Refunds, r.Withdrawals, r.Expenses, r.Net);
+            export.WriteRow(r.Day.ToString("yyyy-MM-dd"), r.Collections, r.Refunds, r.Expenses, r.Net);
         export.WriteRow("الإجمالي", rows.Sum(r => r.Collections), rows.Sum(r => r.Refunds),
-            rows.Sum(r => r.Withdrawals), rows.Sum(r => r.Expenses), rows.Sum(r => r.Net));
+            rows.Sum(r => r.Expenses), rows.Sum(r => r.Net));
         return export.Build("cash_flow");
     }
 

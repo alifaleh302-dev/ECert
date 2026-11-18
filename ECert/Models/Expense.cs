@@ -23,6 +23,14 @@ public class ExpenseCategory
     [Display(Name = "الترتيب")]
     public int SortOrder { get; set; }
 
+    /// <summary>
+    /// سقف الميزانية المسموح صرفه تحت هذا البند. <c>null</c> يعني بلا حد أقصى.
+    /// يُرفض أي مصروف يجعل مجموع المصروفات غير المرفوضة تحت البند يتجاوز هذا السقف.
+    /// </summary>
+    [Display(Name = "الحد الأقصى للميزانية")]
+    [Range(0.01, double.MaxValue, ErrorMessage = "الحد الأقصى يجب أن يكون أكبر من صفر")]
+    public decimal? MaxAmount { get; set; }
+
     [Display(Name = "تاريخ الإنشاء")]
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 }

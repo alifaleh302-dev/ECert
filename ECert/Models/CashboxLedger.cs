@@ -38,39 +38,14 @@ public class CashboxTransfer
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 }
 
-/// <summary>
-/// عملية سحب من الصندوق العام — لمدير النظام فقط.
-/// يُسجَّل في ledger مستقل؛ لا يطمس ترحيلات الدورات.
-/// </summary>
-public class CashboxWithdrawal
-{
-    [Key]
-    public int Id { get; set; }
-
-    [Display(Name = "المبلغ")]
-    [Range(0.01, double.MaxValue, ErrorMessage = "المبلغ يجب أن يكون أكبر من صفر")]
-    public decimal Amount { get; set; }
-
-    [Required]
-    [StringLength(500)]
-    [Display(Name = "السبب / البيان")]
-    public string Reason { get; set; } = string.Empty;
-
-    [Required]
-    [StringLength(150)]
-    [Display(Name = "سحبها")]
-    public string CreatedBy { get; set; } = string.Empty;
-
-    [Display(Name = "تاريخ السحب")]
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
-}
-
 public static class CashboxRoles
 {
     public const string SystemManager = "SuperAdmin";      // مدير النظام — الجهة الوحيدة التي تتعامل مع الصندوق الرئيسي
 
     // The main fund is reachable only by the SuperAdmin. Collections flow into an employee's
     // custody first, and reach the fund solely through an approved handover (توريد) from
-    // /Custody — the single, auditable path. There is deliberately no per-course "transfer"
-    // permission: that legacy path is retired.
+    // /Custody — the single, auditable path. Money leaves the fund only through an approved
+    // expense (مصروف معتمد) or a refund paid straight from the fund. There is deliberately no
+    // standalone "withdrawal" movement and no per-course "transfer" permission: both legacy
+    // paths are retired.
 }

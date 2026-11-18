@@ -53,7 +53,7 @@
                             <tr><td>الاستردادات المعتمدة</td><td class="a-amount a-amount--out">@result.TotalRefunded.ToString("N2") @Currency.Symbol</td></tr>
                             <tr><td class="text-muted small">منها استرداد من الصندوق الرئيسي</td><td class="a-amount a-amount--out small">@result.TotalRefundedFromFund.ToString("N2") @Currency.Symbol</td></tr>
                             <tr><td>التوريدات للصندوق (من العهد)</td><td class="a-amount">@result.TotalTransferred.ToString("N2") @Currency.Symbol</td></tr>
-                            <tr><td>المسحوب من الصندوق</td><td class="a-amount a-amount--out">@result.TotalWithdrawn.ToString("N2") @Currency.Symbol</td></tr>
+                            <tr><td>المصروفات المعتمدة (من الصندوق)</td><td class="a-amount a-amount--out">@result.TotalExpenses.ToString("N2") @Currency.Symbol</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -66,7 +66,7 @@
                 <div class="a-card__body">
                     <table class="table a-table align-middle">
                         <tbody>
-                            <tr><td>رصيد الصندوق (التوريد − السحب − استرداد من الصندوق)</td><td class="a-amount fw-bold">@result.FundBalance.ToString("N2") @Currency.Symbol</td></tr>
+                            <tr><td>رصيد الصندوق (التوريد − المصروفات − استرداد من الصندوق)</td><td class="a-amount fw-bold">@result.FundBalance.ToString("N2") @Currency.Symbol</td></tr>
                             <tr><td>إجمالي العهد لدى الموظفين</td><td class="a-amount fw-bold">@result.CustodyBalance.ToString("N2") @Currency.Symbol</td></tr>
                             <tr class="border-top"><td class="fw-bold">رصيد النظام</td><td class="a-amount fw-bold">@result.SystemBalance.ToString("N2") @Currency.Symbol</td></tr>
                             <tr><td class="fw-bold">رصيد الحركات</td><td class="a-amount fw-bold">@result.MovementBalance.ToString("N2") @Currency.Symbol</td></tr>

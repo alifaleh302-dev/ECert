@@ -36,7 +36,7 @@
         <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المتأخرات", Value = outstanding.ToString("N2"), Icon = "bi-exclamation-diamond", Tone = "warning", Hint = $"{d.UnpaidInvoices} فاتورة" })" />
         <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "استردادات هذا الشهر", Value = d.RefundedThisMonth.ToString("N2"), Icon = "bi-arrow-counterclockwise", Tone = "neutral", Hint = Currency.Symbol })" />
         <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي العهد", Value = d.CustodyTotal.ToString("N2"), Icon = "bi-wallet2", Tone = "neutral", Hint = "لدى الموظفين" })" />
-        <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "رصيد الصندوق", Value = d.FundBalance.ToString("N2"), Icon = "bi-safe", Tone = "brand", Hint = "المرحَّل − المسحوب" })" />
+        <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "رصيد الصندوق", Value = d.FundBalance.ToString("N2"), Icon = "bi-safe", Tone = "brand", Hint = "التوريد − المصروفات − استرداد الصندوق" })" />
     </section>
 }
 
@@ -53,7 +53,7 @@
                     <div class="a-table-wrap">
                         <table class="table a-table align-middle">
                             <thead>
-                                <tr><th>التاريخ</th><th>التحصيل</th><th>الاسترداد</th><th>السحب</th><th>المصروفات</th><th>الصافي</th></tr>
+                                <tr><th>التاريخ</th><th>التحصيل</th><th>الاسترداد</th><th>المصروفات</th><th>الصافي</th></tr>
                             </thead>
                             <tbody>
                                 @foreach (var r in cashFlow)
@@ -62,7 +62,6 @@
                                         <td class="small">@r.Day.ToString("yyyy-MM-dd")</td>
                                         <td class="a-amount a-amount--in">@r.Collections.ToString("N2")</td>
                                         <td class="a-amount a-amount--out">@r.Refunds.ToString("N2")</td>
-                                        <td class="a-amount a-amount--out">@r.Withdrawals.ToString("N2")</td>
                                         <td class="a-amount a-amount--out">@r.Expenses.ToString("N2")</td>
                                         <td class="a-amount fw-bold @(r.Net >= 0 ? "a-amount--in" : "a-amount--out")">@r.Net.ToString("N2")</td>
                                     </tr>

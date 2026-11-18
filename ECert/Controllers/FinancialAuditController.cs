@@ -10,7 +10,7 @@ namespace ECert.Controllers;
 
 /// <summary>
 /// Read-only view of the append-only financial audit trail: every collection, refund, cancellation,
-/// exemption, handover, transfer and withdrawal, with the acting user, amount and reference. No
+/// exemption, handover, transfer and approved expense, with the acting user, amount and reference. No
 /// action here mutates data — the log is only ever appended to elsewhere.
 /// </summary>
 [Authorize]
@@ -81,7 +81,7 @@ public class FinancialAuditController : Controller
         FinancialActionTypes.Exemption => "إعفاء",
         FinancialActionTypes.Handover => "توريد عهدة",
         FinancialActionTypes.Transfer => "ترحيل رصيد",
-        FinancialActionTypes.Withdraw => "سحب",
+        FinancialActionTypes.Expense => "مصروف",
         _ => actionType
     };
 }

@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ECert.Services;
 
-/// <summary>ينشئ جدولَي الصندوق عبر سكربت CREATE IF NOT EXISTS متوافق مع MySQL.
+/// <summary>ينشئ جدول الصندوق (التوريدات) عبر سكربت CREATE IF NOT EXISTS متوافق مع MySQL.
 /// لا يتم الاعتماد على EF EnsureCreated كلياً لأن EF قد لا يلتقط الجداول الجديدة فوراً.</summary>
 public class CashboxSchemaMigrationService
 {
@@ -27,14 +27,9 @@ CREATE TABLE IF NOT EXISTS `CashboxTransfers` (
         ON DELETE SET NULL
 ) CHARACTER SET utf8mb4;");
 
-        await _db.Database.ExecuteSqlRawAsync(@"
-CREATE TABLE IF NOT EXISTS `CashboxWithdrawals` (
-    `Id` INT NOT NULL AUTO_INCREMENT,
-    `Amount` DECIMAL(18,2) NOT NULL,
-    `Reason` VARCHAR(500) NOT NULL,
-    `CreatedBy` VARCHAR(150) NOT NULL,
-    `CreatedAt` DATETIME(6) NOT NULL,
-    PRIMARY KEY (`Id`)
-) CHARACTER SET utf8mb4;");
+        // The standalone "withdrawal from the fund" feature is retired: money now leaves the fund
+        // only through an approved expense or a refund paid from the fund. Drop the legacy table so
+        // no withdrawal-related state lingers. Idempotent, so it is safe on every startup.
+        await _db.Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS `CashboxWithdrawals`;");
     }
 }
