@@ -51,6 +51,7 @@ public class ECertDbContext : DbContext, IDataProtectionKeyContext
     public DbSet<AccountingPeriodLock> AccountingPeriodLocks => Set<AccountingPeriodLock>();
     public DbSet<ExpenseCategory> ExpenseCategories => Set<ExpenseCategory>();
     public DbSet<Expense> Expenses => Set<Expense>();
+    public DbSet<ExpenseAttachment> ExpenseAttachments => Set<ExpenseAttachment>();
     public DbSet<InstallmentPlan> InstallmentPlans => Set<InstallmentPlan>();
     public DbSet<Installment> Installments => Set<Installment>();
     public DbSet<SecuritySettings> SecuritySettings => Set<SecuritySettings>();
@@ -283,6 +284,15 @@ public class ECertDbContext : DbContext, IDataProtectionKeyContext
 
         modelBuilder.Entity<FinancialAuditEntry>()
             .HasIndex(e => e.ActionType);
+
+        modelBuilder.Entity<Expense>()
+            .HasMany(e => e.Attachments)
+            .WithOne(a => a.Expense)
+            .HasForeignKey(a => a.ExpenseId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Expense>()
+            .HasIndex(e => e.SubmittedByUserId);
 
     }
 }

@@ -77,6 +77,8 @@ public class AdminPermissionsCatalogTests
     [InlineData(AdminPermissions.ApproveRefunds, "Refunds")]
     [InlineData(AdminPermissions.ApproveExpenses, "Expenses")]
     [InlineData(AdminPermissions.ViewExpenses, "Expenses")]
+    [InlineData(AdminPermissions.ManageExpenseCategories, "ExpenseCategories")]
+    [InlineData(AdminPermissions.ViewExpenseCategories, "ExpenseCategories")]
     [InlineData(AdminPermissions.ViewRegistrations, "Registrations")]
     [InlineData(AdminPermissions.ViewPayments, "Payments")]
     [InlineData(AdminPermissions.ViewInstallments, "Installments")]
@@ -95,7 +97,7 @@ public class AdminPermissionsCatalogTests
             AdminPermissions.ViewInstructors, AdminPermissions.ViewCategories,
             AdminPermissions.ViewCertificates, AdminPermissions.ViewPayments,
             AdminPermissions.ViewExpenses, AdminPermissions.ViewInstallments,
-            AdminPermissions.ViewCashbox
+            AdminPermissions.ViewCashbox, AdminPermissions.ViewExpenseCategories
         };
         Assert.All(readOnly, name => Assert.DoesNotContain(name, AdminPermissions.SuperAdminOnly));
     }

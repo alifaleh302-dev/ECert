@@ -146,7 +146,7 @@ public class ExpenseFundTests
         await _fixture.Factory.CreateExpenseCategoryAsync("بند عرض", maxAmount: 1000m);
 
         var admin = await SignInAdminAsync();
-        var html = await admin.GetStringAsync("/Expenses/Categories");
+        var html = await admin.GetStringAsync("/ExpenseCategories");
 
         Assert.Contains("السقف", html);
         Assert.Contains("المستهلك", html);
@@ -161,7 +161,7 @@ public class ExpenseFundTests
         await _fixture.Factory.CreateExpenseAsync(categoryId, 10m, ExpenseStatus.PendingApproval);
 
         var admin = await SignInAdminAsync();
-        var response = await admin.PostFormAsync("/Expenses/Categories", "/Expenses/DeleteCategory", new[]
+        var response = await admin.PostFormAsync("/ExpenseCategories", "/ExpenseCategories/Delete", new[]
         {
             new KeyValuePair<string, string>("expenseCategoryId", categoryId.ToString())
         });
@@ -178,7 +178,7 @@ public class ExpenseFundTests
         var categoryId = await _fixture.Factory.CreateExpenseCategoryAsync("بند حر");
 
         var admin = await SignInAdminAsync();
-        var response = await admin.PostFormAsync("/Expenses/Categories", "/Expenses/DeleteCategory", new[]
+        var response = await admin.PostFormAsync("/ExpenseCategories", "/ExpenseCategories/Delete", new[]
         {
             new KeyValuePair<string, string>("expenseCategoryId", categoryId.ToString())
         });
@@ -250,4 +250,164 @@ public class ExpenseFundTests
         // The approval is refused, so the expense stays pending and the cap holds.
         Assert.Equal(ExpenseStatus.PendingApproval, await _fixture.Factory.ExpenseStatusAsync(second));
     }
+
+    // ===== The submitter may withdraw their own pending request =====
+
+    [Fact]
+    public async Task The_submitter_can_cancel_their_own_pending_expense()
+    {
+        var categoryId = await _fixture.Factory.CreateExpenseCategoryAsync("بند إلغاء");
+        var adminUserId = await _fixture.Factory.AdminUserIdAsync();
+        var expenseId = await _fixture.Factory.CreateExpenseAsync(categoryId, 120m,
+            ExpenseStatus.PendingApproval, submittedByUserId: adminUserId);
+
+        var admin = await SignInAdminAsync();
+        var response = await admin.PostFormAsync("/Expenses", "/Expenses/Cancel", new[]
+        {
+            new KeyValuePair<string, string>("id", expenseId.ToString())
+        });
+        response.EnsureSuccessStatusCode();
+
+        Assert.Equal(ExpenseStatus.Cancelled, await _fixture.Factory.ExpenseStatusAsync(expenseId));
+    }
+
+    [Fact]
+    public async Task A_cancelled_expense_releases_its_category_budget()
+    {
+        var categoryId = await _fixture.Factory.CreateExpenseCategoryAsync("بند إلغاء", maxAmount: 500m);
+        var adminUserId = await _fixture.Factory.AdminUserIdAsync();
+        var expenseId = await _fixture.Factory.CreateExpenseAsync(categoryId, 400m,
+            ExpenseStatus.PendingApproval, submittedByUserId: adminUserId);
+
+        var admin = await SignInAdminAsync();
+        await admin.PostFormAsync("/Expenses", "/Expenses/Cancel", new[]
+        {
+            new KeyValuePair<string, string>("id", expenseId.ToString())
+        });
+
+        // With the pending expense cancelled, a fresh submission of 500 fits under the cap again.
+        var again = await admin.PostFormAsync("/Expenses/Create", "/Expenses/Create", new[]
+        {
+            new KeyValuePair<string, string>("expenseCategoryId", categoryId.ToString()),
+            new KeyValuePair<string, string>("description", "بعد الإلغاء"),
+            new KeyValuePair<string, string>("amount", "500")
+        });
+        again.EnsureSuccessStatusCode();
+
+        var count = await _fixture.Factory.WithDbAsync(db =>
+            db.Expenses.CountAsync(e => e.ExpenseCategoryId == categoryId
+                && e.Status == ExpenseStatus.PendingApproval));
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task An_approver_cannot_cancel_someone_elses_expense_through_the_cancel_action()
+    {
+        // The cancel action is submitter-only: an expense owned by a different user id is refused
+        // even for a SuperAdmin (who approves, not withdraws).
+        var categoryId = await _fixture.Factory.CreateExpenseCategoryAsync("بند مملوك");
+        var expenseId = await _fixture.Factory.CreateExpenseAsync(categoryId, 60m,
+            ExpenseStatus.PendingApproval, submittedByUserId: 999_999);
+
+        var admin = await SignInAdminAsync();
+        await admin.PostFormAsync("/Expenses", "/Expenses/Cancel", new[]
+        {
+            new KeyValuePair<string, string>("id", expenseId.ToString())
+        });
+
+        Assert.Equal(ExpenseStatus.PendingApproval, await _fixture.Factory.ExpenseStatusAsync(expenseId));
+    }
+
+    [Fact]
+    public async Task An_approved_expense_cannot_be_cancelled()
+    {
+        var categoryId = await _fixture.Factory.CreateExpenseCategoryAsync("بند معتمد");
+        var adminUserId = await _fixture.Factory.AdminUserIdAsync();
+        var expenseId = await _fixture.Factory.CreateExpenseAsync(categoryId, 80m,
+            ExpenseStatus.Approved, submittedByUserId: adminUserId);
+
+        var admin = await SignInAdminAsync();
+        await admin.PostFormAsync("/Expenses", "/Expenses/Cancel", new[]
+        {
+            new KeyValuePair<string, string>("id", expenseId.ToString())
+        });
+
+        Assert.Equal(ExpenseStatus.Approved, await _fixture.Factory.ExpenseStatusAsync(expenseId));
+    }
+
+    // ===== Multiple attachments (up to five) =====
+
+    [Fact]
+    public async Task A_submission_can_carry_up_to_five_images()
+    {
+        var categoryId = await _fixture.Factory.CreateExpenseCategoryAsync("بند مرفقات");
+
+        var admin = await SignInAdminAsync();
+        var png = PngBytes();
+        var files = Enumerable.Range(1, 5)
+            .Select(i => ($"attachments", $"img{i}.png", png, "image/png"))
+            .ToList();
+
+        var response = await admin.PostMultipartAsync("/Expenses/Create", "/Expenses/Create", new[]
+        {
+            new KeyValuePair<string, string>("expenseCategoryId", categoryId.ToString()),
+            new KeyValuePair<string, string>("description", "خمس صور"),
+            new KeyValuePair<string, string>("amount", "100")
+        }, files);
+        response.EnsureSuccessStatusCode();
+
+        var expenseId = await _fixture.Factory.WithDbAsync(db =>
+            db.Expenses.Where(e => e.ExpenseCategoryId == categoryId).Select(e => e.ExpenseId).SingleAsync());
+        var urls = await _fixture.Factory.ExpenseAttachmentUrlsAsync(expenseId);
+        Assert.Equal(5, urls.Count);
+        Assert.All(urls, url => Assert.StartsWith("/uploads/expenses/", url));
+    }
+
+    [Fact]
+    public async Task A_sixth_image_is_rejected_and_nothing_is_recorded()
+    {
+        var categoryId = await _fixture.Factory.CreateExpenseCategoryAsync("بند تجاوز");
+        var png = PngBytes();
+        var files = Enumerable.Range(1, 6)
+            .Select(i => ($"attachments", $"img{i}.png", png, "image/png"))
+            .ToList();
+
+        var admin = await SignInAdminAsync();
+        var response = await admin.PostMultipartAsync("/Expenses/Create", "/Expenses/Create", new[]
+        {
+            new KeyValuePair<string, string>("expenseCategoryId", categoryId.ToString()),
+            new KeyValuePair<string, string>("description", "ست صور"),
+            new KeyValuePair<string, string>("amount", "100")
+        }, files);
+        response.EnsureSuccessStatusCode();
+
+        var count = await _fixture.Factory.WithDbAsync(db =>
+            db.Expenses.CountAsync(e => e.ExpenseCategoryId == categoryId));
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public async Task A_non_image_attachment_is_rejected()
+    {
+        var categoryId = await _fixture.Factory.CreateExpenseCategoryAsync("بند ملف خاطئ");
+        // An HTML payload with an image extension must be refused by the magic-byte check.
+        var html = System.Text.Encoding.UTF8.GetBytes("<html><script>alert(1)</script></html>");
+
+        var admin = await SignInAdminAsync();
+        var response = await admin.PostMultipartAsync("/Expenses/Create", "/Expenses/Create", new[]
+        {
+            new KeyValuePair<string, string>("expenseCategoryId", categoryId.ToString()),
+            new KeyValuePair<string, string>("description", "ملف خاطئ"),
+            new KeyValuePair<string, string>("amount", "100")
+        }, new[] { ($"attachments", "evil.png", html, "image/png") });
+        response.EnsureSuccessStatusCode();
+
+        var count = await _fixture.Factory.WithDbAsync(db =>
+            db.Expenses.CountAsync(e => e.ExpenseCategoryId == categoryId));
+        Assert.Equal(0, count);
+    }
+
+    /// <summary>A minimal valid 1x1 PNG, so the upload passes the magic-byte check.</summary>
+    private static byte[] PngBytes() => Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC");
 }

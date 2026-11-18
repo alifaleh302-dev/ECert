@@ -63,6 +63,8 @@ public static class Sections
     public const string ManageExpenses = AdminPermissions.ManageExpenses;
     public const string ApproveExpenses = AdminPermissions.ApproveExpenses;
     public const string ViewExpenses = AdminPermissions.ViewExpenses;
+    public const string ManageExpenseCategories = AdminPermissions.ManageExpenseCategories;
+    public const string ViewExpenseCategories = AdminPermissions.ViewExpenseCategories;
     public const string ManageInstallments = AdminPermissions.ManageInstallments;
     public const string ViewInstallments = AdminPermissions.ViewInstallments;
     public const string ViewFinanceDashboard = AdminPermissions.ViewFinanceDashboard;
@@ -97,6 +99,7 @@ public static class Sections
         new("Receivables", "/Receivables", new[] { ViewReceivables }),
         new("FinancialAudit", "/FinancialAudit", new[] { ViewFinancialAudit }),
         new("Expenses", "/Expenses", new[] { ManageExpenses, ViewExpenses, ApproveExpenses }),
+        new("ExpenseCategories", "/ExpenseCategories", new[] { ManageExpenseCategories, ViewExpenseCategories }),
         new("Installments", "/Installments", new[] { ManageInstallments, ViewInstallments }),
         new("Finance", "/Finance", new[] { ViewFinanceDashboard }),
         new("FinanceSettings", "/FinanceSettings", new[] { ManageFinanceSettings }),

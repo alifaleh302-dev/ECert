@@ -1,0 +1,28 @@
+@*
+    Camera capture for expense attachments. Opens the device camera (getUserMedia) in a modal,
+    takes a still from the live preview and appends it to the attachments file input as a JPEG.
+    On devices without getUserMedia it falls back to a file input carrying capture="environment",
+    which hands off to the native camera app.
+*@
+<div class="camera-modal" data-camera-modal hidden>
+    <div class="camera-modal__backdrop" data-camera-close></div>
+    <div class="camera-modal__panel" role="dialog" aria-modal="true" aria-label="التقاط صورة بالكاميرا">
+        <div class="camera-modal__head">
+            <span><i class="bi bi-camera" aria-hidden="true"></i> التقاط صورة</span>
+            <button type="button" class="camera-modal__close" data-camera-close aria-label="إغلاق">
+                <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+        </div>
+        <div class="camera-modal__stage">
+            <video data-camera-video playsinline autoplay muted></video>
+            <p class="camera-modal__error" data-camera-error hidden></p>
+        </div>
+        <div class="camera-modal__foot">
+            <button type="button" class="btn btn-outline-secondary" data-camera-close>إلغاء</button>
+            <button type="button" class="btn btn-primary" data-camera-shoot><i class="bi bi-camera-fill"></i> التقاط</button>
+        </div>
+    </div>
+</div>
+
+@* Fallback for browsers/devices where the live preview is unavailable. *@
+<input type="file" accept="image/*" capture="environment" class="d-none" data-camera-fallback />

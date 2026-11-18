@@ -66,7 +66,10 @@ public class Expense
     [Display(Name = "رقم المستند")]
     public string? DocumentNumber { get; set; }
 
-    /// <summary>Optional uploaded invoice/receipt image, stored under wwwroot/uploads/expenses.</summary>
+    /// <summary>
+    /// Legacy single attachment. New submissions store their images in <see cref="Attachments"/>;
+    /// this column is kept so expenses recorded before multi-image support still render.
+    /// </summary>
     [StringLength(400)]
     [Display(Name = "المرفق")]
     public string? AttachmentUrl { get; set; }
@@ -81,8 +84,19 @@ public class Expense
     [Display(Name = "قدّمه")]
     public string SubmittedBy { get; set; } = string.Empty;
 
+    /// <summary>
+    /// The id of the user who submitted the expense. It lets the submitter withdraw their own
+    /// request while it is still pending, without relying on the display name (which is not unique).
+    /// Null for expenses recorded before this column existed.
+    /// </summary>
+    [Display(Name = "معرّف مقدّم الطلب")]
+    public int? SubmittedByUserId { get; set; }
+
     [Display(Name = "تاريخ التقديم")]
     public DateTime SubmittedAt { get; set; } = DateTime.Now;
+
+    /// <summary>Images attached to the expense (invoices/receipts), at most five.</summary>
+    public ICollection<ExpenseAttachment> Attachments { get; set; } = new List<ExpenseAttachment>();
 
     [StringLength(150)]
     [Display(Name = "اعتمده / رفضه")]
@@ -101,4 +115,30 @@ public static class ExpenseStatus
     public const string PendingApproval = "PendingApproval"; // بانتظار الاعتماد
     public const string Approved = "Approved";               // معتمد — يُحتسب في التقارير
     public const string Rejected = "Rejected";               // مرفوض
+    public const string Cancelled = "Cancelled";             // ملغى من مقدّمه قبل الاعتماد
+}
+
+/// <summary>
+/// One image attached to an expense (an invoice/receipt scan or a photo taken with the camera).
+/// Stored under wwwroot/uploads/expenses. An expense carries at most
+/// <see cref="ExpenseAttachment.MaxPerExpense"/> of them.
+/// </summary>
+public class ExpenseAttachment
+{
+    public const int MaxPerExpense = 5;
+
+    [Key]
+    public int ExpenseAttachmentId { get; set; }
+
+    [Display(Name = "المصروف")]
+    public int ExpenseId { get; set; }
+    public Expense? Expense { get; set; }
+
+    [Required]
+    [StringLength(400)]
+    [Display(Name = "رابط الصورة")]
+    public string Url { get; set; } = string.Empty;
+
+    [Display(Name = "الترتيب")]
+    public int SortOrder { get; set; }
 }

@@ -127,6 +127,7 @@
 | | المتأخرات | Receivables | view-receivables |
 | | استرداد الرسوم | Refunds | manage-refunds |
 | | المصروفات | Expenses | manage-expenses |
+| | بنود المصروفات | ExpenseCategories | manage-expense-categories أو view-expense-categories |
 | | الصندوق | Cashbox | view-cashbox أو manage-cashbox |
 | | تقارير الإيرادات | Reports | view-reports |
 | | سجل التدقيق المالي | FinancialAudit | view-financial-audit |
@@ -148,7 +149,7 @@
 | `/CertificatesImport/Import` | استيراد شهادات قديمة | issue-certificates |
 | `/CoursesManage/Import` | استيراد دورات من Excel | manage-courses |
 | `/Registrations/Import` | استيراد متدربين من Excel | manage-registrations |
-| `/Expenses/Categories` | بنود المصروفات | manage-expenses |
+| `/ExpenseCategories` | بنود المصروفات | manage-expense-categories أو view-expense-categories |
 | `/Installments/Late` | الأقساط المتأخرة | manage-installments |
 | `/Reports/CashFlow` | التدفق النقدي | view-reports |
 | `/Reports/IncomeStatement` | قائمة الدخل | view-reports |
@@ -1144,12 +1145,19 @@ PDF**، **إغلاق**.
 **البند** (select)، **الحالة** (select)، **من/إلى** (date). الأزرار: **تصفية**، **مسح**.
 
 #### الأعمدة
-التاريخ، البند، البيان، المبلغ، المستند، قدّمه، الحالة.
+التاريخ، البند، البيان، المبلغ، المرفقات (روابط الصور مع العدد)، قدّمه، الحالة.
 
 #### الأزرار
-- **بنود المصروفات** → `/Expenses/Categories`.
+- **بنود المصروفات** → `/ExpenseCategories` (تظهر فقط لمن يملك صلاحية بنود المصروفات).
 - **تصدير XLSX**، **مصروف جديد** → `/Expenses/Create`.
 - لكل صف (صلاحية `approve-expenses`): **اعتماد** / **رفض**، مع قفل صف المصروف لمنع الاعتماد المزدوج.
+- **إلغاء الطلب:** يظهر لمقدّم الطلب نفسه على مصروفه بحالة **بانتظار الاعتماد** فقط. يُلغي الطلب
+  (الحالة تصبح «ملغى») دون الحاجة إلى اعتماد المدير، ويُحرّر ميزانية البند فوراً. لا يمكن إلغاء مصروف
+  سبق اعتماده أو رفضه.
+
+#### الحالات
+**بانتظار الاعتماد**، **معتمد**، **مرفوض**، **ملغى**. المعتمد فقط يُحتسب في رصيد الصندوق والتقارير؛
+المرفوض والملغى لا يُحتسبان (الملغى سحبه مقدّم الطلب قبل الاعتماد).
 
 > **المصروفات — `/Expenses`**
 >
@@ -1169,22 +1177,29 @@ PDF**، **إغلاق**.
 | **البيان** | text | نعم |
 | **تاريخ المصروف** | date | لا |
 | **رقم المستند** | text | لا |
-| **المرفق (صورة الفاتورة)** | file | لا (يُتحقق منها) |
+| **المرفقات (صور الفاتورة)** | file متعدد | لا (حتى 5 صور، يُتحقق منها) |
+| زر **التقاط صورة بالكاميرا** | — | — |
 | زر **حفظ المصروف** | — | — |
+
+يمكن إرفاق **حتى 5 صور** في الطلب الواحد (JPG/PNG/GIF/WEBP، بحد 5 ميغابايت للصورة)، مع **معاينة
+مصغّرة** لكل صورة وإمكانية حذفها قبل الحفظ. زر **التقاط صورة بالكاميرا** يفتح كاميرا الجهاز مباشرة
+(مع بديل رفع الملف على الأجهزة التي لا تدعم الكاميرا الحيّة). يُتحقق من كل صورة على الخادم (النوع والحجم
+والتوقيع الثنائي) وتُرفض الصورة غير الصالحة دون تسجيل المصروف.
 
 يُرفض الحفظ إذا تجاوز المبلغ **السقف المتبقي** لبند المصروف (انظر 5.20)، ويُظهر النموذج رصيد الصندوق
 المتاح والمتبقي من سقف البند.
 
-### 5.20 بنود المصروفات — `/Expenses/Categories`
+### 5.20 بنود المصروفات — `/ExpenseCategories`
 
-**الصلاحيات:** `manage-expenses`.
+**الصلاحيات:** `manage-expense-categories` (تعديل) / `view-expense-categories` (قراءة فقط). فصل هذه
+الصلاحية يسمح بمنح محاسبٍ إدارة شجرة البنود دون منحه حق تسجيل أو اعتماد المصروفات.
 
 جدول: البند، الترتيب، الحالة، **السقف**، **المستهلك**، **المتبقي**، وزر حذف. نموذج **إضافة بند**:
 **اسم البند** (مطلوب)، **الترتيب** (number)، **نشط** (checkbox)، **الحد الأقصى للميزانية** (اختياري؛
 اتركه فارغاً لبلا حد)، زر **حفظ البند**.
 
-**السقف:** يُرفض أي مصروف يجعل مجموع المصروفات **غير المرفوضة** تحت البند يتجاوز الحد — عند الإضافة
-وعند الاعتماد معاً. البند المرتبط بمصروفات لا يُحذف.
+**السقف:** يُرفض أي مصروف يجعل مجموع المصروفات **غير المرفوضة وغير الملغاة** تحت البند يتجاوز الحد —
+عند الإضافة وعند الاعتماد معاً. البند المرتبط بمصروفات لا يُحذف.
 
 ### 5.21 الصندوق الرئيسي — `/Cashbox/Index`
 
@@ -2009,7 +2024,8 @@ Icon)**، **الرابط**). أزرار **حفظ الروابط**، **إضافة
 >
 > ![المصروفات](https://raw.githubusercontent.com/alifaleh302-dev/ECert/main/docs/screenshots/47-expenses.png)
 
-**الخطوة 6.** اضغط **اعتماد** (بحقل ملاحظة اختياري).
+**الخطوة 6.** اضغط **اعتماد** (بحقل ملاحظة اختياري). أما **مقدّم الطلب** فيمكنه **إلغاء الطلب** بنفسه
+وهو بحالة «بانتظار الاعتماد» من زر **إلغاء الطلب** في الصف (يُحرّر ميزانية البند فوراً).
 > **رسالة نجاح العملية — `/Custody`**
 >
 > ![رسالة نجاح العملية](https://raw.githubusercontent.com/alifaleh302-dev/ECert/main/docs/screenshots/41-custody.png)
@@ -2183,40 +2199,56 @@ UPDATE/DELETE مباشرةً على جداول التدقيق (تُرفض بخط
 
 ## الفصل 10 — الملاحق
 
-### الملحق أ — جدول الصلاحيات الكامل (28 صلاحية)
+### الملحق أ — جدول الصلاحيات الكامل (46 صلاحية)
 
 | # | اسم الصلاحية | الوصف بالعربية | المجموعة | يفتح القسم |
 |---|--------------|----------------|----------|------------|
 | 1 | manage-registrations | إدارة التسجيلات | إدارة التدريب | Registrations |
-| 2 | manage-courses | إدارة الدورات | إدارة التدريب | CoursesManage |
-| 3 | manage-instructors | إدارة المدربين | إدارة التدريب | Instructors |
-| 4 | manage-categories | إدارة الفئات | إدارة التدريب | CategoriesManage |
-| 5 | issue-certificates | إصدار الشهادات | الشهادات | Certificates |
-| 6 | manage-certificate-designs | إدارة تصميم الشهادات | الشهادات | CertificateDesigns |
-| 7 | manage-finance | إدارة المالية | الإدارة المالية | Invoices |
-| 8 | view-invoices | مشاهدة الفواتير | الإدارة المالية | Invoices |
-| 9 | manage-payments | إدارة الدفعات | الإدارة المالية | Payments |
-| 10 | view-reports | مشاهدة تقارير الإيرادات | الإدارة المالية | Reports |
-| 11 | view-custody | عهدة الموظف والتوريد للصندوق | الإدارة المالية | Custody |
-| 12 | manage-refunds | استرداد الرسوم | الإدارة المالية | Refunds |
-| 13 | view-receivables | تقارير المتأخرات وكشف الحساب | الإدارة المالية | Receivables |
-| 14 | view-financial-audit | سجل التدقيق المالي | الإدارة المالية | FinancialAudit |
-| 15 | manage-expenses | إدارة المصروفات | الإدارة المالية | Expenses |
-| 16 | manage-installments | إدارة الأقساط والخطة الدراسية | الإدارة المالية | Installments |
-| 17 | view-finance-dashboard | لوحة المؤشرات المالية | الإدارة المالية | Finance |
-| 18 | manage-finance-settings | إعدادات النظام المالية (العملة والفترات) | الإدارة المالية | FinanceSettings |
-| 19 | manage-posts | إدارة المنشورات | المحتوى | PostsManage |
-| 20 | manage-news | إدارة الأخبار | المحتوى | NewsManage |
-| 21 | manage-homepage | إدارة الصفحة الرئيسية | المحتوى | HomepageManage |
-| 22 | manage-users | إدارة المستخدمين | النظام | Users |
-| 23 | manage-roles | إدارة الأدوار والصلاحيات | النظام | Roles |
-| 24 | view-audit-log | مشاهدة سجل العمليات | النظام | AuditLog |
-| 25 | manage-academic-catalog | إدارة البيانات الجامعية | النظام | AcademicCatalog |
-| 26 | manage-phone-countries | إدارة مفاتيح الهواتف | النظام | PhoneCountries |
-| 27 | view-security-audit | مراجعة سجلات العمليات والتدقيق (قراءة فقط) | النظام | AuditLog |
-| 28 | manage-security-settings | إعدادات الأمان والنسخ الاحتياطي | النظام | SecuritySettings |
+| 2 | view-registrations | مشاهدة التسجيلات (قراءة فقط) | إدارة التدريب | Registrations |
+| 3 | manage-courses | إدارة الدورات | إدارة التدريب | CoursesManage |
+| 4 | view-courses | مشاهدة الدورات (قراءة فقط) | إدارة التدريب | CoursesManage |
+| 5 | manage-instructors | إدارة المدربين | إدارة التدريب | Instructors |
+| 6 | view-instructors | مشاهدة المدربين (قراءة فقط) | إدارة التدريب | Instructors |
+| 7 | manage-categories | إدارة الفئات | إدارة التدريب | CategoriesManage |
+| 8 | view-categories | مشاهدة الفئات (قراءة فقط) | إدارة التدريب | CategoriesManage |
+| 9 | issue-certificates | إصدار الشهادات | الشهادات | Certificates |
+| 10 | view-certificates | مشاهدة الشهادات (قراءة فقط) | الشهادات | Certificates |
+| 11 | manage-certificate-designs | إدارة تصميم الشهادات | الشهادات | CertificateDesigns |
+| 12 | manage-finance | إدارة المالية | الإدارة المالية | Invoices |
+| 13 | view-invoices | مشاهدة الفواتير | الإدارة المالية | Invoices |
+| 14 | manage-payments | إدارة الدفعات | الإدارة المالية | Payments |
+| 15 | view-payments | مشاهدة الدفعات (قراءة فقط) | الإدارة المالية | Payments |
+| 16 | view-reports | مشاهدة تقارير الإيرادات | الإدارة المالية | Reports |
+| 17 | view-custody | عهدة الموظف والتوريد للصندوق | الإدارة المالية | Custody |
+| 18 | approve-custody | اعتماد توريد العهد إلى الصندوق | الإدارة المالية | Custody |
+| 19 | view-cashbox | مشاهدة الصندوق الرئيسي (قراءة فقط) | الإدارة المالية | Cashbox |
+| 20 | manage-cashbox | إدارة الصندوق الرئيسي | الإدارة المالية | Cashbox |
+| 21 | manage-refunds | استرداد الرسوم | الإدارة المالية | Refunds |
+| 22 | approve-refunds | اعتماد الاستردادات | الإدارة المالية | Refunds |
+| 23 | view-receivables | تقارير المتأخرات وكشف الحساب | الإدارة المالية | Receivables |
+| 24 | view-financial-audit | سجل التدقيق المالي | الإدارة المالية | FinancialAudit |
+| 25 | manage-expenses | إدارة المصروفات | الإدارة المالية | Expenses |
+| 26 | approve-expenses | اعتماد المصروفات | الإدارة المالية | Expenses |
+| 27 | view-expenses | مشاهدة المصروفات (قراءة فقط) | الإدارة المالية | Expenses |
+| 28 | manage-expense-categories | إدارة بنود المصروفات | الإدارة المالية | ExpenseCategories |
+| 29 | view-expense-categories | مشاهدة بنود المصروفات (قراءة فقط) | الإدارة المالية | ExpenseCategories |
+| 30 | manage-installments | إدارة الأقساط والخطة الدراسية | الإدارة المالية | Installments |
+| 31 | view-installments | مشاهدة الأقساط (قراءة فقط) | الإدارة المالية | Installments |
+| 32 | view-finance-dashboard | لوحة المؤشرات المالية | الإدارة المالية | Finance |
+| 33 | manage-finance-settings | إعدادات النظام المالية (العملة والفترات) | الإدارة المالية | SuperAdmin فقط |
+| 34 | manage-posts | إدارة المنشورات | المحتوى | PostsManage |
+| 35 | manage-news | إدارة الأخبار | المحتوى | NewsManage |
+| 36 | manage-homepage | إدارة الصفحة الرئيسية | المحتوى | HomepageManage |
+| 37 | manage-users | إدارة المستخدمين | النظام | Users |
+| 38 | manage-roles | إدارة الأدوار والصلاحيات | النظام | SuperAdmin فقط |
+| 39 | view-audit-log | مشاهدة سجل العمليات | النظام | AuditLog |
+| 40 | manage-academic-catalog | إدارة البيانات الجامعية | النظام | AcademicCatalog |
+| 41 | manage-phone-countries | إدارة مفاتيح الهواتف | النظام | PhoneCountries |
+| 42 | view-security-audit | مراجعة سجلات العمليات والتدقيق (قراءة فقط) | النظام | AuditLog |
+| 43 | manage-security-settings | إعدادات الأمان والنسخ الاحتياطي | النظام | SuperAdmin فقط |
+| 44 | manage-certificate-export-settings | إعدادات تصدير الشهادات | النظام | SuperAdmin فقط |
 
-> **حصرية لمدير النظام:** الصلاحيات 18، 23، 28. **الصندوق (Cashbox)** لا تفتحه أي صلاحية (SuperAdmin فقط).
+> **حصرية لمدير النظام:** الصلاحيات 33، 38، 43، 44. **الصندوق (Cashbox)** يفتحه مدير النظام دائماً.
 
 ### الملحق ب — جدول المسارات الكامل
 
@@ -2240,7 +2272,8 @@ UPDATE/DELETE مباشرةً على جداول التدقيق (تُرفض بخط
 | `/Custody` | عهدة الموظف | view-custody |
 | `/Receivables` + `/Statement/{invoiceId}` + `/ExportXlsx` | المتأخرات | view-receivables |
 | `/Refunds` + `/Create/{invoiceId}` + `/Receipt/{id}` | الاستردادات | manage-refunds |
-| `/Expenses` + `/Create` + `/Categories` + `/ExportXlsx` | المصروفات | manage-expenses |
+| `/Expenses` + `/Create` + `/Cancel` + `/ExportXlsx` | المصروفات | manage-expenses |
+| `/ExpenseCategories` | بنود المصروفات | manage-expense-categories / view-expense-categories |
 | `/Cashbox` | الصندوق الرئيسي | **SuperAdmin فقط** |
 | `/Reports/CourseRevenue` + `/CourseRevenueDetail/{id}` + `/CashFlow` + `/IncomeStatement` + `/Aging` + `/Reconciliation` | التقارير | view-reports/view-receivables/view-financial-audit |
 | `/FinancialAudit` + `/ExportXlsx` | سجل التدقيق المالي | view-financial-audit |
@@ -2661,11 +2694,11 @@ UPDATE/DELETE مباشرةً على جداول التدقيق (تُرفض بخط
 
 <sub>الملف: `docs/screenshots/48-expense-create.png` — المسار: `/Expenses/Create`</sub>
 
-### 53. بنود المصروفات — `/Expenses/Categories`
+### 53. بنود المصروفات — `/ExpenseCategories`
 
 ![بنود المصروفات](https://raw.githubusercontent.com/alifaleh302-dev/ECert/main/docs/screenshots/49-expense-categories.png)
 
-<sub>الملف: `docs/screenshots/49-expense-categories.png` — المسار: `/Expenses/Categories`</sub>
+<sub>الملف: `docs/screenshots/49-expense-categories.png` — المسار: `/ExpenseCategories`</sub>
 
 ### 54. الصندوق الرئيسي (مدير النظام فقط) — `/Cashbox`
 
