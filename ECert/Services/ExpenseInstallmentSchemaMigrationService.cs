@@ -30,10 +30,9 @@ CREATE TABLE IF NOT EXISTS `ExpenseCategories` (
     PRIMARY KEY (`ExpenseCategoryId`)
 ) CHARACTER SET utf8mb4;");
 
-        // An existing deployment predates the per-category budget cap; add the column if missing.
-        // MariaDB/MySQL support ADD COLUMN IF NOT EXISTS, so this stays idempotent.
-        await _db.Database.ExecuteSqlRawAsync(
-            "ALTER TABLE `ExpenseCategories` ADD COLUMN IF NOT EXISTS `MaxAmount` DECIMAL(18,2) NULL;");
+        // An existing deployment predates the per-category budget cap. MySQL has no
+        // `ADD COLUMN IF NOT EXISTS` (MariaDB does), so guard with an INFORMATION_SCHEMA check.
+        await EnsureColumnAsync("ExpenseCategories", "MaxAmount", "DECIMAL(18,2) NULL");
 
         await _db.Database.ExecuteSqlRawAsync(@"
 CREATE TABLE IF NOT EXISTS `Expenses` (
@@ -88,5 +87,34 @@ CREATE TABLE IF NOT EXISTS `Installments` (
         FOREIGN KEY (`InstallmentPlanId`) REFERENCES `InstallmentPlans` (`InstallmentPlanId`)
         ON DELETE CASCADE
 ) CHARACTER SET utf8mb4;");
+    }
+
+    /// <summary>
+    /// Adds a column only when it is missing. Uses INFORMATION_SCHEMA rather than
+    /// <c>ADD COLUMN IF NOT EXISTS</c>, which MySQL does not support (MariaDB does).
+    /// </summary>
+    private async Task EnsureColumnAsync(string tableName, string columnName, string definitionSql)
+    {
+        var connection = _db.Database.GetDbConnection();
+        var close = connection.State != System.Data.ConnectionState.Open;
+        try
+        {
+            if (close) await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = @"
+SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @tableName AND COLUMN_NAME = @columnName;";
+            var p1 = command.CreateParameter(); p1.ParameterName = "@tableName"; p1.Value = tableName; command.Parameters.Add(p1);
+            var p2 = command.CreateParameter(); p2.ParameterName = "@columnName"; p2.Value = columnName; command.Parameters.Add(p2);
+            var exists = Convert.ToInt32(await command.ExecuteScalarAsync()) > 0;
+            if (exists) return;
+        }
+        finally
+        {
+            if (close && connection.State == System.Data.ConnectionState.Open)
+                await connection.CloseAsync();
+        }
+
+        await _db.Database.ExecuteSqlRawAsync($"ALTER TABLE `{tableName}` ADD COLUMN `{columnName}` {definitionSql};");
     }
 }
