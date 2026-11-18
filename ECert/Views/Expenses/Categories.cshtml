@@ -1,10 +1,10 @@
 @{
     ViewData["Title"] = "بنود المصروفات";
     ViewData["PageIcon"] = "bi-tags";
-    ViewData["PageDesc"] = "تصنيفات المصروفات التي يمكن اختيارها عند تسجيل مصروف جديد";
+    ViewData["PageDesc"] = "تصنيفات المصروفات مع سقف الميزانية لكل بند (اتركه فارغاً لبلا حد)";
     Layout = "_AdminLayout";
     var categories = ViewBag.Categories as List<ExpenseCategory> ?? new();
-    var usage = ViewBag.Usage as Dictionary<int, int> ?? new();
+    var spent = ViewBag.Spent as Dictionary<int, decimal> ?? new();
 }
 
 <div class="page-header">
@@ -39,6 +39,11 @@
                         </div>
                     </div>
                     <div class="a-field a-field--full">
+                        <label class="a-field__label" for="catMax">الحد الأقصى للميزانية (@Currency.Symbol)</label>
+                        <input id="catMax" type="number" name="maxAmount" min="0.01" step="0.01" class="form-control" placeholder="اتركه فارغاً لبلا حد" />
+                        <p class="a-hint">يمنع تسجيل أو اعتماد مصروف يتجاوز هذا السقف لهذا البند.</p>
+                    </div>
+                    <div class="a-field a-field--full">
                         <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ البند</button>
                     </div>
                 </form>
@@ -53,15 +58,30 @@
                 {
                     <div class="a-table-wrap">
                         <table class="table a-table align-middle">
-                            <thead><tr><th>البند</th><th>الترتيب</th><th>الحالة</th><th>عدد المصروفات</th></tr></thead>
+                            <thead><tr><th>البند</th><th>الترتيب</th><th>الحالة</th><th>السقف</th><th>المستهلك</th><th>المتبقي</th><th></th></tr></thead>
                             <tbody>
                                 @foreach (var c in categories)
                                 {
+                                    var used = spent.TryGetValue(c.ExpenseCategoryId, out var s) ? s : 0m;
+                                    var remaining = c.MaxAmount.HasValue ? c.MaxAmount.Value - used : (decimal?)null;
+                                    var over = remaining.HasValue && remaining.Value < 0;
                                     <tr>
                                         <td class="a-table__primary">@c.Name</td>
                                         <td>@c.SortOrder</td>
                                         <td><span class="a-badge @(c.IsActive ? "a-badge--success" : "a-badge--neutral")">@(c.IsActive ? "نشط" : "غير نشط")</span></td>
-                                        <td>@(usage.TryGetValue(c.ExpenseCategoryId, out var n) ? n : 0)</td>
+                                        <td class="a-amount">@(c.MaxAmount.HasValue ? c.MaxAmount.Value.ToString("N2") : "بلا حد")</td>
+                                        <td class="a-amount a-amount--out">@used.ToString("N2")</td>
+                                        <td class="a-amount @(over ? "a-amount--out" : "")">@(remaining.HasValue ? remaining.Value.ToString("N2") : "—")</td>
+                                        <td class="text-end">
+                                            <form asp-action="DeleteCategory" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="expenseCategoryId" value="@c.ExpenseCategoryId" />
+                                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                        data-confirm="حذف البند «@c.Name»؟ لا يمكن الحذف إن كان مرتبطاً بمصروفات.">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
                                     </tr>
                                 }
                             </tbody>

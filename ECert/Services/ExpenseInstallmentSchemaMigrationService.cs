@@ -25,9 +25,15 @@ CREATE TABLE IF NOT EXISTS `ExpenseCategories` (
     `Name` VARCHAR(120) NOT NULL,
     `IsActive` TINYINT(1) NOT NULL DEFAULT 1,
     `SortOrder` INT NOT NULL DEFAULT 0,
+    `MaxAmount` DECIMAL(18,2) NULL,
     `CreatedAt` DATETIME(6) NOT NULL,
     PRIMARY KEY (`ExpenseCategoryId`)
 ) CHARACTER SET utf8mb4;");
+
+        // An existing deployment predates the per-category budget cap; add the column if missing.
+        // MariaDB/MySQL support ADD COLUMN IF NOT EXISTS, so this stays idempotent.
+        await _db.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE `ExpenseCategories` ADD COLUMN IF NOT EXISTS `MaxAmount` DECIMAL(18,2) NULL;");
 
         await _db.Database.ExecuteSqlRawAsync(@"
 CREATE TABLE IF NOT EXISTS `Expenses` (

@@ -49,8 +49,7 @@ public class PerformanceIndexSchemaMigrationService
             ("Expenses", "IX_Expenses_ExpenseDate", "`ExpenseDate`"),
             ("Refunds", "IX_Refunds_RefundDate", "`RefundDate`"),
             ("CustodyEntries", "IX_CustodyEntries_UserId_CreatedAt", "`UserId`, `CreatedAt`"),
-            ("CashboxTransfers", "IX_CashboxTransfers_CreatedAt", "`CreatedAt`"),
-            ("CashboxWithdrawals", "IX_CashboxWithdrawals_CreatedAt", "`CreatedAt`")
+            ("CashboxTransfers", "IX_CashboxTransfers_CreatedAt", "`CreatedAt`")
         };
 
         foreach (var (table, name, columns) in indexes)

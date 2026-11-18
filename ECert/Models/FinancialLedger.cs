@@ -197,7 +197,7 @@ public class Refund
 
 /// <summary>
 /// Append-only record of every financial movement: collections, refunds, cancellations,
-/// exemptions, custody handovers, transfers and withdrawals. Rows are only ever inserted and read;
+/// exemptions, custody handovers, transfers and approved expenses. Rows are only ever inserted and read;
 /// no code path updates or deletes them, which is what makes the log trustworthy as an audit trail.
 /// </summary>
 public class FinancialAuditEntry
@@ -264,7 +264,6 @@ public static class FinancialActionTypes
     public const string Exemption = "Exemption";     // إعفاء / خصم
     public const string Handover = "Handover";       // ترحيل عهدة
     public const string Transfer = "Transfer";       // ترحيل رصيد دورة للصندوق
-    public const string Withdraw = "Withdraw";       // سحب من الصندوق
     public const string Expense = "Expense";         // مصروف معتمد
     public const string PeriodLock = "PeriodLock";   // إقفال فترة مالية
     public const string PeriodReopen = "PeriodReopen"; // إعادة فتح فترة مالية

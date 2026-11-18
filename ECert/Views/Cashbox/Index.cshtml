@@ -1,16 +1,17 @@
 @{
     ViewData["Title"] = "الصندوق الرئيسي";
     ViewData["PageIcon"] = "bi-safe";
-    ViewData["PageDesc"] = "الصندوق الرئيسي — التوريدات المعتمدة من العهد والسحوبات.";
+    ViewData["PageDesc"] = "الصندوق الرئيسي — التوريدات المعتمدة من العهد، والمصروفات المعتمدة، والاستردادات من الصندوق.";
     Layout = "_AdminLayout";
-    bool canWithdraw = ViewBag.CanWithdraw is bool cw && cw;
 
     var transfers = ViewBag.Transfers as List<CashboxTransfer> ?? new();
-    var withdrawals = ViewBag.Withdrawals as List<CashboxWithdrawal> ?? new();
+    var expenses = ViewBag.Expenses as List<Expense> ?? new();
+    var fundRefunds = ViewBag.FundRefunds as List<Refund> ?? new();
     decimal totalCollected = ViewBag.TotalCollected is decimal tc ? tc : 0m;
     decimal totalTransferred = ViewBag.TotalTransferred is decimal tt ? tt : 0m;
-    decimal totalWithdrawn = ViewBag.TotalWithdrawn is decimal tw ? tw : 0m;
-    decimal fundRemaining = ViewBag.FundRemaining is decimal fr ? fr : 0m;
+    decimal totalExpenses = ViewBag.TotalExpenses is decimal te ? te : 0m;
+    decimal totalFundRefunds = ViewBag.TotalFundRefunds is decimal tr ? tr : 0m;
+    decimal fundBalance = ViewBag.FundBalance is decimal fb ? fb : 0m;
     decimal custodyTotal = ViewBag.CustodyTotal is decimal ct ? ct : 0m;
     var coursesMap = new Dictionary<int, string>();
     if (ViewBag.Courses is List<Course> cList)
@@ -20,6 +21,9 @@
 <div class="page-header">
     <partial name="_PageHeader" />
     <div class="page-actions">
+        <a asp-controller="Expenses" asp-action="Index" class="btn btn-outline-primary">
+            <i class="bi bi-cart-dash"></i> المصروفات
+        </a>
         <a asp-controller="Custody" asp-action="Index" class="btn btn-outline-primary">
             <i class="bi bi-wallet2"></i> عهدة الموظف والتوريد
         </a>
@@ -31,7 +35,8 @@
     <i class="bi bi-signpost-split" aria-hidden="true"></i>
     <div>
         المسار الوحيد لدخول الأموال إلى الصندوق الرئيسي هو <strong>توريد العهدة</strong> المعتمد من صفحة
-        <a asp-controller="Custody" asp-action="Index">عهدة الموظف</a>.
+        <a asp-controller="Custody" asp-action="Index">عهدة الموظف</a>؛ ويخرج المال منه عبر
+        <a asp-controller="Expenses" asp-action="Index">المصروفات المعتمدة</a> أو استرداد مدفوع من الصندوق.
     </div>
 </div>
 
@@ -39,41 +44,10 @@
     <partial name="_KpiCard" model="@(new KpiCard { Label = "إجمالي المحصَّل من الدورات", Value = totalCollected.ToString("N0"), Icon = "bi-cash-stack", Tone = "brand", Hint = Currency.Symbol })" />
     <partial name="_KpiCard" model="@(new KpiCard { Label = "إجمالي المورَّد للصندوق", Value = totalTransferred.ToString("N0"), Icon = "bi-safe", Tone = "success", Hint = Currency.Symbol })" />
     <partial name="_KpiCard" model="@(new KpiCard { Label = "إجمالي العهد لدى الموظفين", Value = custodyTotal.ToString("N0"), Icon = "bi-wallet2", Tone = "warning", Hint = "لم تُورَّد بعد" })" />
-    <partial name="_KpiCard" model="@(new KpiCard { Label = "الصندوق المتاح", Value = fundRemaining.ToString("N0"), Icon = "bi-bank", Tone = "neutral", Hint = "المورَّد − المسحوب" })" />
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "المصروفات المعتمدة", Value = totalExpenses.ToString("N0"), Icon = "bi-cart-dash", Tone = "danger", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "الاستردادات من الصندوق", Value = totalFundRefunds.ToString("N0"), Icon = "bi-arrow-counterclockwise", Tone = "danger", Hint = Currency.Symbol })" />
+    <partial name="_KpiCard" model="@(new KpiCard { Label = "رصيد الصندوق", Value = fundBalance.ToString("N0"), Icon = "bi-bank", Tone = "brand", Hint = "المورَّد − المصروفات − استرداد الصندوق" })" />
 </section>
-
-<div class="a-card mb-4">
-    <div class="a-card__header">
-        <h2 class="a-card__title"><i class="bi bi-cash-withdraw" aria-hidden="true"></i> سحب من الصندوق</h2>
-    </div>
-    <div class="a-card__body">
-        @if (canWithdraw)
-        {
-            <form asp-action="Withdraw" method="post" class="a-form__grid">
-                @Html.AntiForgeryToken()
-                <div class="a-field">
-                    <label class="a-field__label a-label--required">المبلغ (@Currency.Symbol)</label>
-                    <input type="number" name="amount" min="0.01" step="0.01" max="@fundRemaining.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required />
-                </div>
-                <div class="a-field">
-                    <label class="a-field__label a-label--required">السبب / البيان</label>
-                    <input type="text" name="reason" maxlength="500" class="form-control" placeholder="مثلاً: مصروفات تشغيلية شهرية" required />
-                </div>
-                <div class="a-field a-field--full">
-                    <button type="submit" class="btn btn-danger"
-                            data-confirm="تأكيد سحب المبلغ من الصندوق العام؟">
-                        <i class="bi bi-dash-circle"></i> سحب
-                    </button>
-                    <p class="a-hint mt-2 mb-0">الصندوق المتاح للسحب الآن: <strong>@fundRemaining.ToString("N0")</strong> @Currency.Symbol</p>
-                </div>
-            </form>
-        }
-        else
-        {
-            <p class="text-muted mb-0"><i class="bi bi-lock" aria-hidden="true"></i> عرض فقط — السحب من الصندوق يتطلب صلاحية «إدارة الصندوق الرئيسي والسحب منه».</p>
-        }
-    </div>
-</div>
 
 <div class="a-card mb-4">
     <div class="a-card__header">
@@ -126,33 +100,34 @@
     </div>
 </div>
 
-<div class="a-card">
+<div class="a-card mb-4">
     <div class="a-card__header">
-        <h2 class="a-card__title"><i class="bi bi-cash-withdraw" aria-hidden="true"></i> عمليات السحب من الصندوق</h2>
+        <h2 class="a-card__title"><i class="bi bi-cart-dash" aria-hidden="true"></i> المصروفات المعتمدة (خارج الصندوق)</h2>
+        <a asp-controller="Expenses" asp-action="Index" class="btn btn-sm btn-outline-secondary">إدارة المصروفات</a>
     </div>
-    <div class="a-card__body @(withdrawals.Any() ? "a-card__body--flush" : "")">
-        @if (withdrawals.Any())
+    <div class="a-card__body @(expenses.Any() ? "a-card__body--flush" : "")">
+        @if (expenses.Any())
         {
             <div class="a-table-wrap">
                 <table class="table a-table table-hover align-middle">
                     <thead>
                         <tr>
-                            <th>#</th>
-                            <th>المبلغ</th>
-                            <th>السبب / البيان</th>
-                            <th>سحبها</th>
                             <th>التاريخ</th>
+                            <th>البند</th>
+                            <th>البيان</th>
+                            <th>المبلغ</th>
+                            <th>اعتمده</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var w in withdrawals)
+                        @foreach (var e in expenses)
                         {
                             <tr>
-                                <td>@w.Id</td>
-                                <td class="a-amount a-amount--out">@w.Amount.ToString("N0") @Currency.Symbol</td>
-                                <td>@w.Reason</td>
-                                <td class="small">@w.CreatedBy</td>
-                                <td class="small">@w.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td class="small">@e.ExpenseDate.ToString("yyyy-MM-dd")</td>
+                                <td class="small">@e.Category?.Name</td>
+                                <td class="a-table__primary">@e.Description</td>
+                                <td class="a-amount a-amount--out">@e.Amount.ToString("N2") @Currency.Symbol</td>
+                                <td class="small">@e.ReviewedBy</td>
                             </tr>
                         }
                     </tbody>
@@ -161,7 +136,47 @@
         }
         else
         {
-            <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-cash-withdraw", Title = "لا توجد عمليات سحب", Text = "لا توجد عمليات سحب حتى الآن." })" />
+            <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-cart-dash", Title = "لا توجد مصروفات معتمدة", Text = "لم تُعتمد أي مصروفات بعد." })" />
+        }
+    </div>
+</div>
+
+<div class="a-card">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> الاستردادات المدفوعة من الصندوق</h2>
+    </div>
+    <div class="a-card__body @(fundRefunds.Any() ? "a-card__body--flush" : "")">
+        @if (fundRefunds.Any())
+        {
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>المبلغ</th>
+                            <th>السبب</th>
+                            <th>نفّذها</th>
+                            <th>التاريخ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in fundRefunds)
+                        {
+                            <tr>
+                                <td>@r.RefundId</td>
+                                <td class="a-amount a-amount--out">@r.Amount.ToString("N0") @Currency.Symbol</td>
+                                <td>@r.Reason</td>
+                                <td class="small">@r.RefundedBy</td>
+                                <td class="small">@r.RefundDate.ToString("yyyy-MM-dd HH:mm")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <partial name="_EmptyState" model="@(new EmptyState { Icon = "bi-arrow-counterclockwise", Title = "لا توجد استردادات من الصندوق", Text = "لم يُصرف أي استرداد من الصندوق بعد." })" />
         }
     </div>
 </div>

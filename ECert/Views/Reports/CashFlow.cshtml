@@ -1,12 +1,11 @@
 @{
     ViewData["Title"] = "التدفق النقدي";
     ViewData["PageIcon"] = "bi-graph-up-arrow";
-    ViewData["PageDesc"] = "التحصيل والاسترداد والسحب والمصروفات يوماً بيوم";
+    ViewData["PageDesc"] = "التحصيل والاسترداد والمصروفات يوماً بيوم";
     Layout = "_AdminLayout";
     var rows = ViewBag.Rows as List<ECert.Services.FinanceReportService.CashFlowRow> ?? new();
     decimal collections = ViewBag.Collections is decimal c ? c : 0m;
     decimal refundsTotal = ViewBag.Refunds is decimal rt ? rt : 0m;
-    decimal withdrawals = ViewBag.Withdrawals is decimal w ? w : 0m;
     decimal expenses = ViewBag.Expenses is decimal e ? e : 0m;
     decimal net = ViewBag.Net is decimal n ? n : 0m;
 }
@@ -38,7 +37,6 @@
 <section class="a-kpis mb-4" aria-label="ملخص الفترة">
     <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي التحصيل", Value = collections.ToString("N2"), Icon = "bi-cash-stack", Tone = "success", Hint = Currency.Symbol })" />
     <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "الاستردادات", Value = refundsTotal.ToString("N2"), Icon = "bi-arrow-counterclockwise", Tone = "warning", Hint = Currency.Symbol })" />
-    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "السحوبات", Value = withdrawals.ToString("N2"), Icon = "bi-cash-withdraw", Tone = "danger", Hint = Currency.Symbol })" />
     <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "المصروفات", Value = expenses.ToString("N2"), Icon = "bi-cart-dash", Tone = "danger", Hint = Currency.Symbol })" />
     <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "الصافي", Value = net.ToString("N2"), Icon = "bi-graph-up", Tone = (net >= 0 ? "success" : "danger"), Hint = Currency.Symbol })" />
 </section>
@@ -50,7 +48,7 @@
             <div class="a-table-wrap">
                 <table class="table a-table table-hover align-middle">
                     <thead>
-                        <tr><th>التاريخ</th><th>التحصيل</th><th>الاسترداد</th><th>السحب</th><th>المصروفات</th><th>الصافي</th></tr>
+                        <tr><th>التاريخ</th><th>التحصيل</th><th>الاسترداد</th><th>المصروفات</th><th>الصافي</th></tr>
                     </thead>
                     <tbody>
                         @foreach (var r in rows)
@@ -59,7 +57,6 @@
                                 <td class="small">@r.Day.ToString("yyyy-MM-dd")</td>
                                 <td class="a-amount a-amount--in">@r.Collections.ToString("N2")</td>
                                 <td class="a-amount a-amount--out">@r.Refunds.ToString("N2")</td>
-                                <td class="a-amount a-amount--out">@r.Withdrawals.ToString("N2")</td>
                                 <td class="a-amount a-amount--out">@r.Expenses.ToString("N2")</td>
                                 <td class="a-amount fw-bold @(r.Net >= 0 ? "a-amount--in" : "a-amount--out")">@r.Net.ToString("N2")</td>
                             </tr>
@@ -70,7 +67,6 @@
                             <td>الإجمالي</td>
                             <td class="a-amount a-amount--in">@collections.ToString("N2")</td>
                             <td class="a-amount a-amount--out">@refundsTotal.ToString("N2")</td>
-                            <td class="a-amount a-amount--out">@withdrawals.ToString("N2")</td>
                             <td class="a-amount a-amount--out">@expenses.ToString("N2")</td>
                             <td class="a-amount @(net >= 0 ? "a-amount--in" : "a-amount--out")">@net.ToString("N2")</td>
                         </tr>

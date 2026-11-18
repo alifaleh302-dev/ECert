@@ -4,6 +4,8 @@
     ViewData["PageDesc"] = "تسجيل مصروف جديد؛ يبقى بانتظار اعتماد مدير النظام قبل أن يُحتسب";
     Layout = "_AdminLayout";
     var categories = ViewBag.Categories as List<ExpenseCategory> ?? new();
+    var remaining = ViewBag.CategoryRemaining as Dictionary<int, decimal?> ?? new();
+    decimal fundBalance = ViewBag.FundBalance is decimal fb ? fb : 0m;
 }
 
 <div class="page-header">
@@ -13,6 +15,14 @@
     </div>
 </div>
 
+
+<div class="a-note a-note--info mb-4">
+    <i class="bi bi-safe" aria-hidden="true"></i>
+    <div>
+        رصيد الصندوق الرئيسي المتاح حالياً: <strong>@fundBalance.ToString("N2") @Currency.Symbol</strong>.
+        يُخصم المصروف من الرصيد عند اعتماده فقط، ولا يُحتسب قبل ذلك.
+    </div>
+</div>
 
 @if (!categories.Any())
 {
@@ -32,7 +42,11 @@
                     <option value="">— اختر البند —</option>
                     @foreach (var c in categories)
                     {
-                        <option value="@c.ExpenseCategoryId">@c.Name</option>
+                        var rem = remaining.TryGetValue(c.ExpenseCategoryId, out var r) ? r : null;
+                        var label = c.Name;
+                        if (rem.HasValue)
+                            label = $"{c.Name} — المتبقي: {rem.Value:N2}";
+                        <option value="@c.ExpenseCategoryId">@label</option>
                     }
                 </select>
             </div>

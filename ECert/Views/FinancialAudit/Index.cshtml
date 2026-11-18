@@ -1,7 +1,7 @@
 @{
     ViewData["Title"] = "سجل التدقيق المالي";
     ViewData["PageIcon"] = "bi-shield-check";
-    ViewData["PageDesc"] = "سجل غير قابل للتعديل لكل الحركات المالية: القبض، الاسترداد، الإلغاء، الإعفاء، التوريد، الترحيل والسحب";
+    ViewData["PageDesc"] = "سجل غير قابل للتعديل لكل الحركات المالية: القبض، الاسترداد، الإلغاء، الإعفاء، التوريد، الترحيل والمصروفات";
     Layout = "_AdminLayout";
     var entries = ViewBag.Entries as List<FinancialAuditEntry> ?? new();
     var actionTypes = ViewBag.ActionTypes as List<string> ?? new();

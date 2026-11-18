@@ -6,6 +6,7 @@
     var expenses = ViewBag.Expenses as List<Expense> ?? new();
     var categories = ViewBag.Categories as List<ExpenseCategory> ?? new();
     decimal approvedTotal = ViewBag.ApprovedTotal is decimal a ? a : 0m;
+    decimal fundBalance = ViewBag.FundBalance is decimal fb ? fb : 0m;
     int pendingCount = ViewBag.PendingCount is int p ? p : 0;
     bool canManage = ViewBag.CanManage is bool cm && cm;
     bool canApprove = ViewBag.CanApprove is bool ca && ca;
@@ -34,6 +35,7 @@
 <section class="a-kpis mb-4" aria-label="ملخص المصروفات">
     <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "إجمالي المصروفات المعتمدة", Value = approvedTotal.ToString("N2"), Icon = "bi-cart-dash", Tone = "danger", Hint = Currency.Symbol })" />
     <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "بانتظار الاعتماد", Value = pendingCount.ToString(), Icon = "bi-hourglass-split", Tone = "warning", Hint = "مصروف" })" />
+    <partial name="_KpiCard" model="@(new ECert.ViewModels.KpiCard { Label = "رصيد الصندوق الرئيسي", Value = fundBalance.ToString("N2"), Icon = "bi-safe", Tone = "brand", Hint = "المورَّد − المصروفات − استرداد الصندوق" })" />
 </section>
 
 <form method="get" class="a-toolbar" role="search" aria-label="تصفية المصروفات">

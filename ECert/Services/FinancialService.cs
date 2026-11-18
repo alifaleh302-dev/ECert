@@ -107,9 +107,9 @@ public class FinancialService
 
         // Where the money comes from. The refund is normally paid out of the employee's own custody,
         // and is refused when that custody cannot cover it — so a custody can never go negative. A
-        // holder of manage-cashbox (who may withdraw from the main fund anyway) whose own custody
-        // cannot cover it may draw the amount from the main fund instead (the fund must cover it), so
-        // the cashier is never blocked and no custody is pushed below zero.
+        // holder of manage-cashbox whose own custody cannot cover it may draw the amount from the
+        // main fund instead (the fund must cover it), so the cashier is never blocked and no custody
+        // is pushed below zero.
         var custody = await _ledger.GetCustodyBalanceAsync(performingUserId);
         var payFromFund = false;
         if (amount > custody)

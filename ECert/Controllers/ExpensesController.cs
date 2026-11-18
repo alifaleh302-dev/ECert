@@ -24,13 +24,16 @@ public class ExpensesController : Controller
     private readonly ExpenseService _expenses;
     private readonly AuditLogService _audit;
     private readonly IWebHostEnvironment _env;
+    private readonly FinancialLedgerService _ledger;
 
-    public ExpensesController(ECertDbContext db, ExpenseService expenses, AuditLogService audit, IWebHostEnvironment env)
+    public ExpensesController(ECertDbContext db, ExpenseService expenses, AuditLogService audit,
+        IWebHostEnvironment env, FinancialLedgerService ledger)
     {
         _db = db;
         _expenses = expenses;
         _audit = audit;
         _env = env;
+        _ledger = ledger;
     }
 
     private string Actor => User.Identity?.Name ?? "System";
@@ -56,6 +59,7 @@ public class ExpensesController : Controller
         ViewBag.To = to?.ToString("yyyy-MM-dd");
         ViewBag.ApprovedTotal = expenses.Where(e => e.Status == ExpenseStatus.Approved).Sum(e => e.Amount);
         ViewBag.PendingCount = expenses.Count(e => e.Status == ExpenseStatus.PendingApproval);
+        ViewBag.FundBalance = await _ledger.GetMainFundBalanceAsync();
         ViewBag.CanManage = User.HasPermission(AdminPermissions.ManageExpenses);
         ViewBag.CanApprove = User.HasPermission(AdminPermissions.ApproveExpenses);
         return View();
@@ -65,8 +69,20 @@ public class ExpensesController : Controller
     public async Task<IActionResult> Create()
     {
         if (!User.HasPermission(AdminPermissions.ManageExpenses)) return Forbid();
-        ViewBag.Categories = await _db.ExpenseCategories.Where(c => c.IsActive).OrderBy(c => c.SortOrder).ToListAsync();
+        var categories = await _db.ExpenseCategories.Where(c => c.IsActive).OrderBy(c => c.SortOrder).ToListAsync();
+        ViewBag.Categories = categories;
+        ViewBag.FundBalance = await _ledger.GetMainFundBalanceAsync();
+        ViewBag.CategoryRemaining = await BuildCategoryRemainingAsync(categories);
         return View();
+    }
+
+    /// <summary>Remaining budget per category id; a null value means the category has no cap.</summary>
+    private async Task<Dictionary<int, decimal?>> BuildCategoryRemainingAsync(List<ExpenseCategory> categories)
+    {
+        var map = new Dictionary<int, decimal?>();
+        foreach (var c in categories)
+            map[c.ExpenseCategoryId] = await _expenses.GetCategoryRemainingAsync(c);
+        return map;
     }
 
     [HttpPost]
@@ -177,38 +193,36 @@ public class ExpensesController : Controller
     public async Task<IActionResult> Categories()
     {
         if (!User.HasPermission(AdminPermissions.ManageExpenses)) return Forbid();
-        ViewBag.Categories = await _db.ExpenseCategories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToListAsync();
-        ViewBag.Usage = await _db.Expenses.GroupBy(e => e.ExpenseCategoryId)
-            .Select(g => new { CategoryId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.CategoryId, x => x.Count);
+        var categories = await _db.ExpenseCategories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToListAsync();
+        ViewBag.Categories = categories;
+        // Spent per category counts every non-rejected expense, matching the cap rule.
+        ViewBag.Spent = await _db.Expenses.Where(e => e.Status != ExpenseStatus.Rejected)
+            .GroupBy(e => e.ExpenseCategoryId)
+            .Select(g => new { CategoryId = g.Key, Total = g.Sum(e => e.Amount) })
+            .ToDictionaryAsync(x => x.CategoryId, x => x.Total);
         return View();
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveCategory(int? expenseCategoryId, string name, int sortOrder, bool isActive = true)
+    public async Task<IActionResult> SaveCategory(int? expenseCategoryId, string name, int sortOrder,
+        bool isActive = true, decimal? maxAmount = null)
     {
         if (!User.HasPermission(AdminPermissions.ManageExpenses)) return Forbid();
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            TempData["Error"] = "اسم البند مطلوب.";
-            return RedirectToAction(nameof(Categories));
-        }
 
-        if (expenseCategoryId.HasValue)
-        {
-            var existing = await _db.ExpenseCategories.FirstOrDefaultAsync(c => c.ExpenseCategoryId == expenseCategoryId.Value);
-            if (existing == null) return NotFound();
-            existing.Name = name.Trim();
-            existing.SortOrder = sortOrder;
-            existing.IsActive = isActive;
-        }
-        else
-        {
-            _db.ExpenseCategories.Add(new ExpenseCategory { Name = name.Trim(), SortOrder = sortOrder, IsActive = isActive });
-        }
-        await _db.SaveChangesAsync();
-        TempData["Success"] = "تم حفظ بند المصروف.";
+        var result = await _expenses.SaveCategoryAsync(expenseCategoryId, name, sortOrder, isActive, maxAmount);
+        TempData[result.Success ? "Success" : "Error"] = result.Message;
+        return RedirectToAction(nameof(Categories));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteCategory(int expenseCategoryId)
+    {
+        if (!User.HasPermission(AdminPermissions.ManageExpenses)) return Forbid();
+
+        var result = await _expenses.DeleteCategoryAsync(expenseCategoryId);
+        TempData[result.Success ? "Success" : "Error"] = result.Message;
         return RedirectToAction(nameof(Categories));
     }
 

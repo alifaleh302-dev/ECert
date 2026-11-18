@@ -1,4 +1,5 @@
 using ECert.Data;
+using ECert.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -459,6 +460,77 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
     /// <summary>Counts financial audit rows of a given action type.</summary>
     public Task<int> FinancialAuditCountAsync(string actionType) =>
         WithDbAsync(db => db.FinancialAuditEntries.CountAsync(e => e.ActionType == actionType));
+
+    // ===== Expenses & main fund =====
+
+    /// <summary>Creates an expense category; returns its id.</summary>
+    public async Task<int> CreateExpenseCategoryAsync(string name, decimal? maxAmount = null)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        var category = new ECert.Models.ExpenseCategory
+        {
+            Name = name,
+            IsActive = true,
+            SortOrder = 0,
+            MaxAmount = maxAmount,
+            CreatedAt = DateTime.Now
+        };
+        db.ExpenseCategories.Add(category);
+        await db.SaveChangesAsync();
+        return category.ExpenseCategoryId;
+    }
+
+    /// <summary>Creates an expense directly in the given status; returns its id.</summary>
+    public async Task<int> CreateExpenseAsync(int categoryId, decimal amount,
+        string status = ECert.Models.ExpenseStatus.Approved, DateTime? expenseDate = null, string by = "seed")
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        var expense = new ECert.Models.Expense
+        {
+            ExpenseCategoryId = categoryId,
+            Description = "مصروف اختبار",
+            Amount = amount,
+            ExpenseDate = expenseDate ?? DateTime.Now,
+            Status = status,
+            SubmittedBy = by,
+            SubmittedAt = DateTime.Now,
+            ReviewedBy = status == ECert.Models.ExpenseStatus.PendingApproval ? null : by,
+            ReviewedAt = status == ECert.Models.ExpenseStatus.PendingApproval ? null : DateTime.Now
+        };
+        db.Expenses.Add(expense);
+        await db.SaveChangesAsync();
+        return expense.ExpenseId;
+    }
+
+    /// <summary>Adds a fund handover (توريد) directly, so the fund starts with a balance.</summary>
+    public async Task AddFundTransferAsync(decimal amount)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        db.CashboxTransfers.Add(new ECert.Models.CashboxTransfer
+        {
+            Amount = amount,
+            Note = "توريد اختبار",
+            CreatedBy = "seed",
+            CreatedAt = DateTime.Now
+        });
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>The derived main-fund balance, via the canonical service.</summary>
+    public async Task<decimal> MainFundBalanceAsync()
+    {
+        using var scope = Services.CreateScope();
+        var ledger = scope.ServiceProvider.GetRequiredService<FinancialLedgerService>();
+        return await ledger.GetMainFundBalanceAsync();
+    }
+
+    /// <summary>An expense's status, for asserting that a decision did or did not change it.</summary>
+    public Task<string> ExpenseStatusAsync(int expenseId) =>
+        WithDbAsync(async db => await db.Expenses.Where(e => e.ExpenseId == expenseId)
+            .Select(e => e.Status).SingleAsync());
 
     /// <summary>Latest custody-handover status for a user (or null when they have none).</summary>
     public Task<string?> LatestHandoverStatusAsync(int userId) =>
