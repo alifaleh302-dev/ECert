@@ -161,6 +161,15 @@ public class Refund
     public string RefundedBy { get; set; } = string.Empty;
 
     /// <summary>
+    /// The user whose custody funds this refund — the employee who created the request. A pending
+    /// refund is a claim against that custody, and approving it debits it there (not the approver's),
+    /// because the collected money sits in the requester's custody. Null for rows created before this
+    /// column existed; approval then falls back to the approver's custody.
+    /// </summary>
+    [Display(Name = "معرّف مقدّم الطلب")]
+    public int? RequestedByUserId { get; set; }
+
+    /// <summary>
     /// <see cref="RefundStatus.PendingApproval"/> while a refund above the direct ceiling waits for a
     /// SuperAdmin; <see cref="RefundStatus.Approved"/> once it counts against the invoice and custody.
     /// A pending refund affects neither until it is approved.

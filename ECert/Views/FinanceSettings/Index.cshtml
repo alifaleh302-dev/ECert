@@ -6,6 +6,9 @@
     var currencyName = ViewBag.CurrencyName as string;
     var currencySymbol = ViewBag.CurrencySymbol as string;
     var threshold = ViewBag.RefundThreshold as decimal?;
+    var refundAutoApproval = ViewBag.RefundAutoApproval is bool ra && ra;
+    var handoverAutoApproval = ViewBag.HandoverAutoApproval is bool ha && ha;
+    int maxOpenHandovers = ViewBag.MaxOpenHandovers is int mo ? mo : 1;
     var lockedThrough = ViewBag.LockedThrough as DateTime?;
     var history = ViewBag.History as List<AccountingPeriodLock> ?? new();
     int usage = ViewBag.CurrencyUsage is int u ? u : 0;
@@ -59,6 +62,65 @@
                     </div>
                     <div class="a-field a-field--full">
                         <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ الحد</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="a-card mt-4">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-robot" aria-hidden="true"></i> الأتمتة والاعتماد التلقائي</h2>
+    </div>
+    <div class="a-card__body">
+        <div class="a-note a-note--info mb-4">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            <div>هذه الخيارات تُنظّم كيف تُعتمد الحركات المالية وكم طلباً يمكن أن يبقى معلّقاً. القيم الافتراضية تُبقي المراجعة اليدوية كما هي.</div>
+        </div>
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <form asp-action="SaveRefundAutoApproval" method="post" class="a-form__grid">
+                    @Html.AntiForgeryToken()
+                    <div class="a-field a-field--full">
+                        <label class="a-field__label" for="refundAuto">الاعتماد التلقائي للاستردادات</label>
+                        <div class="form-check form-switch">
+                            <input id="refundAuto" type="checkbox" name="refundAutoApproval" value="true" class="form-check-input" @(refundAutoApproval ? "checked" : null) />
+                            <label class="form-check-label" for="refundAuto">عند التفعيل يُطبَّق كل استرداد فوراً دون انتظار اعتماد، متجاوزاً حد الاعتماد أعلاه.</label>
+                        </div>
+                        <p class="a-hint mb-0">عند الإلغاء يبقى الحد ساري المفعول: أي استرداد يتجاوزه ينتظر اعتماد مدير النظام.</p>
+                    </div>
+                    <div class="a-field a-field--full">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ</button>
+                    </div>
+                </form>
+            </div>
+            <div class="col-lg-6">
+                <form asp-action="SaveHandoverAutoApproval" method="post" class="a-form__grid">
+                    @Html.AntiForgeryToken()
+                    <div class="a-field a-field--full">
+                        <label class="a-field__label" for="handoverAuto">الاعتماد التلقائي للتوريد</label>
+                        <div class="form-check form-switch">
+                            <input id="handoverAuto" type="checkbox" name="handoverAutoApproval" value="true" class="form-check-input" @(handoverAutoApproval ? "checked" : null) />
+                            <label class="form-check-label" for="handoverAuto">عند التفعيل يُنفَّذ طلب التوريد فوراً (خصم العهدة وإضافة المبلغ للصندوق) دون انتظار موافقة.</label>
+                        </div>
+                        <p class="a-hint mb-0">عند الإلغاء يبقى كل طلب توريد بانتظار اعتماد مدير النظام.</p>
+                    </div>
+                    <div class="a-field a-field--full">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ</button>
+                    </div>
+                </form>
+            </div>
+            <div class="col-lg-6">
+                <form asp-action="SaveMaxOpenHandovers" method="post" class="a-form__grid">
+                    @Html.AntiForgeryToken()
+                    <div class="a-field a-field--full">
+                        <label class="a-field__label" for="maxOpen">الحد الأقصى لطلبات التوريد المفتوحة لكل موظف</label>
+                        <input id="maxOpen" type="number" name="maxOpenHandovers" min="1" step="1" value="@maxOpenHandovers" class="form-control" />
+                        <p class="a-hint">كم طلب توريد يمكن أن يبقى معلّقاً عند الموظف في الوقت نفسه. القيمة الافتراضية 1.</p>
+                    </div>
+                    <div class="a-field a-field--full">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ</button>
                     </div>
                 </form>
             </div>

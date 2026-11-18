@@ -120,6 +120,10 @@ CREATE TABLE IF NOT EXISTS `AccountingPeriodLocks` (
         await EnsureColumnAsync("Refunds", "ApprovedAt", "DATETIME(6) NULL");
         // Refund funding source: existing rows came out of an employee's custody, not the fund.
         await EnsureColumnAsync("Refunds", "PaidFromFund", "TINYINT(1) NOT NULL DEFAULT 0");
+        // The requester whose custody funds the refund. Null on legacy rows, so approval falls back
+        // to the approver's custody for them.
+        await EnsureColumnAsync("Refunds", "RequestedByUserId", "INT NULL");
+        await EnsureIndexAsync("Refunds", "IX_Refunds_RequestedByUserId", "`RequestedByUserId`", unique: false);
     }
 
     private async Task EnsureColumnAsync(string tableName, string columnName, string definitionSql)

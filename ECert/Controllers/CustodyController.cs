@@ -23,12 +23,17 @@ public class CustodyController : Controller
     private readonly ECertDbContext _db;
     private readonly AuditLogService _audit;
     private readonly FinancialLedgerService _ledger;
+    private readonly FinancialService _financial;
+    private readonly SystemSettingsService _settings;
 
-    public CustodyController(ECertDbContext db, AuditLogService audit, FinancialLedgerService ledger)
+    public CustodyController(ECertDbContext db, AuditLogService audit, FinancialLedgerService ledger,
+        FinancialService financial, SystemSettingsService settings)
     {
         _db = db;
         _audit = audit;
         _ledger = ledger;
+        _financial = financial;
+        _settings = settings;
     }
 
     private bool HasPermission(string perm) => User.HasPermission(perm);
@@ -160,23 +165,32 @@ public class CustodyController : Controller
             return RedirectToAction(nameof(Index));
         }
 
+        // A handover may only draw on custody not already claimed by another pending movement (a
+        // refund request or an earlier handover), so two requests can never promise the same money.
         var balance = await _ledger.GetCustodyBalanceAsync(CurrentUserId.Value);
-        if (amount > balance)
+        var reserved = await _financial.GetReservedCustodyAsync(CurrentUserId.Value);
+        var free = balance - reserved;
+        if (amount > free)
         {
-            TempData["Error"] = $"المبلغ المطلوب ({amount:N2}) أكبر من رصيد عهدتك الحالي ({balance:N2}).";
+            TempData["Error"] = $"المبلغ المطلوب ({amount:N2}) أكبر من رصيد عهدتك المتاح ({free:N2})" +
+                (reserved > 0 ? $" — منه {reserved:N2} محجوز لطلبات معلّقة." : ".");
             return RedirectToAction(nameof(Index));
         }
 
-        // Only one open request at a time, so the approver is never asked to release money twice.
-        var hasPending = await _db.CustodyHandovers.AnyAsync(h =>
+        // A configurable cap on how many handover requests an employee may keep open at once, so the
+        // approver is never asked to release the same custody several times over.
+        var maxOpen = await _settings.GetMaxOpenHandoversPerEmployeeAsync();
+        var openCount = await _db.CustodyHandovers.CountAsync(h =>
             h.UserId == CurrentUserId.Value && h.Status == CustodyHandoverStatus.Pending);
-        if (hasPending)
+        if (openCount >= maxOpen)
         {
-            TempData["Error"] = "لديك طلب توريد قيد المراجعة بالفعل. انتظر اعتماده أو رفضه.";
+            TempData["Error"] = maxOpen <= 1
+                ? "لديك طلب توريد قيد المراجعة بالفعل. انتظر اعتماده أو رفضه."
+                : $"لديك {openCount} طلبات توريد قيد المراجعة، والحد الأقصى {maxOpen}. انتظر اعتمادها أو رفضها.";
             return RedirectToAction(nameof(Index));
         }
 
-        _db.CustodyHandovers.Add(new CustodyHandover
+        var handover = new CustodyHandover
         {
             UserId = CurrentUserId.Value,
             Amount = amount,
@@ -184,11 +198,21 @@ public class CustodyController : Controller
             Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim(),
             RequestedBy = Actor,
             RequestedAt = DateTime.Now
-        });
+        };
+        _db.CustodyHandovers.Add(handover);
         await _db.SaveChangesAsync();
-        await _audit.LogAsync(Actor, "Create", "CustodyHandover", null, null, $"Handover request: {amount:N2}");
+        await _audit.LogAsync(Actor, "Create", "CustodyHandover", handover.CustodyHandoverId, null, $"Handover request: {amount:N2}");
 
-        TempData["Success"] = $"تم تقديم طلب توريد بمبلغ {amount:N2} ريال للصندوق الرئيسي، وهو بانتظار اعتماد مدير النظام.";
+        // When auto-approval is on, the request settles immediately: the custody is debited and the
+        // main fund credited, exactly as if an approver had released it.
+        if (await _settings.HandoverAutoApprovalEnabledAsync())
+        {
+            await ApproveHandoverAsync(handover, note);
+            TempData["Success"] = $"تم توريد {amount:N2} {await _settings.GetCurrencySymbolAsync()} إلى الصندوق الرئيسي (اعتماد تلقائي).";
+            return RedirectToAction(nameof(Index));
+        }
+
+        TempData["Success"] = $"تم تقديم طلب توريد بمبلغ {amount:N2} {await _settings.GetCurrencySymbolAsync()} للصندوق الرئيسي، وهو بانتظار اعتماد مدير النظام.";
         return RedirectToAction(nameof(Index));
     }
 
@@ -213,6 +237,23 @@ public class CustodyController : Controller
             TempData["Error"] = $"رصيد العهدة الحالي ({balance:N2}) أقل من المبلغ المطلوب ({handover.Amount:N2}). رفض الطلب أو انتظر تسويات جديدة.";
             return RedirectToAction(nameof(Index), new { userId = handover.UserId });
         }
+
+        await ApproveHandoverAsync(handover, note);
+
+        TempData["Success"] = $"تم اعتماد توريد {handover.Amount:N2} {await _settings.GetCurrencySymbolAsync()} إلى الصندوق الرئيسي.";
+        return RedirectToAction(nameof(Index), new { userId = handover.UserId });
+    }
+
+    /// <summary>
+    /// Settles a pending handover: debits the employee's custody and credits the main fund as one
+    /// atomic movement, then marks the request approved. Shared by the manual approval action and by
+    /// auto-approval so both paths move the money identically. The caller must have checked that the
+    /// custody covers the amount.
+    /// </summary>
+    private async Task ApproveHandoverAsync(CustodyHandover handover, string? note)
+    {
+        if (handover.User == null)
+            handover.User = await _db.Users.FirstOrDefaultAsync(u => u.UserId == handover.UserId);
 
         await using var transaction = await _db.Database.BeginTransactionAsync();
 
@@ -239,9 +280,6 @@ public class CustodyController : Controller
         await transaction.CommitAsync();
         await _audit.LogAsync(Actor, "Approve", "CustodyHandover", handover.CustodyHandoverId, null,
             $"Approved handover: {handover.Amount:N2}");
-
-        TempData["Success"] = $"تم اعتماد توريد {handover.Amount:N2} ريال إلى الصندوق الرئيسي.";
-        return RedirectToAction(nameof(Index), new { userId = handover.UserId });
     }
 
     /// <summary>An approver rejects a handover; nothing moves.</summary>

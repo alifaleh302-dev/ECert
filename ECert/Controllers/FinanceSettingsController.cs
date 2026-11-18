@@ -43,6 +43,9 @@ public class FinanceSettingsController : Controller
         ViewBag.CurrencyName = await _settings.GetCurrencyNameAsync();
         ViewBag.CurrencySymbol = await _settings.GetCurrencySymbolAsync();
         ViewBag.RefundThreshold = await _settings.GetRefundApprovalThresholdAsync();
+        ViewBag.RefundAutoApproval = await _settings.RefundAutoApprovalEnabledAsync();
+        ViewBag.HandoverAutoApproval = await _settings.HandoverAutoApprovalEnabledAsync();
+        ViewBag.MaxOpenHandovers = await _settings.GetMaxOpenHandoversPerEmployeeAsync();
         ViewBag.LockedThrough = await _periods.GetLockedThroughAsync();
         ViewBag.History = await _periods.HistoryAsync();
         ViewBag.CurrencyUsage = await CountCurrencyUsageAsync();
@@ -84,6 +87,56 @@ public class FinanceSettingsController : Controller
             (refundApprovalThreshold ?? 0m).ToString(System.Globalization.CultureInfo.InvariantCulture));
         await _audit.LogAsync(Actor, "Update", "FinanceSettings", null, null, $"RefundThreshold: {refundApprovalThreshold}");
         TempData["Success"] = "تم حفظ حد اعتماد الاسترداد.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>Turns the automatic application of refunds on or off (bypassing the ceiling).</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveRefundAutoApproval(bool refundAutoApproval)
+    {
+        if (!User.HasPermission(AdminPermissions.ManageFinanceSettings)) return Forbid();
+
+        await UpsertAsync(SystemSettingsService.RefundAutoApprovalKey, refundAutoApproval ? "true" : "false");
+        await _audit.LogAsync(Actor, "Update", "FinanceSettings", null, null, $"RefundAutoApproval: {refundAutoApproval}");
+        TempData["Success"] = refundAutoApproval
+            ? "تم تفعيل الاعتماد التلقائي للاستردادات."
+            : "تم إلغاء تفعيل الاعتماد التلقائي للاستردادات.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>Turns automatic settlement of handover requests on or off.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveHandoverAutoApproval(bool handoverAutoApproval)
+    {
+        if (!User.HasPermission(AdminPermissions.ManageFinanceSettings)) return Forbid();
+
+        await UpsertAsync(SystemSettingsService.HandoverAutoApprovalKey, handoverAutoApproval ? "true" : "false");
+        await _audit.LogAsync(Actor, "Update", "FinanceSettings", null, null, $"HandoverAutoApproval: {handoverAutoApproval}");
+        TempData["Success"] = handoverAutoApproval
+            ? "تم تفعيل الاعتماد التلقائي للتوريد."
+            : "تم إلغاء تفعيل الاعتماد التلقائي للتوريد.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>Sets the most handover requests one employee may keep open at once.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveMaxOpenHandovers(int maxOpenHandovers)
+    {
+        if (!User.HasPermission(AdminPermissions.ManageFinanceSettings)) return Forbid();
+
+        if (maxOpenHandovers < 1)
+        {
+            TempData["Error"] = "الحد الأقصى لطلبات التوريد يجب أن يكون 1 على الأقل.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        await UpsertAsync(SystemSettingsService.MaxOpenHandoversPerEmployeeKey,
+            maxOpenHandovers.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        await _audit.LogAsync(Actor, "Update", "FinanceSettings", null, null, $"MaxOpenHandovers: {maxOpenHandovers}");
+        TempData["Success"] = "تم حفظ الحد الأقصى لطلبات التوريد لكل موظف.";
         return RedirectToAction(nameof(Index));
     }
 

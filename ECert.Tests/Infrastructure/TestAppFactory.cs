@@ -226,7 +226,7 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
     /// Creates a registration and its invoice directly, so a payment test has a real invoice to
     /// target without driving the whole accept flow. Returns the new invoice id.
     /// </summary>
-    public async Task<int> CreateInvoiceAsync()
+    public async Task<int> CreateInvoiceAsync(decimal totalAmount = 500m)
     {
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
@@ -253,8 +253,8 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
             TraineeName = registration.FullName,
             TraineePhone = registration.Phone,
             CourseName = course.CourseName,
-            OriginalAmount = 500m,
-            TotalAmount = 500m,
+            OriginalAmount = totalAmount,
+            TotalAmount = totalAmount,
             PaidAmount = 0m,
             Status = "Unpaid",
             CreatedAt = DateTime.Now
@@ -558,6 +558,47 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
     public Task<string?> LatestHandoverStatusAsync(int userId) =>
         WithDbAsync(async db => await db.CustodyHandovers.Where(h => h.UserId == userId)
             .OrderByDescending(h => h.CustodyHandoverId).Select(h => h.Status).FirstOrDefaultAsync());
+
+    /// <summary>The id of a user's most recent handover request, to approve or reject it.</summary>
+    public Task<int> LatestHandoverIdAsync(int userId) =>
+        WithDbAsync(db => db.CustodyHandovers.Where(h => h.UserId == userId)
+            .OrderByDescending(h => h.CustodyHandoverId).Select(h => h.CustodyHandoverId).FirstAsync());
+
+    /// <summary>How many handover requests a user currently has waiting for review.</summary>
+    public Task<int> PendingHandoverCountAsync(int userId) =>
+        WithDbAsync(db => db.CustodyHandovers.CountAsync(h =>
+            h.UserId == userId && h.Status == ECert.Models.CustodyHandoverStatus.Pending));
+
+    /// <summary>The most recent refund on an invoice, for asserting its status and funding.</summary>
+    public Task<ECert.Models.Refund?> LatestRefundAsync(int invoiceId) =>
+        WithDbAsync(db => db.Refunds.Where(r => r.InvoiceId == invoiceId)
+            .OrderByDescending(r => r.RefundId).FirstOrDefaultAsync());
+
+    /// <summary>Writes a key/value system setting, for shaping a scenario (or an unset default).</summary>
+    public async Task SetSettingAsync(string key, string value)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        var setting = await db.SiteSettings.FirstOrDefaultAsync(s => s.Key == key);
+        if (setting == null) db.SiteSettings.Add(new ECert.Models.SiteSetting { Key = key, Value = value });
+        else setting.Value = value;
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Removes a user's still-pending handover requests. A test that leaves one open would otherwise
+    /// keep reserving part of that user's custody for every later test in the shared fixture database.
+    /// </summary>
+    public async Task ClearPendingHandoversAsync(int userId)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ECertDbContext>();
+        var pending = await db.CustodyHandovers
+            .Where(h => h.UserId == userId && h.Status == ECert.Models.CustodyHandoverStatus.Pending)
+            .ToListAsync();
+        db.CustodyHandovers.RemoveRange(pending);
+        await db.SaveChangesAsync();
+    }
 
     /// <summary>The user id of the seeded admin account.</summary>
     public Task<int> AdminUserIdAsync() => UserIdAsync("admin");
