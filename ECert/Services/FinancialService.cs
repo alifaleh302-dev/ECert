@@ -68,6 +68,27 @@ public class FinancialService
             .SumAsync(r => (decimal?)r.Amount) ?? 0m;
 
     /// <summary>
+    /// The part of a user's custody already claimed by movements that are waiting for approval: a
+    /// refund request (that will be paid out of the custody) and a handover request both reserve their
+    /// amount the moment they are created. Subtracting this from the balance gives the free custody a
+    /// new movement may draw on, so two pending requests can never together promise the same money.
+    /// </summary>
+    public async Task<decimal> GetReservedCustodyAsync(int userId)
+    {
+        var pendingRefunds = await _db.Refunds
+            .Where(r => r.RequestedByUserId == userId
+                && r.Status == RefundStatus.PendingApproval
+                && !r.PaidFromFund)
+            .SumAsync(r => (decimal?)r.Amount) ?? 0m;
+
+        var pendingHandovers = await _db.CustodyHandovers
+            .Where(h => h.UserId == userId && h.Status == CustodyHandoverStatus.Pending)
+            .SumAsync(h => (decimal?)h.Amount) ?? 0m;
+
+        return pendingRefunds + pendingHandovers;
+    }
+
+    /// <summary>
     /// Creates a refund against an invoice. The amount may not exceed the invoice's currently paid
     /// amount (minus any refunds already awaiting approval), and a reason is mandatory. A refund above
     /// the configured direct ceiling is created in <see cref="RefundStatus.PendingApproval"/>: it does
@@ -110,22 +131,31 @@ public class FinancialService
         // holder of manage-cashbox whose own custody cannot cover it may draw the amount from the
         // main fund instead (the fund must cover it), so the cashier is never blocked and no custody
         // is pushed below zero.
+        //
+        // Money already claimed elsewhere must not be spent twice: refunds waiting for approval and
+        // handover requests waiting for approval both reserve part of the requester's custody, so the
+        // free (unreserved) balance is what a new refund may draw on. Without this, a refund and a
+        // handover could each be created against the same balance and the second to settle would drive
+        // the custody negative.
         var custody = await _ledger.GetCustodyBalanceAsync(performingUserId);
+        var reserved = await GetReservedCustodyAsync(performingUserId);
+        var freeCustody = custody - reserved;
         var payFromFund = false;
-        if (amount > custody)
+        if (amount > freeCustody)
         {
             if (!canDrawFromFund)
                 return new RefundResult(false,
-                    $"رصيد عهدتك ({custody:N2}) لا يكفي لصرف هذا الاسترداد ({amount:N2}). ورّد عهدتك أو تواصل مع أمين الصندوق.");
+                    $"رصيد عهدتك المتاح ({freeCustody:N2}) لا يكفي لصرف هذا الاسترداد ({amount:N2}) — منه {reserved:N2} محجوز لطلبات معلّقة. ورّد عهدتك أو تواصل مع أمين الصندوق.");
 
             var fund = await _ledger.GetMainFundBalanceAsync();
             if (amount > fund)
                 return new RefundResult(false,
-                    $"رصيد عهدتك ({custody:N2}) ورصيد الصندوق الرئيسي ({fund:N2}) لا يكفيان لصرف هذا الاسترداد ({amount:N2}).");
+                    $"رصيد عهدتك المتاح ({freeCustody:N2}) ورصيد الصندوق الرئيسي ({fund:N2}) لا يكفيان لصرف هذا الاسترداد ({amount:N2}).");
             payFromFund = true;
         }
 
-        var requiresApproval = await _settings.RefundRequiresApprovalAsync(amount);
+        var autoApprove = await _settings.RefundAutoApprovalEnabledAsync();
+        var requiresApproval = !autoApprove && await _settings.RefundRequiresApprovalAsync(amount);
 
         var refund = new Refund
         {
@@ -137,6 +167,7 @@ public class FinancialService
             ReceiptNumber = string.IsNullOrWhiteSpace(receiptNumber) ? null : receiptNumber.Trim(),
             RefundDate = DateTime.Now,
             RefundedBy = performingUserName,
+            RequestedByUserId = performingUserId,
             PaidFromFund = payFromFund,
             Status = requiresApproval ? RefundStatus.PendingApproval : RefundStatus.Approved,
             ApprovedBy = requiresApproval ? null : performingUserName,
@@ -181,17 +212,22 @@ public class FinancialService
         if (invoice == null)
             return new RefundResult(false, "الفاتورة المرتبطة غير موجودة.");
 
-        // Re-check the funding source at approval time: custody may have been handed over since the
-        // request was created, so a request that no longer has cover must not go through. The approver
-        // holds approve-refunds (a high-trust permission), so a shortfall may be drawn from the main
-        // fund — never leaving a negative custody.
-        var custody = await _ledger.GetCustodyBalanceAsync(performingUserId);
+        // The money sits in the custody of the employee who requested the refund, so approval debits
+        // that custody — not the approver's. A SuperAdmin who holds no custody of their own can still
+        // approve. Legacy rows carry no requester, so fall back to the approver's custody.
+        var payerUserId = refund.RequestedByUserId ?? performingUserId;
+
+        // Re-check the funding source at approval time: custody may have moved since the request was
+        // created, so a request that no longer has cover must not go through. The approver holds
+        // approve-refunds (a high-trust permission), so a shortfall may be drawn from the main fund —
+        // never leaving a negative custody.
+        var custody = await _ledger.GetCustodyBalanceAsync(payerUserId);
         if (refund.Amount > custody)
         {
             var fund = await _ledger.GetMainFundBalanceAsync();
             if (refund.Amount > fund)
                 return new RefundResult(false,
-                    $"رصيد العهدة ({custody:N2}) ورصيد الصندوق الرئيسي ({fund:N2}) لا يكفيان لاعتماد هذا الاسترداد ({refund.Amount:N2}).");
+                    $"رصيد عهدة مقدّم الطلب ({custody:N2}) ورصيد الصندوق الرئيسي ({fund:N2}) لا يكفيان لاعتماد هذا الاسترداد ({refund.Amount:N2}).");
             refund.PaidFromFund = true;
         }
 
@@ -199,8 +235,12 @@ public class FinancialService
         refund.ApprovedBy = approver;
         refund.ApprovedAt = DateTime.Now;
 
-        ApplyRefundPayout(refund, performingUserId, approver, invoice);
+        ApplyRefundPayout(refund, payerUserId, approver, invoice);
 
+        // Persist the approval (and the custody/audit movement) before recomputing the invoice, so the
+        // balance query sees this refund as approved. Recomputing first would read the row while it is
+        // still PendingApproval and leave the invoice showing the pre-refund paid amount.
+        await _db.SaveChangesAsync();
         await RecomputeInvoiceAsync(invoice);
         await _db.SaveChangesAsync();
 

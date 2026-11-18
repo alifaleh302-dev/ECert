@@ -273,6 +273,12 @@ public static class DbSeeder
         EnsureSiteSetting(db, "CurrencySymbol", "ر.ي", "Finance");
         // Refunds at or below this ceiling apply immediately; a larger one waits for a SuperAdmin.
         EnsureSiteSetting(db, "RefundApprovalThreshold", "500", "Finance");
+        // Off by default: the ceiling still gates refunds. Turning it on applies every refund at once.
+        EnsureSiteSetting(db, "RefundAutoApprovalEnabled", "false", "Finance");
+        // Off by default: a handover request waits for an approver. Turning it on settles it at once.
+        EnsureSiteSetting(db, "HandoverAutoApprovalEnabled", "false", "Finance");
+        // How many handover requests one employee may keep open at once.
+        EnsureSiteSetting(db, "MaxOpenHandoversPerEmployee", "1", "Finance");
         BackfillBlankRefundThreshold(db);
 
         if (!db.ExpenseCategories.Any())

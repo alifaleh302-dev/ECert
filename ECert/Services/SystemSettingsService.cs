@@ -17,9 +17,13 @@ public class SystemSettingsService
     public const string CurrencyNameKey = "CurrencyName";
     public const string CurrencySymbolKey = "CurrencySymbol";
     public const string RefundApprovalThresholdKey = "RefundApprovalThreshold";
+    public const string RefundAutoApprovalKey = "RefundAutoApprovalEnabled";
+    public const string HandoverAutoApprovalKey = "HandoverAutoApprovalEnabled";
+    public const string MaxOpenHandoversPerEmployeeKey = "MaxOpenHandoversPerEmployee";
 
     public const string DefaultCurrencyName = "ريال يمني";
     public const string DefaultCurrencySymbol = "ر.ي";
+    public const int DefaultMaxOpenHandoversPerEmployee = 1;
 
     /// <summary>A setting's raw value, or <paramref name="defaultValue"/> when it is missing or blank.</summary>
     public async Task<string> GetStringAsync(string key, string defaultValue = "")
@@ -34,6 +38,21 @@ public class SystemSettingsService
         var value = await GetStringAsync(key);
         return decimal.TryParse(value, System.Globalization.NumberStyles.Number,
             System.Globalization.CultureInfo.InvariantCulture, out var parsed) ? parsed : null;
+    }
+
+    /// <summary>A boolean setting, defaulting when it is unset or not "true"/"false".</summary>
+    public async Task<bool> GetBoolAsync(string key, bool defaultValue = false)
+    {
+        var value = await GetStringAsync(key);
+        return bool.TryParse(value, out var parsed) ? parsed : defaultValue;
+    }
+
+    /// <summary>An integer setting, defaulting when it is unset or not a whole number.</summary>
+    public async Task<int> GetIntAsync(string key, int defaultValue)
+    {
+        var value = await GetStringAsync(key);
+        return int.TryParse(value, System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture, out var parsed) ? parsed : defaultValue;
     }
 
     public Task<string> GetCurrencyNameAsync() => GetStringAsync(CurrencyNameKey, DefaultCurrencyName);
@@ -51,5 +70,27 @@ public class SystemSettingsService
     {
         var threshold = await GetRefundApprovalThresholdAsync();
         return threshold.HasValue && amount > threshold.Value;
+    }
+
+    /// <summary>
+    /// When on, every refund applies immediately and none waits for approval — the ceiling is ignored.
+    /// Off by default, so the ceiling governs unless an administrator opts out of the gate.
+    /// </summary>
+    public Task<bool> RefundAutoApprovalEnabledAsync() => GetBoolAsync(RefundAutoApprovalKey);
+
+    /// <summary>
+    /// When on, a handover request settles immediately (custody debited, fund credited) instead of
+    /// waiting for an approver. Off by default.
+    /// </summary>
+    public Task<bool> HandoverAutoApprovalEnabledAsync() => GetBoolAsync(HandoverAutoApprovalKey);
+
+    /// <summary>
+    /// The most handover requests an employee may keep open at once. At least one, so an employee can
+    /// always request a handover; the default is one.
+    /// </summary>
+    public async Task<int> GetMaxOpenHandoversPerEmployeeAsync()
+    {
+        var value = await GetIntAsync(MaxOpenHandoversPerEmployeeKey, DefaultMaxOpenHandoversPerEmployee);
+        return value < 1 ? DefaultMaxOpenHandoversPerEmployee : value;
     }
 }

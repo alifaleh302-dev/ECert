@@ -272,6 +272,9 @@ public class ECertDbContext : DbContext, IDataProtectionKeyContext
             .HasIndex(r => r.InvoiceId);
 
         modelBuilder.Entity<Refund>()
+            .HasIndex(r => r.RequestedByUserId);
+
+        modelBuilder.Entity<Refund>()
             .HasIndex(r => r.PublicId)
             .IsUnique();
 
