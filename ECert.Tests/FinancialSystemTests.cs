@@ -392,6 +392,154 @@ public class FinancialSystemTests
         Assert.False(await client.CanOpenAsync("/FinancialAudit"));
     }
 
+    // ===== Refund entry points: the payments tab and the refunds page =====
+
+    /// <summary>
+    /// The payments list offers a refund button on each active row that points at the refund form
+    /// for that row's invoice, so a refund can be started straight from the payment.
+    /// </summary>
+    [Fact]
+    public async Task The_payments_tab_offers_a_refund_button_linking_to_the_invoice()
+    {
+        var invoiceId = await _fixture.Factory.CreateInvoiceAsync();
+        var admin = await SignInAdminAsync();
+        await admin.PostFormAsync($"/Payments/Add?invoiceId={invoiceId}", "/Payments/Add", new[]
+        {
+            new KeyValuePair<string, string>("InvoiceId", invoiceId.ToString()),
+            new KeyValuePair<string, string>("Amount", "200"),
+            new KeyValuePair<string, string>("PaymentMethod", "Cash")
+        });
+
+        var html = await admin.GetStringAsync("/Payments");
+        Assert.Contains($"/Refunds/Create?invoiceId={invoiceId}", html);
+    }
+
+    /// <summary>
+    /// The refunds page now opens an invoice picker, so a refund can be started without first
+    /// locating the invoice elsewhere. Only invoices with a positive refundable balance appear.
+    /// </summary>
+    [Fact]
+    public async Task The_refunds_page_links_to_a_refund_invoice_picker()
+    {
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/Refunds");
+        Assert.Contains("/Refunds/NewRefund", html);
+    }
+
+    [Fact]
+    public async Task The_refund_invoice_picker_lists_a_paid_invoice_and_omits_an_unpaid_one()
+    {
+        var paidInvoiceId = await _fixture.Factory.CreateInvoiceAsync();
+        var unpaidInvoiceId = await _fixture.Factory.CreateInvoiceAsync();
+        var admin = await SignInAdminAsync();
+        await admin.PostFormAsync($"/Payments/Add?invoiceId={paidInvoiceId}", "/Payments/Add", new[]
+        {
+            new KeyValuePair<string, string>("InvoiceId", paidInvoiceId.ToString()),
+            new KeyValuePair<string, string>("Amount", "300"),
+            new KeyValuePair<string, string>("PaymentMethod", "Cash")
+        });
+
+        var html = await admin.GetStringAsync("/Refunds/NewRefund");
+        Assert.Contains($"/Refunds/Create?invoiceId={paidInvoiceId}", html);
+        Assert.DoesNotContain($"/Refunds/Create?invoiceId={unpaidInvoiceId}", html);
+    }
+
+    /// <summary>
+    /// The refunds list offers a further-refund button on a row whose invoice still has a balance,
+    /// so money can be refunded again without leaving the page.
+    /// </summary>
+    [Fact]
+    public async Task The_refunds_list_offers_a_further_refund_button()
+    {
+        var invoiceId = await _fixture.Factory.CreateInvoiceAsync();
+        var admin = await SignInAdminAsync();
+        await admin.PostFormAsync($"/Payments/Add?invoiceId={invoiceId}", "/Payments/Add", new[]
+        {
+            new KeyValuePair<string, string>("InvoiceId", invoiceId.ToString()),
+            new KeyValuePair<string, string>("Amount", "500"),
+            new KeyValuePair<string, string>("PaymentMethod", "Cash")
+        });
+        await admin.PostFormAsync($"/Refunds/Create?invoiceId={invoiceId}", "/Refunds/Create", new[]
+        {
+            new KeyValuePair<string, string>("invoiceId", invoiceId.ToString()),
+            new KeyValuePair<string, string>("amount", "100"),
+            new KeyValuePair<string, string>("reason", "استرداد جزئي"),
+            new KeyValuePair<string, string>("refundMethod", "Cash")
+        });
+
+        var html = await admin.GetStringAsync("/Refunds");
+        Assert.Contains($"/Refunds/Create?invoiceId={invoiceId}", html);
+    }
+
+    /// <summary>A refund started from the picker reaches the same working form and moves the money.</summary>
+    [Fact]
+    public async Task A_refund_started_from_the_picker_form_reduces_the_invoice()
+    {
+        var invoiceId = await _fixture.Factory.CreateInvoiceAsync();
+        var admin = await SignInAdminAsync();
+        await admin.PostFormAsync($"/Payments/Add?invoiceId={invoiceId}", "/Payments/Add", new[]
+        {
+            new KeyValuePair<string, string>("InvoiceId", invoiceId.ToString()),
+            new KeyValuePair<string, string>("Amount", "500"),
+            new KeyValuePair<string, string>("PaymentMethod", "Cash")
+        });
+
+        // The picker links to /Refunds/Create?invoiceId=…; follow it and confirm the form renders.
+        var picker = await admin.GetStringAsync("/Refunds/NewRefund");
+        Assert.Contains($"/Refunds/Create?invoiceId={invoiceId}", picker);
+        var formHtml = await admin.GetStringAsync($"/Refunds/Create?invoiceId={invoiceId}");
+        Assert.Contains("سند استرداد جديد", System.Net.WebUtility.HtmlDecode(formHtml));
+
+        var response = await admin.PostFormAsync($"/Refunds/Create?invoiceId={invoiceId}", "/Refunds/Create", new[]
+        {
+            new KeyValuePair<string, string>("invoiceId", invoiceId.ToString()),
+            new KeyValuePair<string, string>("amount", "120"),
+            new KeyValuePair<string, string>("reason", "انسحاب من الدورة"),
+            new KeyValuePair<string, string>("refundMethod", "Cash")
+        });
+        response.EnsureSuccessStatusCode();
+
+        Assert.Equal(120m, await _fixture.Factory.RefundedTotalAsync(invoiceId));
+        Assert.Equal(380m, (await _fixture.Factory.GetInvoiceAsync(invoiceId)).PaidAmount);
+    }
+
+    /// <summary>The picker is gated on manage-refunds: a user without it cannot open it.</summary>
+    [Fact]
+    public async Task The_refund_invoice_picker_is_gated_on_manage_refunds()
+    {
+        var user = await CreateUserWithRoleAsync(new[] { AdminPermissions.ManagePayments });
+        var client = await SignInAsync(user.Username, user.Password);
+
+        Assert.True(await client.CanOpenAsync("/Payments"));
+        Assert.False(await client.CanOpenAsync("/Refunds/NewRefund"));
+    }
+
+    /// <summary>
+    /// A user who may refund but not record payments sees the refund button on the payments list
+    /// (the button follows manage-refunds, not manage-payments).
+    /// </summary>
+    [Fact]
+    public async Task The_refund_button_follows_the_refund_permission_not_the_payment_permission()
+    {
+        var invoiceId = await _fixture.Factory.CreateInvoiceAsync();
+        var admin = await SignInAdminAsync();
+        await admin.PostFormAsync($"/Payments/Add?invoiceId={invoiceId}", "/Payments/Add", new[]
+        {
+            new KeyValuePair<string, string>("InvoiceId", invoiceId.ToString()),
+            new KeyValuePair<string, string>("Amount", "150"),
+            new KeyValuePair<string, string>("PaymentMethod", "Cash")
+        });
+
+        var user = await CreateUserWithRoleAsync(new[]
+        {
+            AdminPermissions.ViewPayments, AdminPermissions.ManageRefunds
+        });
+        var client = await SignInAsync(user.Username, user.Password);
+
+        var html = await client.GetStringAsync("/Payments");
+        Assert.Contains($"/Refunds/Create?invoiceId={invoiceId}", html);
+    }
+
     private async Task<AppClient> SignInAdminAsync()
     {
         var client = AppClient.Create(_fixture.Factory);

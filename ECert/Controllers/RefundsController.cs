@@ -78,6 +78,63 @@ public class RefundsController : Controller
         return View();
     }
 
+    /// <summary>
+    /// Invoice picker (طلب استرداد جديد): lists the invoices that still have a positive net paid
+    /// balance inside the caller's scope, so a refund can be started from the refunds page without
+    /// first hunting for the invoice. Read-only; it needs <c>manage-refunds</c> because its only
+    /// purpose is to lead into the refund form.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> NewRefund(string? search)
+    {
+        if (!HasPermission(AdminPermissions.ManageRefunds)) return Forbid();
+
+        var query = _db.Invoices.InScope(User)
+            .Where(i => i.Status != "Cancelled" && i.PaidAmount > 0);
+
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(i => i.InvoiceNumber.Contains(search)
+                || i.TraineeName.Contains(search)
+                || (i.TraineeNameArabic != null && i.TraineeNameArabic.Contains(search))
+                || (i.TraineeNameEnglish != null && i.TraineeNameEnglish.Contains(search))
+                || i.TraineePhone.Contains(search));
+
+        var invoices = await query.OrderByDescending(i => i.PaidAmount).ThenByDescending(i => i.CreatedAt)
+            .Take(300).ToListAsync();
+
+        // PaidAmount is already net of approved refunds; a pending refund also holds back part of it.
+        var ids = invoices.Select(i => i.InvoiceId).ToList();
+        var approved = await _db.Refunds
+            .Where(r => ids.Contains(r.InvoiceId) && r.Status == RefundStatus.Approved)
+            .GroupBy(r => r.InvoiceId)
+            .Select(g => new { InvoiceId = g.Key, Total = g.Sum(r => r.Amount) })
+            .ToDictionaryAsync(x => x.InvoiceId, x => x.Total);
+        var pending = await _db.Refunds
+            .Where(r => ids.Contains(r.InvoiceId) && r.Status == RefundStatus.PendingApproval)
+            .GroupBy(r => r.InvoiceId)
+            .Select(g => new { InvoiceId = g.Key, Total = g.Sum(r => r.Amount) })
+            .ToDictionaryAsync(x => x.InvoiceId, x => x.Total);
+
+        ViewBag.Rows = invoices.Select(i =>
+        {
+            var refunded = approved.TryGetValue(i.InvoiceId, out var a) ? a : 0m;
+            var held = pending.TryGetValue(i.InvoiceId, out var p) ? p : 0m;
+            return new RefundableInvoiceRow
+            {
+                InvoiceId = i.InvoiceId,
+                InvoiceNumber = i.InvoiceNumber,
+                TraineeName = i.TraineeNameArabic ?? i.TraineeName,
+                TraineePhone = i.TraineePhone,
+                CourseName = i.CourseNameArabic ?? i.CourseName,
+                GrossPaid = i.PaidAmount + refunded,
+                Refunded = refunded,
+                Refundable = i.PaidAmount - held
+            };
+        }).ToList();
+        ViewBag.Search = search;
+        return View();
+    }
+
     [HttpGet]
     public async Task<IActionResult> Create(int invoiceId)
     {
@@ -217,4 +274,21 @@ public class RefundsController : Controller
                 await _settings.GetCurrencySymbolAsync()));
         return View(refund);
     }
+}
+
+/// <summary>
+/// A row of the refund invoice picker: an invoice that still has money to refund, with the figures
+/// the operator needs to choose it — how much was collected, how much has already gone back, and
+/// how much is left to refund (net of any refund still awaiting approval).
+/// </summary>
+public class RefundableInvoiceRow
+{
+    public int InvoiceId { get; set; }
+    public string InvoiceNumber { get; set; } = string.Empty;
+    public string TraineeName { get; set; } = string.Empty;
+    public string TraineePhone { get; set; } = string.Empty;
+    public string CourseName { get; set; } = string.Empty;
+    public decimal GrossPaid { get; set; }
+    public decimal Refunded { get; set; }
+    public decimal Refundable { get; set; }
 }
