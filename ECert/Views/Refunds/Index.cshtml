@@ -6,11 +6,18 @@
     var refunds = ViewBag.Refunds as List<Refund> ?? new();
     var search = ViewBag.Search as string;
     bool canApprove = User.HasPermission(AdminPermissions.ApproveRefunds);
+    bool canRefund = User.HasPermission(AdminPermissions.ManageRefunds);
     var pending = refunds.Where(r => r.Status == RefundStatus.PendingApproval).ToList();
 }
 
 <div class="page-header">
     <partial name="_PageHeader" />
+    <div class="page-actions">
+        @if (canRefund)
+        {
+            <a asp-action="NewRefund" class="btn btn-danger"><i class="bi bi-plus-circle"></i> طلب استرداد جديد</a>
+        }
+    </div>
 </div>
 
 
@@ -93,7 +100,9 @@
                             <tr>
                                 <td>@r.RefundId</td>
                                 <td><span class="a-code">@(r.ReceiptNumber ?? $"R-{r.RefundId}")</span></td>
-                                <td><span class="a-code">@r.Invoice?.InvoiceNumber</span></td>
+                                <td>
+                                    <a class="a-code" asp-controller="Receivables" asp-action="Statement" asp-route-invoiceId="@r.InvoiceId" title="كشف حساب">@r.Invoice?.InvoiceNumber</a>
+                                </td>
                                 <td class="a-table__primary">@(r.Invoice?.TraineeNameArabic ?? r.Invoice?.TraineeName)</td>
                                 <td class="a-amount a-amount--out">@r.Amount.ToString("N2") @Currency.Symbol</td>
                                 <td class="text-muted small">@r.Reason</td>
@@ -104,7 +113,19 @@
                                     </span>
                                 </td>
                                 <td class="small">@r.RefundDate.ToString("yyyy-MM-dd HH:mm")</td>
-                                <td>
+                                <td class="text-nowrap">
+                                    @{
+                                        // Allow a further refund on the same invoice while it still has a
+                                        // positive net paid balance (an invoice can be refunded more than once).
+                                        bool canRefundAgain = canRefund && r.Invoice != null
+                                            && r.Invoice.Status != "Cancelled" && r.Invoice.PaidAmount > 0;
+                                    }
+                                    @if (canRefundAgain)
+                                    {
+                                        <a class="btn btn-sm btn-outline-warning" asp-action="Create" asp-route-invoiceId="@r.InvoiceId" title="استرداد من نفس الفاتورة">
+                                            <i class="bi bi-arrow-counterclockwise"></i> استرداد
+                                        </a>
+                                    }
                                     <a class="btn btn-sm btn-outline-primary" asp-action="Receipt" asp-route-id="@r.RefundId">
                                         <i class="bi bi-printer"></i> سند
                                     </a>
@@ -117,7 +138,7 @@
         }
         else
         {
-            <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-arrow-counterclockwise", Title = "لا توجد استردادات", Text = "لم تُسجَّل أي سندات استرداد بعد." })" />
+            <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-arrow-counterclockwise", Title = "لا توجد استردادات", Text = "لم تُسجَّل أي سندات استرداد بعد. ابدأ بطلب استرداد جديد.", ActionText = canRefund ? "طلب استرداد جديد" : null, ActionHref = canRefund ? Url.Action("NewRefund") : null })" />
         }
     </div>
 </div>

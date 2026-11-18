@@ -1,0 +1,89 @@
+@{
+    ViewData["Title"] = "طلب استرداد جديد";
+    ViewData["PageIcon"] = "bi-arrow-counterclockwise";
+    ViewData["PageDesc"] = "اختر الفاتورة التي تريد استرداد رسوم منها؛ تُعرض الفواتير التي لها رصيد مدفوع قابل للاسترداد";
+    Layout = "_AdminLayout";
+    var rows = ViewBag.Rows as List<ECert.Controllers.RefundableInvoiceRow> ?? new();
+    var search = ViewBag.Search as string;
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> كل الاستردادات</a>
+    </div>
+</div>
+
+<div class="a-note a-note--info mb-4">
+    <i class="bi bi-info-circle" aria-hidden="true"></i>
+    <div>
+        اختر الفاتورة ثم أدخل مبلغ الاسترداد وسببه. يُخصم المبلغ من <strong>عهدتك</strong> (أو من
+        <strong>الصندوق الرئيسي</strong> لأمين الصندوق عند عدم كفاية العهدة)، ويقلّل رصيد الفاتورة.
+    </div>
+</div>
+
+<form method="get" class="a-toolbar" role="search" aria-label="بحث في الفواتير القابلة للاسترداد">
+    <div class="a-toolbar__field a-toolbar__field--grow">
+        <label class="a-field__label" for="refundPickSearch">بحث</label>
+        <input id="refundPickSearch" type="search" name="search" value="@search" class="form-control" placeholder="رقم الفاتورة أو اسم المتدرب أو الهاتف" />
+    </div>
+    <div class="a-toolbar__actions">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> بحث</button>
+        <a asp-action="NewRefund" class="btn btn-outline-secondary">مسح</a>
+    </div>
+</form>
+
+<div class="a-card">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-receipt" aria-hidden="true"></i> الفواتير القابلة للاسترداد</h2>
+        <span class="a-badge a-badge--neutral a-badge--none">@rows.Count فاتورة</span>
+    </div>
+    <div class="a-card__body @(rows.Any() ? "a-card__body--flush" : "")">
+        @if (rows.Any())
+        {
+            <div class="a-table-wrap">
+                <table class="table a-table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>رقم الفاتورة</th>
+                            <th>المتدرب</th>
+                            <th>الدورة</th>
+                            <th>المحصّل</th>
+                            <th>المسترد</th>
+                            <th>القابل للاسترداد</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in rows)
+                        {
+                            <tr>
+                                <td><span class="a-code">@row.InvoiceNumber</span></td>
+                                <td>
+                                    <strong>@row.TraineeName</strong>
+                                    <span class="d-block text-muted small" dir="ltr">@row.TraineePhone</span>
+                                </td>
+                                <td>@row.CourseName</td>
+                                <td class="a-amount">@row.GrossPaid.ToString("N2") @Currency.Symbol</td>
+                                <td class="a-amount a-amount--out">@row.Refunded.ToString("N2") @Currency.Symbol</td>
+                                <td class="a-amount">@row.Refundable.ToString("N2") @Currency.Symbol</td>
+                                <td>
+                                    <a asp-action="Create" asp-route-invoiceId="@row.InvoiceId" class="btn btn-sm btn-outline-warning">
+                                        <i class="bi bi-arrow-counterclockwise"></i> استرداد
+                                    </a>
+                                    <a asp-controller="Receivables" asp-action="Statement" asp-route-invoiceId="@row.InvoiceId" class="btn btn-sm btn-outline-secondary" title="كشف حساب">
+                                        <i class="bi bi-journal-text"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <partial name="_EmptyState" model="@(new ECert.ViewModels.EmptyState { Icon = "bi-receipt", Title = "لا توجد فواتير قابلة للاسترداد", Text = "لا توجد فاتورة لها رصيد مدفوع قابل للاسترداد مطابقة للبحث." })" />
+        }
+    </div>
+</div>
