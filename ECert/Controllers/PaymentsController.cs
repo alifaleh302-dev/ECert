@@ -196,6 +196,14 @@ public class PaymentsController : Controller
         if (payment?.Invoice == null) return NotFound();
         if (!CanAccess(User, payment.Invoice)) return Forbid();
 
+        // A cancelled payment's receipt is void: its QR/link no longer verifies, so the voucher must
+        // not be printable either (it would print a dead link).
+        if (payment.IsCancelled)
+        {
+            TempData["Error"] = "سند هذه الدفعة مُبطل لأن الدفعة ملغاة.";
+            return RedirectToAction("Details", "Invoices", new { id = payment.InvoiceId });
+        }
+
         if (string.IsNullOrWhiteSpace(payment.PublicId))
         {
             await _ledger.EnsurePaymentPublicIdAsync(payment);
@@ -258,6 +266,10 @@ public class PaymentsController : Controller
 
         payment.IsCancelled = true;
         payment.CancellationReason = reason;
+
+        // The receipt voucher is void with the payment: clearing its public id makes the printed QR
+        // and the /r/{id} verification link stop resolving, so a refunded receipt can never verify.
+        _ledger.VoidPaymentReceipt(payment);
 
         // Cancelling a collection reverses it in the collector's custody and is audited.
         var collector = await ResolveCollectorAsync(payment.RecordedBy);
@@ -323,7 +335,8 @@ public class PaymentsController : Controller
         var invoice = payment.Invoice;
         var amount = payment.Amount;
 
-        // Removing a collection also reverses it in the collector's custody and is audited.
+        // Removing a collection also reverses it in the collector's custody and is audited. The row is
+        // deleted, so its public receipt id goes with it and the /r/{id} link stops resolving.
         var collector = await ResolveCollectorAsync(payment.RecordedBy);
         if (collector.HasValue)
             _ledger.AddCustodyEntry(collector.Value, -amount, CustodyEntryTypes.Adjustment,

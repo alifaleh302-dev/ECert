@@ -124,6 +124,11 @@ CREATE TABLE IF NOT EXISTS `AccountingPeriodLocks` (
         // to the approver's custody for them.
         await EnsureColumnAsync("Refunds", "RequestedByUserId", "INT NULL");
         await EnsureIndexAsync("Refunds", "IX_Refunds_RequestedByUserId", "`RequestedByUserId`", unique: false);
+        // Withdrawn refund requests are now deleted rather than flagged. Purge the legacy rows left by
+        // the earlier "mark as Cancelled" behaviour: they moved no money, and a row that lingers would
+        // keep a receipt number and a dead public verification link alive.
+        await _db.Database.ExecuteSqlRawAsync(
+            "DELETE FROM `Refunds` WHERE `Status` = 'Cancelled';");
     }
 
     private async Task EnsureColumnAsync(string tableName, string columnName, string definitionSql)

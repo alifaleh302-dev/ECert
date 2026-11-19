@@ -104,6 +104,7 @@
                                     @if (p.IsCancelled)
                                     {
                                         <span class="a-badge a-badge--danger">ملغية</span>
+                                        <div class="small text-muted mt-1"><i class="bi bi-x-octagon"></i> السند مُبطل</div>
                                     }
                                     else
                                     {
@@ -111,10 +112,13 @@
                                     }
                                 </td>
                                 <td>
-                                    <a asp-action="Receipt" asp-route-id="@p.PaymentId"
-                                       class="btn btn-sm btn-outline-primary" title="طباعة سند القبض" target="_blank" rel="noopener">
-                                        <i class="bi bi-printer"></i> طباعة السند
-                                    </a>
+                                    @if (!p.IsCancelled)
+                                    {
+                                        <a asp-action="Receipt" asp-route-id="@p.PaymentId"
+                                           class="btn btn-sm btn-outline-primary" title="طباعة سند القبض" target="_blank" rel="noopener">
+                                            <i class="bi bi-printer"></i> طباعة السند
+                                        </a>
+                                    }
                                     @if (canManage)
                                     {
                                         <form asp-action="Delete" method="post" style="display:inline" data-confirm="هل أنت متأكد من حذف هذه الدفعة؟ سيتم تحديث رصيد الفاتورة تلقائياً." data-confirm-tone="danger">

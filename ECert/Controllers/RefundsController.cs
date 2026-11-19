@@ -252,7 +252,8 @@ public class RefundsController : Controller
     /// Withdraws a refund request that is still waiting for approval. The employee who created the
     /// request can pull it back before a SuperAdmin approves it; nothing has moved at that point, so
     /// the cancellation only releases the custody the request was reserving. Only the requester may
-    /// cancel (an approver uses <see cref="Approve"/>), and only while it is pending.
+    /// cancel (an approver uses <see cref="Approve"/>), and only while it is pending. The request row
+    /// is deleted outright, so its receipt number and public verification link stop resolving.
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -266,6 +267,11 @@ public class RefundsController : Controller
         if (refund?.Invoice?.Registration == null) return NotFound();
         if (!User.CanAccessCourse(refund.Invoice.Registration.CourseId)) return Forbid();
 
+        // Captured before the delete so the audit row and redirect still have them.
+        var invoiceNumber = refund.Invoice.InvoiceNumber;
+        var refundAmount = refund.Amount;
+        var receiptNumber = refund.ReceiptNumber;
+
         await using var transaction = await _db.Database.BeginTransactionAsync();
         var result = await _financial.CancelRefundAsync(refund, CurrentUserId.Value, Actor);
         if (!result.Success)
@@ -276,8 +282,8 @@ public class RefundsController : Controller
         }
 
         await transaction.CommitAsync();
-        await _audit.LogAsync(Actor, "Cancel", "Refund", refund.RefundId, null,
-            $"Cancel refund request: {refund.Amount:N2}; Invoice: {refund.Invoice.InvoiceNumber}");
+        await _audit.LogAsync(Actor, "Cancel", "Refund", id, null,
+            $"Cancel refund request: {refundAmount:N2}; Invoice: {invoiceNumber}; Receipt: {receiptNumber ?? "-"}");
         TempData["Success"] = result.Message;
         return RedirectToAction(nameof(Index));
     }
@@ -292,6 +298,13 @@ public class RefundsController : Controller
             .FirstOrDefaultAsync(r => r.RefundId == id);
         if (refund?.Invoice?.Registration == null) return NotFound();
         if (!User.CanAccessCourse(refund.Invoice.Registration.CourseId)) return Forbid();
+
+        // A withdrawn (legacy) refund request has no valid voucher; its row is normally deleted.
+        if (refund.Status == RefundStatus.Cancelled)
+        {
+            TempData["Error"] = "سند هذا الاسترداد مُبطل لأن الطلب ملغى.";
+            return RedirectToAction(nameof(Index));
+        }
 
         if (string.IsNullOrWhiteSpace(refund.PublicId))
         {

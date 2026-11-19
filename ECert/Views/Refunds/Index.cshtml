@@ -3,14 +3,15 @@
     ViewData["PageIcon"] = "bi-arrow-counterclockwise";
     ViewData["PageDesc"] = "سندات استرداد الرسوم؛ كل استرداد حركة مستقلة تُخصم من عهدة الموظف المنفّذ";
     Layout = "_AdminLayout";
-    var refunds = ViewBag.Refunds as List<Refund> ?? new();
+    var refunds = (ViewBag.Refunds as List<Refund> ?? new())
+        .Where(r => r.Status != RefundStatus.Cancelled).ToList();
     var search = ViewBag.Search as string;
     bool canApprove = User.HasPermission(AdminPermissions.ApproveRefunds);
     bool canRefund = User.HasPermission(AdminPermissions.ManageRefunds);
     int? currentUserId = ViewBag.CurrentUserId as int?;
     var pending = refunds.Where(r => r.Status == RefundStatus.PendingApproval).ToList();
-    string statusLabel(string s) => s == RefundStatus.Approved ? "معتمد" : s == RefundStatus.Cancelled ? "ملغى" : "بانتظار الاعتماد";
-    string statusBadge(string s) => s == RefundStatus.Approved ? "a-badge--success" : s == RefundStatus.Cancelled ? "a-badge--neutral" : "a-badge--warning";
+    string statusLabel(string s) => s == RefundStatus.Approved ? "معتمد" : "بانتظار الاعتماد";
+    string statusBadge(string s) => s == RefundStatus.Approved ? "a-badge--success" : "a-badge--warning";
 }
 
 <div class="page-header">

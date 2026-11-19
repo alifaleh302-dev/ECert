@@ -202,8 +202,12 @@ public class FinancialService
     /// withdraw the request before it is approved. Only the requester may cancel it, and only while it
     /// is <see cref="RefundStatus.PendingApproval"/>: a pending refund has not moved any money, so
     /// cancelling it changes neither the invoice nor the custody — it only releases the custody it was
-    /// reserving. An approved refund can never be cancelled here. The caller must already be inside a
-    /// transaction; this method saves but does not commit.
+    /// reserving. An approved refund can never be cancelled here.
+    ///
+    /// The row is deleted outright rather than flagged: a withdrawn request was never a real voucher,
+    /// so its row, its receipt number and its public verification id (the QR / <c>/r/{id}</c> link)
+    /// must all disappear with it. Deleting the row is what makes the link stop resolving. The caller
+    /// must already be inside a transaction; this method saves but does not commit.
     /// </summary>
     public async Task<RefundResult> CancelRefundAsync(Refund refund, int userId, string actor)
     {
@@ -213,15 +217,14 @@ public class FinancialService
         if (refund.RequestedByUserId != userId)
             return new RefundResult(false, "يمكن لمقدّم الطلب فقط إلغاء الاسترداد قبل الاعتماد.");
 
-        refund.Status = RefundStatus.Cancelled;
-        await _db.SaveChangesAsync();
-
         _ledger.AddAudit(actor, FinancialActionTypes.Cancel, refund.Amount,
             referenceType: nameof(Refund), referenceId: refund.RefundId, referenceNumber: refund.ReceiptNumber,
-            details: $"إلغاء طلب استرداد بانتظار الاعتماد على الفاتورة {refund.Invoice?.InvoiceNumber ?? refund.InvoiceId.ToString()}");
+            details: $"إلغاء وحذف طلب استرداد بانتظار الاعتماد على الفاتورة {refund.Invoice?.InvoiceNumber ?? refund.InvoiceId.ToString()}");
+
+        _db.Refunds.Remove(refund);
         await _db.SaveChangesAsync();
 
-        return new RefundResult(true, "تم إلغاء طلب الاسترداد.", refund);
+        return new RefundResult(true, "تم إلغاء طلب الاسترداد وحذف سنده نهائياً.", refund);
     }
 
     /// <summary>

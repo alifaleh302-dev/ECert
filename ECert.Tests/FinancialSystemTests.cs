@@ -546,11 +546,12 @@ public class FinancialSystemTests
     }
 
     /// <summary>
-    /// Cancelling a pending refund request marks it cancelled and releases the custody it was reserving,
-    /// so the employee's balance is free again — and the invoice is untouched because nothing moved.
+    /// Withdrawing a pending refund request deletes the row outright — no «ملغى» record is left
+    /// behind — and its voucher dies with it: the public verification link no longer resolves.
+    /// Nothing moved, so the custody and the invoice are untouched.
     /// </summary>
     [Fact]
-    public async Task Cancelling_a_pending_refund_releases_the_reserved_custody()
+    public async Task Withdrawing_a_pending_refund_deletes_it_and_voids_its_voucher()
     {
         var invoiceId = await _fixture.Factory.CreateInvoiceAsync(20_000m);
         var collector = await CreateUserWithRoleAsync(new[]
@@ -578,16 +579,117 @@ public class FinancialSystemTests
         var refundId = (await _fixture.Factory.LatestRefundAsync(invoiceId))!.RefundId;
         Assert.Equal(RefundStatus.PendingApproval, (await _fixture.Factory.LatestRefundAsync(invoiceId))!.Status);
 
+        // The pending voucher carries a live public verification link.
+        var voucher = await client.GetStringAsync($"/Refunds/Receipt/{refundId}");
+        var match = System.Text.RegularExpressions.Regex.Match(voucher, "/r/[A-Za-z0-9]+\\?sig=[A-Za-z0-9_\\-]+");
+        Assert.True(match.Success, "a pending refund voucher should embed a verification link");
+        var anon = AppClient.Create(_fixture.Factory);
+        Assert.Contains("سند استرداد", System.Net.WebUtility.HtmlDecode(await anon.GetStringAsync(match.Value)));
+
         var cancel = await client.PostFormAsync("/Refunds", $"/Refunds/Cancel/{refundId}", new[]
         {
             new KeyValuePair<string, string>("id", refundId.ToString())
         });
         cancel.EnsureSuccessStatusCode();
 
-        Assert.Equal(RefundStatus.Cancelled, (await _fixture.Factory.LatestRefundAsync(invoiceId))!.Status);
+        // The row is deleted, so nothing lingers as a cancelled record and its link stops resolving.
+        Assert.Null(await _fixture.Factory.LatestRefundAsync(invoiceId));
+        Assert.DoesNotContain("سند استرداد صحيح",
+            System.Net.WebUtility.HtmlDecode(await anon.GetStringAsync(match.Value)));
+
         // Nothing moved: the collection stays in the custody and the invoice keeps its paid amount.
         Assert.Equal(20_000m, await _fixture.Factory.CustodyBalanceAsync(collectorId));
         Assert.Equal(20_000m, (await _fixture.Factory.GetInvoiceAsync(invoiceId)).PaidAmount);
+    }
+
+    /// <summary>
+    /// Cancelling a payment voids its receipt: the public id is cleared, so the printed QR and the
+    /// <c>/r/{id}</c> link stop resolving and the voucher can no longer be printed.
+    /// </summary>
+    [Fact]
+    public async Task Cancelling_a_payment_voids_its_receipt_link()
+    {
+        var invoiceId = await _fixture.Factory.CreateInvoiceAsync();
+        var admin = await SignInAdminAsync();
+
+        await admin.PostFormAsync($"/Payments/Add?invoiceId={invoiceId}", "/Payments/Add", new[]
+        {
+            new KeyValuePair<string, string>("InvoiceId", invoiceId.ToString()),
+            new KeyValuePair<string, string>("Amount", "400"),
+            new KeyValuePair<string, string>("PaymentMethod", "Cash")
+        });
+
+        var paymentId = (await _fixture.Factory.LatestPaymentAsync(invoiceId))!.PaymentId;
+        var receiptHtml = await admin.GetStringAsync($"/Payments/Receipt/{paymentId}");
+        var match = System.Text.RegularExpressions.Regex.Match(receiptHtml, "/r/[A-Za-z0-9]+\\?sig=[A-Za-z0-9_\\-]+");
+        Assert.True(match.Success, "an active payment receipt should embed a verification link");
+
+        // The link verifies while the payment is active.
+        var anon = AppClient.Create(_fixture.Factory);
+        Assert.Contains("سند قبض صحيح", System.Net.WebUtility.HtmlDecode(await anon.GetStringAsync(match.Value)));
+
+        var token = await admin.FetchTokenAsync($"/Invoices/Details/{invoiceId}");
+        var cancel = await admin.PostFormWithTokenAsync(token, "/Payments/Cancel", new[]
+        {
+            new KeyValuePair<string, string>("id", paymentId.ToString())
+        });
+        cancel.EnsureSuccessStatusCode();
+
+        // The public id is cleared, so the old link no longer resolves to a valid receipt.
+        Assert.True(await _fixture.Factory.WithDbAsync(async db =>
+            string.IsNullOrWhiteSpace((await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+                .FirstAsync(db.Payments.Where(p => p.PaymentId == paymentId))).PublicId)));
+        Assert.DoesNotContain("سند قبض صحيح",
+            System.Net.WebUtility.HtmlDecode(await anon.GetStringAsync(match.Value)));
+
+        // And the receipt page refuses to print a dead voucher.
+        var blocked = await admin.GetAsync($"/Payments/Receipt/{paymentId}");
+        Assert.Equal($"/Invoices/Details/{invoiceId}", blocked.RequestMessage?.RequestUri?.AbsolutePath);
+    }
+
+    /// <summary>
+    /// Cancelling an invoice voids every receipt issued against it, so a cancelled invoice's vouchers
+    /// can never verify as genuine money received.
+    /// </summary>
+    [Fact]
+    public async Task Cancelling_an_invoice_voids_its_payment_receipts()
+    {
+        var invoiceId = await _fixture.Factory.CreateInvoiceAsync();
+        var admin = await SignInAdminAsync();
+
+        await admin.PostFormAsync($"/Payments/Add?invoiceId={invoiceId}", "/Payments/Add", new[]
+        {
+            new KeyValuePair<string, string>("InvoiceId", invoiceId.ToString()),
+            new KeyValuePair<string, string>("Amount", "150"),
+            new KeyValuePair<string, string>("PaymentMethod", "Cash")
+        });
+
+        var paymentId = (await _fixture.Factory.LatestPaymentAsync(invoiceId))!.PaymentId;
+        var receiptHtml = await admin.GetStringAsync($"/Payments/Receipt/{paymentId}");
+        var match = System.Text.RegularExpressions.Regex.Match(receiptHtml, "/r/[A-Za-z0-9]+\\?sig=[A-Za-z0-9_\\-]+");
+        Assert.True(match.Success, "the receipt should embed a verification link");
+
+        // An invoice with an active payment cannot be cancelled, so delete the payment first.
+        var token = await admin.FetchTokenAsync($"/Invoices/Details/{invoiceId}");
+        var del = await admin.PostFormWithTokenAsync(token, "/Payments/Delete", new[]
+        {
+            new KeyValuePair<string, string>("id", paymentId.ToString())
+        });
+        del.EnsureSuccessStatusCode();
+
+        // Deleting the payment clears its public id, so the voucher it printed stops verifying.
+        var anon = AppClient.Create(_fixture.Factory);
+        Assert.DoesNotContain("سند قبض صحيح",
+            System.Net.WebUtility.HtmlDecode(await anon.GetStringAsync(match.Value)));
+
+        // The invoice can now be cancelled.
+        var cancelToken = await admin.FetchTokenAsync($"/Invoices/Details/{invoiceId}");
+        var cancel = await admin.PostFormWithTokenAsync(cancelToken, "/Invoices/Cancel", new[]
+        {
+            new KeyValuePair<string, string>("id", invoiceId.ToString())
+        });
+        cancel.EnsureSuccessStatusCode();
+        Assert.Equal("Cancelled", (await _fixture.Factory.GetInvoiceAsync(invoiceId)).Status);
     }
 
     /// <summary>
@@ -942,7 +1044,6 @@ public class FinancialSystemTests
         Assert.Contains("SaveRefundAutoApproval", html);
         Assert.Contains("SaveHandoverAutoApproval", html);
         Assert.Contains("SaveMaxOpenHandovers", html);
-
         try
         {
             foreach (var (action, field, value) in new[]
