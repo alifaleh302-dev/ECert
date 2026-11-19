@@ -1,4 +1,5 @@
 using ECert.Data;
+using ECert.Models;
 using ECert.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -40,7 +41,9 @@ public class ReceiptVerificationController : Controller
         var payment = await _db.Payments.AsNoTracking()
             .Include(p => p.Invoice)
             .FirstOrDefaultAsync(p => p.PublicId == normalized);
-        if (payment != null)
+        // A cancelled payment's receipt is void, so its link must resolve to nothing at all (the
+        // public id is cleared on cancel; this also covers any row that still carries one).
+        if (payment != null && !payment.IsCancelled)
         {
             model.IsFound = true;
             model.Kind = "سند قبض";
@@ -49,17 +52,15 @@ public class ReceiptVerificationController : Controller
             model.TraineeName = payment.Invoice?.TraineeNameArabic ?? payment.Invoice?.TraineeName ?? "—";
             model.CourseName = payment.Invoice?.CourseNameArabic ?? payment.Invoice?.CourseName ?? "—";
             model.Date = payment.PaymentDate;
-            model.RecordedBy = payment.RecordedBy;
-            model.IsCancelled = payment.IsCancelled;
-            model.Message = payment.IsCancelled
-                ? "تم العثور على السند، لكن هذه الدفعة ملغاة."
-                : "سند قبض صحيح ومسجَّل في النظام.";
+            model.RecordedBy = payment.RecordedBy ?? string.Empty;
+            model.Message = "سند قبض صحيح ومسجَّل في النظام.";
             return View(model);
         }
 
+        // Cancelled refund requests are deleted, so a legacy row flagged Cancelled must not verify.
         var refund = await _db.Refunds.AsNoTracking()
             .Include(r => r.Invoice)
-            .FirstOrDefaultAsync(r => r.PublicId == normalized);
+            .FirstOrDefaultAsync(r => r.PublicId == normalized && r.Status != RefundStatus.Cancelled);
         if (refund != null)
         {
             model.IsFound = true;
@@ -91,6 +92,5 @@ public class PublicReceiptVerificationViewModel
     public string CourseName { get; set; } = string.Empty;
     public DateTime Date { get; set; }
     public string RecordedBy { get; set; } = string.Empty;
-    public bool IsCancelled { get; set; }
     public string Message { get; set; } = string.Empty;
 }
