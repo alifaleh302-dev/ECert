@@ -178,4 +178,18 @@ public class FinancialLedgerService
         refund.PublicId = Guid.NewGuid().ToString("N");
         return refund.PublicId;
     }
+
+    /// <summary>
+    /// Voids a payment receipt's public verification id so its QR code and <c>/r/{id}</c> link stop
+    /// resolving. Called whenever a payment is cancelled or deleted — a receipt for money that was
+    /// returned must never verify as genuine. The row itself is kept (a cancelled payment stays in the
+    /// ledger for reconciliation), but its public handle is cleared.
+    /// </summary>
+    public void VoidPaymentReceipt(Payment payment) => payment.PublicId = null;
+
+    /// <summary>Voids the public verification id of every payment on an invoice (see <see cref="VoidPaymentReceipt"/>).</summary>
+    public void VoidInvoiceReceipts(IEnumerable<Payment> payments)
+    {
+        foreach (var payment in payments) VoidPaymentReceipt(payment);
+    }
 }
