@@ -8,6 +8,7 @@
     var whatsAppLink = ViewBag.WhatsAppLink as string ?? "";
     var siteName = (ViewBag.SiteSettings as List<SiteSetting>)?.FirstOrDefault(s => s.Key == "SiteName")?.Value;
     if (string.IsNullOrWhiteSpace(siteName)) siteName = "مركز التدريب";
+    var logoUrl = (ViewBag.SiteSettings as List<SiteSetting>)?.FirstOrDefault(s => s.Key == "LogoUrl")?.Value;
 }
 
 @section Styles {
@@ -29,7 +30,14 @@
 <div class="rp-sheet">
     <header class="rp-sheet__head">
         <div class="rp-sheet__brand">
-            <span class="rp-sheet__seal" aria-hidden="true"><i class="bi bi-arrow-counterclockwise"></i></span>
+            @if (!string.IsNullOrWhiteSpace(logoUrl))
+            {
+                <img class="rp-sheet__logo" src="@logoUrl" alt="شعار @siteName" />
+            }
+            else
+            {
+                <span class="rp-sheet__seal" aria-hidden="true"><i class="bi bi-arrow-counterclockwise"></i></span>
+            }
             <div>
                 <p class="rp-sheet__org">@siteName</p>
                 <p class="rp-sheet__org-sub">Training Center</p>

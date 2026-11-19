@@ -574,6 +574,11 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
         WithDbAsync(db => db.Refunds.Where(r => r.InvoiceId == invoiceId)
             .OrderByDescending(r => r.RefundId).FirstOrDefaultAsync());
 
+    /// <summary>The most recent payment on an invoice, for asserting its receipt link.</summary>
+    public Task<ECert.Models.Payment?> LatestPaymentAsync(int invoiceId) =>
+        WithDbAsync(db => db.Payments.Where(p => p.InvoiceId == invoiceId)
+            .OrderByDescending(p => p.PaymentId).FirstOrDefaultAsync());
+
     /// <summary>Writes a key/value system setting, for shaping a scenario (or an unset default).</summary>
     public async Task SetSettingAsync(string key, string value)
     {
