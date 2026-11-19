@@ -122,6 +122,8 @@ public class PaymentsApiController : ControllerBase
 
         payment.IsCancelled = true;
         payment.CancellationReason = req?.Reason;
+        // A cancelled payment's receipt must stop verifying (see PaymentsController.Cancel).
+        _ledger.VoidPaymentReceipt(payment);
 
         await _db.SaveChangesAsync();
         await RecomputeInvoiceAsync(payment.Invoice);
