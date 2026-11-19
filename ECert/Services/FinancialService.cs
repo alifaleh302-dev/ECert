@@ -198,6 +198,33 @@ public class FinancialService
     }
 
     /// <summary>
+    /// Cancels a refund that is still waiting for approval, so the employee who requested it can
+    /// withdraw the request before it is approved. Only the requester may cancel it, and only while it
+    /// is <see cref="RefundStatus.PendingApproval"/>: a pending refund has not moved any money, so
+    /// cancelling it changes neither the invoice nor the custody — it only releases the custody it was
+    /// reserving. An approved refund can never be cancelled here. The caller must already be inside a
+    /// transaction; this method saves but does not commit.
+    /// </summary>
+    public async Task<RefundResult> CancelRefundAsync(Refund refund, int userId, string actor)
+    {
+        if (refund.Status != RefundStatus.PendingApproval)
+            return new RefundResult(false, "لا يمكن إلغاء استرداد تمت مراجعته مسبقاً.");
+
+        if (refund.RequestedByUserId != userId)
+            return new RefundResult(false, "يمكن لمقدّم الطلب فقط إلغاء الاسترداد قبل الاعتماد.");
+
+        refund.Status = RefundStatus.Cancelled;
+        await _db.SaveChangesAsync();
+
+        _ledger.AddAudit(actor, FinancialActionTypes.Cancel, refund.Amount,
+            referenceType: nameof(Refund), referenceId: refund.RefundId, referenceNumber: refund.ReceiptNumber,
+            details: $"إلغاء طلب استرداد بانتظار الاعتماد على الفاتورة {refund.Invoice?.InvoiceNumber ?? refund.InvoiceId.ToString()}");
+        await _db.SaveChangesAsync();
+
+        return new RefundResult(true, "تم إلغاء طلب الاسترداد.", refund);
+    }
+
+    /// <summary>
     /// Approves a refund that was waiting for approval: it now moves the money (out of the
     /// performing employee's custody, or out of the main fund when it was requested that way) and
     /// lowers the invoice balance, exactly as a direct refund would have. The caller must already be

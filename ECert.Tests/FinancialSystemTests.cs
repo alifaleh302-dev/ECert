@@ -482,11 +482,11 @@ public class FinancialSystemTests
     }
 
     /// <summary>
-    /// The refunds list offers a further-refund button on a row whose invoice still has a balance,
-    /// so money can be refunded again without leaving the page.
+    /// The refunds list no longer offers a further-refund button on a row: a new refund is started from
+    /// the invoice picker (طلب استرداد جديد), not by re-refunding a row already shown in the list.
     /// </summary>
     [Fact]
-    public async Task The_refunds_list_offers_a_further_refund_button()
+    public async Task The_refunds_list_no_longer_offers_a_further_refund_button()
     {
         var invoiceId = await _fixture.Factory.CreateInvoiceAsync();
         var admin = await SignInAdminAsync();
@@ -505,7 +505,132 @@ public class FinancialSystemTests
         });
 
         var html = await admin.GetStringAsync("/Refunds");
-        Assert.Contains($"/Refunds/Create?invoiceId={invoiceId}", html);
+        // The refund still appears in the list (with its receipt link), but not a further-refund button.
+        Assert.Contains($"/Refunds/Receipt/", html);
+        Assert.DoesNotContain($"/Refunds/Create?invoiceId={invoiceId}", html);
+    }
+
+    /// <summary>
+    /// A pending refund request can be withdrawn by the employee who created it — the row shows an
+    /// إلغاء button only to the requester, so they can pull the request back before it is approved.
+    /// </summary>
+    [Fact]
+    public async Task The_refunds_list_offers_a_cancel_button_to_the_requester_of_a_pending_refund()
+    {
+        // A 20,000 refund on a 20,000 collection is above the default ceiling, so it waits for approval.
+        var invoiceId = await _fixture.Factory.CreateInvoiceAsync(20_000m);
+        var collector = await CreateUserWithRoleAsync(new[]
+        {
+            AdminPermissions.ManagePayments, AdminPermissions.ManageRefunds, AdminPermissions.ViewCustody
+        });
+        var client = await SignInAsync(collector.Username, collector.Password);
+
+        await client.PostFormAsync($"/Payments/Add?invoiceId={invoiceId}", "/Payments/Add", new[]
+        {
+            new KeyValuePair<string, string>("InvoiceId", invoiceId.ToString()),
+            new KeyValuePair<string, string>("Amount", "20000"),
+            new KeyValuePair<string, string>("PaymentMethod", "Cash")
+        });
+        await client.PostFormAsync($"/Refunds/Create?invoiceId={invoiceId}", "/Refunds/Create", new[]
+        {
+            new KeyValuePair<string, string>("invoiceId", invoiceId.ToString()),
+            new KeyValuePair<string, string>("amount", "20000"),
+            new KeyValuePair<string, string>("reason", "انسحاب المتدرب"),
+            new KeyValuePair<string, string>("refundMethod", "Cash")
+        });
+        var refundId = (await _fixture.Factory.LatestRefundAsync(invoiceId))!.RefundId;
+        Assert.Equal(RefundStatus.PendingApproval, (await _fixture.Factory.LatestRefundAsync(invoiceId))!.Status);
+
+        var html = await client.GetStringAsync("/Refunds");
+        Assert.Contains($"/Refunds/Cancel/{refundId}", html);
+    }
+
+    /// <summary>
+    /// Cancelling a pending refund request marks it cancelled and releases the custody it was reserving,
+    /// so the employee's balance is free again — and the invoice is untouched because nothing moved.
+    /// </summary>
+    [Fact]
+    public async Task Cancelling_a_pending_refund_releases_the_reserved_custody()
+    {
+        var invoiceId = await _fixture.Factory.CreateInvoiceAsync(20_000m);
+        var collector = await CreateUserWithRoleAsync(new[]
+        {
+            AdminPermissions.ManagePayments, AdminPermissions.ManageRefunds, AdminPermissions.ViewCustody
+        });
+        var client = await SignInAsync(collector.Username, collector.Password);
+        var collectorId = await _fixture.Factory.UserIdAsync(collector.Username);
+
+        await client.PostFormAsync($"/Payments/Add?invoiceId={invoiceId}", "/Payments/Add", new[]
+        {
+            new KeyValuePair<string, string>("InvoiceId", invoiceId.ToString()),
+            new KeyValuePair<string, string>("Amount", "20000"),
+            new KeyValuePair<string, string>("PaymentMethod", "Cash")
+        });
+        Assert.Equal(20_000m, await _fixture.Factory.CustodyBalanceAsync(collectorId));
+
+        await client.PostFormAsync($"/Refunds/Create?invoiceId={invoiceId}", "/Refunds/Create", new[]
+        {
+            new KeyValuePair<string, string>("invoiceId", invoiceId.ToString()),
+            new KeyValuePair<string, string>("amount", "20000"),
+            new KeyValuePair<string, string>("reason", "انسحاب المتدرب"),
+            new KeyValuePair<string, string>("refundMethod", "Cash")
+        });
+        var refundId = (await _fixture.Factory.LatestRefundAsync(invoiceId))!.RefundId;
+        Assert.Equal(RefundStatus.PendingApproval, (await _fixture.Factory.LatestRefundAsync(invoiceId))!.Status);
+
+        var cancel = await client.PostFormAsync("/Refunds", $"/Refunds/Cancel/{refundId}", new[]
+        {
+            new KeyValuePair<string, string>("id", refundId.ToString())
+        });
+        cancel.EnsureSuccessStatusCode();
+
+        Assert.Equal(RefundStatus.Cancelled, (await _fixture.Factory.LatestRefundAsync(invoiceId))!.Status);
+        // Nothing moved: the collection stays in the custody and the invoice keeps its paid amount.
+        Assert.Equal(20_000m, await _fixture.Factory.CustodyBalanceAsync(collectorId));
+        Assert.Equal(20_000m, (await _fixture.Factory.GetInvoiceAsync(invoiceId)).PaidAmount);
+    }
+
+    /// <summary>
+    /// A pending refund may only be withdrawn by the employee who requested it: a different user (even
+    /// one who may approve refunds) cannot cancel it from the list, and the request stays pending.
+    /// </summary>
+    [Fact]
+    public async Task A_pending_refund_cannot_be_cancelled_by_someone_other_than_the_requester()
+    {
+        var invoiceId = await _fixture.Factory.CreateInvoiceAsync(20_000m);
+        var collector = await CreateUserWithRoleAsync(new[]
+        {
+            AdminPermissions.ManagePayments, AdminPermissions.ManageRefunds, AdminPermissions.ViewCustody
+        });
+        var collectorClient = await SignInAsync(collector.Username, collector.Password);
+
+        await collectorClient.PostFormAsync($"/Payments/Add?invoiceId={invoiceId}", "/Payments/Add", new[]
+        {
+            new KeyValuePair<string, string>("InvoiceId", invoiceId.ToString()),
+            new KeyValuePair<string, string>("Amount", "20000"),
+            new KeyValuePair<string, string>("PaymentMethod", "Cash")
+        });
+        await collectorClient.PostFormAsync($"/Refunds/Create?invoiceId={invoiceId}", "/Refunds/Create", new[]
+        {
+            new KeyValuePair<string, string>("invoiceId", invoiceId.ToString()),
+            new KeyValuePair<string, string>("amount", "20000"),
+            new KeyValuePair<string, string>("reason", "انسحاب المتدرب"),
+            new KeyValuePair<string, string>("refundMethod", "Cash")
+        });
+        var refundId = (await _fixture.Factory.LatestRefundAsync(invoiceId))!.RefundId;
+
+        // The SuperAdmin may approve refunds but is not the requester, so the row shows no cancel button.
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/Refunds");
+        Assert.DoesNotContain($"/Refunds/Cancel/{refundId}", html);
+
+        // And a crafted POST is refused, leaving the request pending.
+        var response = await admin.PostFormAsync("/Refunds", $"/Refunds/Cancel/{refundId}", new[]
+        {
+            new KeyValuePair<string, string>("id", refundId.ToString())
+        });
+        response.EnsureSuccessStatusCode();
+        Assert.Equal(RefundStatus.PendingApproval, (await _fixture.Factory.LatestRefundAsync(invoiceId))!.Status);
     }
 
     /// <summary>A refund started from the picker reaches the same working form and moves the money.</summary>

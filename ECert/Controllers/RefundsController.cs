@@ -75,6 +75,7 @@ public class RefundsController : Controller
 
         ViewBag.Refunds = await query.OrderByDescending(r => r.RefundDate).ThenByDescending(r => r.RefundId).Take(500).ToListAsync();
         ViewBag.Search = search;
+        ViewBag.CurrentUserId = CurrentUserId;
         return View();
     }
 
@@ -243,6 +244,40 @@ public class RefundsController : Controller
         await _audit.LogAsync(Actor, "Approve", "Refund", refund.RefundId, null,
             $"Approve refund: {refund.Amount:N2}; Invoice: {refund.Invoice.InvoiceNumber}");
         await _alerts.AlertLargeRefundApprovedAsync(Actor, refund.Invoice.InvoiceNumber ?? "", refund.Amount);
+        TempData["Success"] = result.Message;
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// Withdraws a refund request that is still waiting for approval. The employee who created the
+    /// request can pull it back before a SuperAdmin approves it; nothing has moved at that point, so
+    /// the cancellation only releases the custody the request was reserving. Only the requester may
+    /// cancel (an approver uses <see cref="Approve"/>), and only while it is pending.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Cancel(int id)
+    {
+        if (!HasPermission(AdminPermissions.ManageRefunds)) return Forbid();
+        if (!CurrentUserId.HasValue) return Forbid();
+
+        var refund = await _db.Refunds.Include(r => r.Invoice).ThenInclude(i => i!.Registration)
+            .FirstOrDefaultAsync(r => r.RefundId == id);
+        if (refund?.Invoice?.Registration == null) return NotFound();
+        if (!User.CanAccessCourse(refund.Invoice.Registration.CourseId)) return Forbid();
+
+        await using var transaction = await _db.Database.BeginTransactionAsync();
+        var result = await _financial.CancelRefundAsync(refund, CurrentUserId.Value, Actor);
+        if (!result.Success)
+        {
+            await transaction.RollbackAsync();
+            TempData["Error"] = result.Message;
+            return RedirectToAction(nameof(Index));
+        }
+
+        await transaction.CommitAsync();
+        await _audit.LogAsync(Actor, "Cancel", "Refund", refund.RefundId, null,
+            $"Cancel refund request: {refund.Amount:N2}; Invoice: {refund.Invoice.InvoiceNumber}");
         TempData["Success"] = result.Message;
         return RedirectToAction(nameof(Index));
     }

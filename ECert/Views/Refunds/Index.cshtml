@@ -7,7 +7,10 @@
     var search = ViewBag.Search as string;
     bool canApprove = User.HasPermission(AdminPermissions.ApproveRefunds);
     bool canRefund = User.HasPermission(AdminPermissions.ManageRefunds);
+    int? currentUserId = ViewBag.CurrentUserId as int?;
     var pending = refunds.Where(r => r.Status == RefundStatus.PendingApproval).ToList();
+    string statusLabel(string s) => s == RefundStatus.Approved ? "معتمد" : s == RefundStatus.Cancelled ? "ملغى" : "بانتظار الاعتماد";
+    string statusBadge(string s) => s == RefundStatus.Approved ? "a-badge--success" : s == RefundStatus.Cancelled ? "a-badge--neutral" : "a-badge--warning";
 }
 
 <div class="page-header">
@@ -108,23 +111,25 @@
                                 <td class="text-muted small">@r.Reason</td>
                                 <td class="small">@r.RefundedBy</td>
                                 <td>
-                                    <span class="a-badge @(r.Status == RefundStatus.Approved ? "a-badge--success" : "a-badge--warning")">
-                                        @(r.Status == RefundStatus.Approved ? "معتمد" : "بانتظار الاعتماد")
+                                    <span class="a-badge @statusBadge(r.Status)">
+                                        @statusLabel(r.Status)
                                     </span>
                                 </td>
                                 <td class="small">@r.RefundDate.ToString("yyyy-MM-dd HH:mm")</td>
                                 <td class="text-nowrap">
                                     @{
-                                        // Allow a further refund on the same invoice while it still has a
-                                        // positive net paid balance (an invoice can be refunded more than once).
-                                        bool canRefundAgain = canRefund && r.Invoice != null
-                                            && r.Invoice.Status != "Cancelled" && r.Invoice.PaidAmount > 0;
+                                        // The requester may withdraw their own refund request while it is
+                                        // still waiting for approval; nothing has moved yet, so cancelling
+                                        // only releases the custody the request was reserving.
+                                        bool canCancelOwn = r.Status == RefundStatus.PendingApproval
+                                            && currentUserId.HasValue && r.RequestedByUserId == currentUserId;
                                     }
-                                    @if (canRefundAgain)
+                                    @if (canCancelOwn)
                                     {
-                                        <a class="btn btn-sm btn-outline-warning" asp-action="Create" asp-route-invoiceId="@r.InvoiceId" title="استرداد من نفس الفاتورة">
-                                            <i class="bi bi-arrow-counterclockwise"></i> استرداد
-                                        </a>
+                                        <form asp-action="Cancel" asp-route-id="@r.RefundId" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary" data-confirm="إلغاء طلب الاسترداد؟ لا يمكن التراجع."><i class="bi bi-x-circle"></i> إلغاء</button>
+                                        </form>
                                     }
                                     <a class="btn btn-sm btn-outline-primary" asp-action="Receipt" asp-route-id="@r.RefundId">
                                         <i class="bi bi-printer"></i> سند

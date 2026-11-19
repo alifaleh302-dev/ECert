@@ -262,6 +262,7 @@ public static class RefundStatus
 {
     public const string Approved = "Approved";             // معتمد — يخصم فوراً
     public const string PendingApproval = "PendingApproval"; // بانتظار اعتماد مدير النظام
+    public const string Cancelled = "Cancelled";           // ملغى بواسطة مقدّم الطلب قبل الاعتماد
 }
 
 public static class FinancialActionTypes
