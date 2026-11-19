@@ -5,8 +5,6 @@
     Layout = "_AdminLayout";
     var payments = ViewBag.Payments as List<ECert.Models.Payment> ?? new();
     bool canManage = ViewBag.CanManage is bool cm && cm;
-    // Refunding is a separate right from recording/deleting a payment; the button only shows when held.
-    bool canRefund = User.HasPermission(AdminPermissions.ManageRefunds);
 }
 <div class="page-header">
     <partial name="_PageHeader" />
@@ -113,20 +111,10 @@
                                     }
                                 </td>
                                 <td>
-                                    @{
-                                        // A refund targets the invoice, not the individual payment, and is only
-                                        // possible while the invoice still has a positive net paid balance.
-                                        bool canRefundThis = canRefund && !p.IsCancelled
-                                            && p.Invoice != null && p.Invoice.Status != "Cancelled"
-                                            && p.Invoice.PaidAmount > 0;
-                                    }
-                                    @if (canRefundThis)
-                                    {
-                                        <a asp-controller="Refunds" asp-action="Create" asp-route-invoiceId="@p.InvoiceId"
-                                           class="btn btn-sm btn-outline-warning" title="استرداد من هذه الفاتورة">
-                                            <i class="bi bi-arrow-counterclockwise"></i> استرداد
-                                        </a>
-                                    }
+                                    <a asp-action="Receipt" asp-route-id="@p.PaymentId"
+                                       class="btn btn-sm btn-outline-primary" title="طباعة سند القبض" target="_blank" rel="noopener">
+                                        <i class="bi bi-printer"></i> طباعة السند
+                                    </a>
                                     @if (canManage)
                                     {
                                         <form asp-action="Delete" method="post" style="display:inline" data-confirm="هل أنت متأكد من حذف هذه الدفعة؟ سيتم تحديث رصيد الفاتورة تلقائياً." data-confirm-tone="danger">

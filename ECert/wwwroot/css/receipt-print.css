@@ -29,7 +29,18 @@
     border-bottom: 2px solid #14335c;
 }
 
-.rp-sheet__brand { display: flex; align-items: center; gap: .75rem; }
+.rp-sheet__brand { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+
+/* The centre's uploaded logo, shown in place of the default seal when one is configured. */
+.rp-sheet__logo {
+    display: block;
+    max-height: 52px;
+    max-width: 150px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    flex-shrink: 0;
+}
 
 .rp-sheet__seal {
     display: inline-flex;
@@ -138,3 +149,17 @@
 .rp-sheet--thermal { max-width: 320px; padding: 1rem; }
 .rp-sheet--thermal .rp-grid { grid-template-columns: 1fr; }
 .rp-sheet--thermal .rp-sheet__foot { flex-direction: column; align-items: flex-start; }
+
+/* Phones: stack the header and footer so the verification URL gets the full width instead of
+   being squeezed next to the QR code and broken one character per line. */
+@media screen and (max-width: 640px) {
+    .rp-sheet { padding: 1.25rem 1.1rem; }
+    .rp-sheet__head { flex-direction: column; align-items: flex-start; gap: .6rem; }
+    .rp-sheet__title { text-align: start; }
+    .rp-grid { grid-template-columns: 1fr; }
+    .rp-sheet__foot { flex-direction: column; align-items: stretch; gap: 1.25rem; }
+    .rp-sheet__verify { max-width: 100%; flex-wrap: wrap; align-items: flex-start; }
+    .rp-sheet__sign { text-align: start; }
+    .rp-sheet__sign-line { min-width: 0; }
+    .rp-actions .btn { flex: 1 1 auto; }
+}

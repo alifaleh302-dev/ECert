@@ -67,6 +67,39 @@ public class FinancialSystemTests
         Assert.Contains("/r/", html);
     }
 
+    /// <summary>
+    /// A receipt shows the centre's uploaded logo when one is configured, so the voucher carries the
+    /// centre's identity. The logo is read from the same SiteSettings the layout uses.
+    /// </summary>
+    [Fact]
+    public async Task The_receipt_shows_the_centre_logo_when_one_is_configured()
+    {
+        const string logo = "/uploads/site/logo-test.png";
+        await _fixture.Factory.SetSettingAsync("LogoUrl", logo);
+        try
+        {
+            var invoiceId = await _fixture.Factory.CreateInvoiceAsync();
+            var admin = await SignInAdminAsync();
+            var response = await admin.PostFormAsync($"/Payments/Add?invoiceId={invoiceId}", "/Payments/Add", new[]
+            {
+                new KeyValuePair<string, string>("InvoiceId", invoiceId.ToString()),
+                new KeyValuePair<string, string>("Amount", "150"),
+                new KeyValuePair<string, string>("PaymentMethod", "Cash")
+            });
+            response.EnsureSuccessStatusCode();
+            var receiptPath = response.RequestMessage?.RequestUri?.AbsolutePath ?? string.Empty;
+
+            var html = await admin.GetStringAsync(receiptPath);
+            Assert.Contains("rp-sheet__logo", html);
+            Assert.Contains(logo, html);
+        }
+        finally
+        {
+            // The fixture database is shared, so clear the logo or it leaks into later receipts.
+            await _fixture.Factory.SetSettingAsync("LogoUrl", string.Empty);
+        }
+    }
+
     [Fact]
     public async Task A_refund_reduces_the_invoice_balance_and_debits_the_custody()
     {
@@ -392,14 +425,15 @@ public class FinancialSystemTests
         Assert.False(await client.CanOpenAsync("/FinancialAudit"));
     }
 
-    // ===== Refund entry points: the payments tab and the refunds page =====
+    // ===== Refund entry points: the refunds page =====
 
     /// <summary>
-    /// The payments list offers a refund button on each active row that points at the refund form
-    /// for that row's invoice, so a refund can be started straight from the payment.
+    /// The payments list offers a print-receipt button on each row that opens the payment's own
+    /// receipt (سند القبض) in a new tab, so a receipt can be reprinted straight from the payment.
+    /// Refunds are no longer started from here — they begin on the refunds page.
     /// </summary>
     [Fact]
-    public async Task The_payments_tab_offers_a_refund_button_linking_to_the_invoice()
+    public async Task The_payments_tab_offers_a_print_receipt_button_for_each_payment()
     {
         var invoiceId = await _fixture.Factory.CreateInvoiceAsync();
         var admin = await SignInAdminAsync();
@@ -411,7 +445,10 @@ public class FinancialSystemTests
         });
 
         var html = await admin.GetStringAsync("/Payments");
-        Assert.Contains($"/Refunds/Create?invoiceId={invoiceId}", html);
+        var paymentId = (await _fixture.Factory.LatestPaymentAsync(invoiceId))!.PaymentId;
+        Assert.Contains($"/Payments/Receipt/{paymentId}", html);
+        // The old refund shortcut is gone from the payments tab.
+        Assert.DoesNotContain($"/Refunds/Create?invoiceId={invoiceId}", html);
     }
 
     /// <summary>
@@ -515,11 +552,11 @@ public class FinancialSystemTests
     }
 
     /// <summary>
-    /// A user who may refund but not record payments sees the refund button on the payments list
-    /// (the button follows manage-refunds, not manage-payments).
+    /// The print-receipt button on the payments list is available to anyone who may view payments,
+    /// and it links to that row's own receipt (not to a refund form, which now lives on the refunds page).
     /// </summary>
     [Fact]
-    public async Task The_refund_button_follows_the_refund_permission_not_the_payment_permission()
+    public async Task The_print_receipt_button_follows_the_view_payment_permission()
     {
         var invoiceId = await _fixture.Factory.CreateInvoiceAsync();
         var admin = await SignInAdminAsync();
@@ -529,15 +566,14 @@ public class FinancialSystemTests
             new KeyValuePair<string, string>("Amount", "150"),
             new KeyValuePair<string, string>("PaymentMethod", "Cash")
         });
+        var paymentId = (await _fixture.Factory.LatestPaymentAsync(invoiceId))!.PaymentId;
 
-        var user = await CreateUserWithRoleAsync(new[]
-        {
-            AdminPermissions.ViewPayments, AdminPermissions.ManageRefunds
-        });
+        var user = await CreateUserWithRoleAsync(new[] { AdminPermissions.ViewPayments });
         var client = await SignInAsync(user.Username, user.Password);
 
         var html = await client.GetStringAsync("/Payments");
-        Assert.Contains($"/Refunds/Create?invoiceId={invoiceId}", html);
+        Assert.Contains($"/Payments/Receipt/{paymentId}", html);
+        Assert.DoesNotContain("/Refunds/Create?invoiceId=", html);
     }
 
     // ===== Refund approval funding + competing custody claims =====

@@ -774,6 +774,9 @@ a.a-kpi:focus-visible {
     letter-spacing: -0.02em;
     color: var(--a-text);
     font-variant-numeric: tabular-nums;
+    /* A large amount must stay readable instead of being clipped by the card's overflow. */
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .a-kpi__hint {
@@ -1765,6 +1768,8 @@ a.a-kpi:focus-visible {
 
 @media (max-width: 480px) {
     .a-kpis { grid-template-columns: 1fr 1fr; gap: var(--a-3); }
+    /* Two columns leave little room; drop the value a step so a long amount still fits. */
+    .a-kpi__value { font-size: 1.15rem; }
     .admin-usermenu__meta { display: none; }
     .a-form__grid--3 { grid-template-columns: 1fr; }
 }
