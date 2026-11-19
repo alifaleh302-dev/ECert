@@ -13,8 +13,9 @@ public class InvoicesController : Controller
 {
     private readonly ECertDbContext _db;
     private readonly AuditLogService _audit;
+    private readonly FinancialLedgerService _ledger;
     private readonly RegistrationInvoiceService _invoiceService;
-    public InvoicesController(ECertDbContext db, AuditLogService audit, RegistrationInvoiceService invoiceService) { _db = db; _audit = audit; _invoiceService = invoiceService; }
+    public InvoicesController(ECertDbContext db, AuditLogService audit, FinancialLedgerService ledger, RegistrationInvoiceService invoiceService) { _db = db; _audit = audit; _ledger = ledger; _invoiceService = invoiceService; }
 
     private bool HasPermission(string perm) => User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
 
@@ -107,9 +108,15 @@ public class InvoicesController : Controller
         invoice.Status = "Cancelled";
         invoice.CancelledBy = User.Identity?.Name ?? "System";
         invoice.CancelledAt = DateTime.Now;
+
+        // Every receipt issued against this invoice is void with it: clearing the public ids makes
+        // their QR codes and /r/{id} links stop resolving, so a cancelled invoice's vouchers can never
+        // verify as genuine money received.
+        _ledger.VoidInvoiceReceipts(invoice.Payments);
+
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Cancel", "Invoice", id);
-        TempData["Success"] = "تم إلغاء الفاتورة.";
+        TempData["Success"] = "تم إلغاء الفاتورة وإبطال سنداتها.";
         return RedirectToAction("Index");
     }
 
