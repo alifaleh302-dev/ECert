@@ -111,6 +111,30 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>, IAsyncDispo
             return Convert.ToInt32(await command.ExecuteScalarAsync()) > 0;
         });
 
+    /// <summary>True when the given index exists on the table in this factory's database.</summary>
+    public async Task<bool> IndexExistsAsync(string table, string index) =>
+        await WithDbAsync(async db =>
+        {
+            var connection = db.Database.GetDbConnection();
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @t AND INDEX_NAME = @i;";
+            var t = command.CreateParameter(); t.ParameterName = "@t"; t.Value = table; command.Parameters.Add(t);
+            var i = command.CreateParameter(); i.ParameterName = "@i"; i.Value = index; command.Parameters.Add(i);
+            return Convert.ToInt32(await command.ExecuteScalarAsync()) > 0;
+        });
+
+    /// <summary>Runs a scalar query against this factory's database.</summary>
+    public async Task<object?> ScalarAsync(string sql) =>
+        await WithDbAsync(async db =>
+        {
+            var connection = db.Database.GetDbConnection();
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            return await command.ExecuteScalarAsync();
+        });
+
     public string ConnectionString
     {
         get

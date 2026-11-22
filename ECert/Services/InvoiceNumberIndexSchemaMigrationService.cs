@@ -12,21 +12,32 @@ namespace ECert.Services;
 /// collide (from before the index existed) are reported and left alone rather than aborting
 /// startup; the index is only created once the column is collision-free.
 /// </summary>
+/// <remarks>
+/// Databases created before <see cref="ECert.Models.Invoice.InvoiceNumber"/> carried a length
+/// mapped the column as <c>LONGTEXT</c>, and MySQL refuses to index a TEXT column without a prefix
+/// length, so the constraint silently never appeared. The column is narrowed to
+/// <see cref="ColumnLength"/> first — only when every stored value still fits — so the index is what
+/// a deployment actually ends up with.
+/// </remarks>
 public sealed class InvoiceNumberIndexSchemaMigrationService
 {
+    private const string IndexName = "UX_Invoices_InvoiceNumber";
+    private const int ColumnLength = 40;
+
     private readonly ECertDbContext _db;
 
     public InvoiceNumberIndexSchemaMigrationService(ECertDbContext db) => _db = db;
 
     public async Task EnsureAsync()
     {
-        if (!await TableExistsAsync("Invoices") || await IndexExistsAsync("Invoices", "UX_Invoices_InvoiceNumber"))
-            return;
+        if (!await TableExistsAsync("Invoices")) return;
+        if (!await EnsureIndexableColumnAsync()) return;
+        if (await IndexExistsAsync("Invoices", IndexName)) return;
 
         if (await HasDuplicateInvoiceNumbersAsync())
         {
             Console.Error.WriteLine(
-                "Skipped unique index UX_Invoices_InvoiceNumber: duplicate InvoiceNumber values exist. " +
+                $"Skipped unique index {IndexName}: duplicate InvoiceNumber values exist. " +
                 "Resolve the duplicates, then restart to apply the constraint.");
             return;
         }
@@ -34,7 +45,8 @@ public sealed class InvoiceNumberIndexSchemaMigrationService
         try
         {
             await _db.Database.ExecuteSqlRawAsync(
-                "CREATE UNIQUE INDEX `UX_Invoices_InvoiceNumber` ON `Invoices` (`InvoiceNumber`);");
+                $"CREATE UNIQUE INDEX `{IndexName}` ON `Invoices` (`InvoiceNumber`);");
+            Console.WriteLine($"Created unique index {IndexName} on Invoices.InvoiceNumber.");
         }
         catch (Exception ex)
         {
@@ -42,7 +54,60 @@ public sealed class InvoiceNumberIndexSchemaMigrationService
         }
     }
 
-    private async Task<bool> HasDuplicateInvoiceNumbersAsync()
+    /// <summary>
+    /// MySQL cannot index a TEXT/BLOB column, so a legacy <c>LONGTEXT</c> column is rewritten as
+    /// <c>VARCHAR(40)</c>. Returns false when the column cannot be narrowed (a stored value is too
+    /// long, or the rewrite failed), in which case the index is skipped instead of failing startup.
+    /// </summary>
+    private async Task<bool> EnsureIndexableColumnAsync()
+    {
+        var dataType = Convert.ToString(await ScalarAsync(
+            "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS " +
+            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Invoices' AND COLUMN_NAME = 'InvoiceNumber'"));
+        if (string.IsNullOrEmpty(dataType)) return false;
+        if (!dataType.EndsWith("text", StringComparison.OrdinalIgnoreCase)) return true;
+
+        var longest = Convert.ToInt64(await ScalarAsync(
+            "SELECT COALESCE(MAX(CHAR_LENGTH(`InvoiceNumber`)), 0) FROM `Invoices`"));
+        if (longest > ColumnLength)
+        {
+            Console.Error.WriteLine(
+                $"Skipped unique index {IndexName}: Invoices.InvoiceNumber is {dataType} and holds a " +
+                $"value of {longest} characters, which does not fit VARCHAR({ColumnLength}).");
+            return false;
+        }
+
+        try
+        {
+            await _db.Database.ExecuteSqlRawAsync(
+                $"ALTER TABLE `Invoices` MODIFY `InvoiceNumber` VARCHAR({ColumnLength}) NOT NULL;");
+            Console.WriteLine($"Narrowed Invoices.InvoiceNumber from {dataType} to VARCHAR({ColumnLength}).");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Could not narrow Invoices.InvoiceNumber to VARCHAR({ColumnLength}): {ex.Message}");
+            return false;
+        }
+    }
+
+    private async Task<bool> HasDuplicateInvoiceNumbersAsync() =>
+        Convert.ToInt64(await ScalarAsync(
+            "SELECT COUNT(*) FROM (SELECT `InvoiceNumber` FROM `Invoices` " +
+            "GROUP BY `InvoiceNumber` HAVING COUNT(*) > 1) AS d")) > 0;
+
+    private Task<bool> TableExistsAsync(string tableName) =>
+        ExistsAsync(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES " +
+            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @name", tableName);
+
+    private Task<bool> IndexExistsAsync(string tableName, string indexName) =>
+        ExistsAsync(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS " +
+            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @name AND INDEX_NAME = @index",
+            tableName, indexName);
+
+    private async Task<bool> ExistsAsync(string sql, string name, string? index = null)
     {
         var connection = _db.Database.GetDbConnection();
         var shouldClose = connection.State != ConnectionState.Open;
@@ -50,9 +115,9 @@ public sealed class InvoiceNumberIndexSchemaMigrationService
         try
         {
             await using var command = connection.CreateCommand();
-            command.CommandText =
-                "SELECT COUNT(*) FROM (SELECT `InvoiceNumber` FROM `Invoices` " +
-                "GROUP BY `InvoiceNumber` HAVING COUNT(*) > 1) AS d";
+            command.CommandText = sql;
+            AddParameter(command, "@name", name);
+            if (index != null) AddParameter(command, "@index", index);
             return Convert.ToInt64(await command.ExecuteScalarAsync()) > 0;
         }
         finally
@@ -62,7 +127,7 @@ public sealed class InvoiceNumberIndexSchemaMigrationService
         }
     }
 
-    private async Task<bool> TableExistsAsync(string tableName)
+    private async Task<object?> ScalarAsync(string sql)
     {
         var connection = _db.Database.GetDbConnection();
         var shouldClose = connection.State != ConnectionState.Open;
@@ -70,14 +135,8 @@ public sealed class InvoiceNumberIndexSchemaMigrationService
         try
         {
             await using var command = connection.CreateCommand();
-            command.CommandText =
-                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES " +
-                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @table";
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "@table";
-            parameter.Value = tableName;
-            command.Parameters.Add(parameter);
-            return Convert.ToInt64(await command.ExecuteScalarAsync()) > 0;
+            command.CommandText = sql;
+            return await command.ExecuteScalarAsync();
         }
         finally
         {
@@ -86,31 +145,11 @@ public sealed class InvoiceNumberIndexSchemaMigrationService
         }
     }
 
-    private async Task<bool> IndexExistsAsync(string tableName, string indexName)
+    private static void AddParameter(System.Data.Common.DbCommand command, string name, string value)
     {
-        var connection = _db.Database.GetDbConnection();
-        var shouldClose = connection.State != ConnectionState.Open;
-        if (shouldClose) await connection.OpenAsync();
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.CommandText =
-                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS " +
-                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @table AND INDEX_NAME = @index";
-            var tableParameter = command.CreateParameter();
-            tableParameter.ParameterName = "@table";
-            tableParameter.Value = tableName;
-            command.Parameters.Add(tableParameter);
-            var indexParameter = command.CreateParameter();
-            indexParameter.ParameterName = "@index";
-            indexParameter.Value = indexName;
-            command.Parameters.Add(indexParameter);
-            return Convert.ToInt64(await command.ExecuteScalarAsync()) > 0;
-        }
-        finally
-        {
-            if (shouldClose && connection.State == ConnectionState.Open)
-                await connection.CloseAsync();
-        }
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = name;
+        parameter.Value = value;
+        command.Parameters.Add(parameter);
     }
 }

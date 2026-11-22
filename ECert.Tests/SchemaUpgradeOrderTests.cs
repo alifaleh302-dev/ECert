@@ -1,4 +1,5 @@
 using ECert.Tests.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace ECert.Tests;
@@ -90,5 +91,40 @@ DROP TABLE `ExpenseAttachments`;");
             try { await upgraded.DisposeAsync(); } catch { /* host may not have started */ }
             TestAppFactory.DropDatabaseByName(databaseName);
         }
+    }
+
+    /// <summary>
+    /// A database created before <c>Invoice.InvoiceNumber</c> had a length stores it as LONGTEXT, and
+    /// MySQL rejects a unique index on a TEXT column. The upgrade must narrow the column first,
+    /// otherwise the constraint the app relies on for invoice numbers never exists in production.
+    /// </summary>
+    [Fact]
+    public async Task Legacy_text_invoice_number_is_narrowed_so_the_unique_index_is_created()
+    {
+        await using var factory = new TestAppFactory();
+        _ = factory.Services; // boots the host: schema plus every startup migration
+
+        await factory.ExecuteRawAsync(@"
+ALTER TABLE `Invoices` DROP INDEX `UX_Invoices_InvoiceNumber`;
+ALTER TABLE `Invoices` MODIFY `InvoiceNumber` LONGTEXT NOT NULL;");
+
+        Assert.Equal("longtext", await factory.ScalarAsync(
+            "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() " +
+            "AND TABLE_NAME = 'Invoices' AND COLUMN_NAME = 'InvoiceNumber'"));
+        Assert.False(await factory.IndexExistsAsync("Invoices", "UX_Invoices_InvoiceNumber"));
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ECert.Data.ECertDbContext>();
+            await new ECert.Services.InvoiceNumberIndexSchemaMigrationService(db).EnsureAsync();
+        }
+
+        Assert.Equal("varchar", await factory.ScalarAsync(
+            "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() " +
+            "AND TABLE_NAME = 'Invoices' AND COLUMN_NAME = 'InvoiceNumber'"));
+        Assert.Equal(40L, Convert.ToInt64(await factory.ScalarAsync(
+            "SELECT CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() " +
+            "AND TABLE_NAME = 'Invoices' AND COLUMN_NAME = 'InvoiceNumber'")));
+        Assert.True(await factory.IndexExistsAsync("Invoices", "UX_Invoices_InvoiceNumber"));
     }
 }

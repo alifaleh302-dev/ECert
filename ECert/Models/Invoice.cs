@@ -7,6 +7,7 @@ public class Invoice
     [Key]
     public int InvoiceId { get; set; }
 
+    [StringLength(40)]
     [Display(Name = "رقم الفاتورة")]
     public string InvoiceNumber { get; set; } = string.Empty;
 
