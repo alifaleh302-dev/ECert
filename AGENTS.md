@@ -32,6 +32,17 @@ breadcrumb — don't add a `page-header` to them. Security and backup are two ta
 `SecuritySettingsController` (`Index` / `Backup`) with separate POST actions
 (`SaveSecurity` / `SaveBackup`) so one form never overwrites the other's fields.
 
+## Academic catalog (البيانات الجامعية)
+
+`AcademicCatalogController.Index(selected, add, parentId)` renders one tree of
+universities → colleges → specializations → levels plus a detail panel for the
+selected node. Selection and "add child" are plain links (`?selected=college:3`,
+`?add=college&parentId=3`) so they work without JavaScript and survive reloads;
+`wwwroot/js/academic-catalog.js` only adds collapse/search on top. The tree is a
+recursive partial (`Views/AcademicCatalog/_TreeNode.cshtml`), and every create or
+save redirects back to the affected node instead of the bare list. Styles live in
+the `ac-*` block at the end of `wwwroot/css/settings.css`.
+
 ## GitHub credentials in this environment
 
 Three credential env vars are injected; only two are usable:
