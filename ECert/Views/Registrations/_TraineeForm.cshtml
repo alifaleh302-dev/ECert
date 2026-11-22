@@ -1,0 +1,158 @@
+@model TraineeFormViewModel
+@{
+    var isEdit = Model.IsEdit;
+    var action = isEdit ? "Edit" : "Create";
+    var backUrl = Model.ReturnUrl
+        ?? (isEdit
+            ? Url.Action("Details", "Registrations", new { id = Model.RegistrationId })
+            : Url.Action("Index", "Registrations"));
+}
+
+<form asp-action="@action" asp-route-id="@(isEdit ? Model.RegistrationId : null)" method="post" id="traineeForm" data-trainee-form>
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="RegistrationId" />
+    <input type="hidden" asp-for="ReturnUrl" />
+
+    <div asp-validation-summary="ModelOnly" class="a-error mb-3"></div>
+
+    <h3 class="tf-legend">البيانات الشخصية</h3>
+    <div class="a-form__grid a-form__grid--2">
+        <div class="a-field">
+            <label asp-for="FullNameArabic" class="a-label a-label--required"></label>
+            <input asp-for="FullNameArabic" class="form-control" autocomplete="off" placeholder="مثال: محمد أحمد علي" />
+            <span asp-validation-for="FullNameArabic" class="a-error"></span>
+        </div>
+        <div class="a-field">
+            <label asp-for="FullNameEnglish" class="a-label a-label--required"></label>
+            <input asp-for="FullNameEnglish" class="form-control" dir="ltr" autocomplete="off" placeholder="Mohammed Ahmed Ali" />
+            <span asp-validation-for="FullNameEnglish" class="a-error"></span>
+        </div>
+        <div class="a-field">
+            <label asp-for="Phone" class="a-label a-label--required"></label>
+            <input asp-for="Phone" class="form-control" dir="ltr" inputmode="tel" autocomplete="off" placeholder="7xxxxxxxx" />
+            <span class="a-hint">اكتب الرقم المحلي وسيُضاف مفتاح الدولة تلقائياً، أو اكتبه بصيغة دولية تبدأ بـ +.</span>
+            <span asp-validation-for="Phone" class="a-error"></span>
+        </div>
+        <div class="a-field">
+            <label asp-for="Email" class="a-label"></label>
+            <input asp-for="Email" type="email" class="form-control" dir="ltr" autocomplete="off" placeholder="name@example.com" />
+            <span asp-validation-for="Email" class="a-error"></span>
+        </div>
+        <div class="a-field">
+            <label asp-for="Gender" class="a-label a-label--required"></label>
+            <select asp-for="Gender" class="form-select">
+                <option value="">اختر الجنس</option>
+                <option value="Male">ذكر</option>
+                <option value="Female">أنثى</option>
+            </select>
+            <span asp-validation-for="Gender" class="a-error"></span>
+        </div>
+        <div class="a-field">
+            <label asp-for="HeardFrom" class="a-label"></label>
+            <input asp-for="HeardFrom" class="form-control" autocomplete="off" placeholder="مثال: وسائل التواصل الاجتماعي" />
+            <span asp-validation-for="HeardFrom" class="a-error"></span>
+        </div>
+    </div>
+
+    <h3 class="tf-legend">الدورة</h3>
+    <div class="a-form__grid a-form__grid--2">
+        <div class="a-field">
+            <label asp-for="CourseId" class="a-label a-label--required"></label>
+            @if (Model.CourseLocked)
+            {
+                <input type="hidden" asp-for="CourseId" />
+                <input class="form-control" value="@Model.LockedCourseName" disabled />
+                <span class="a-hint">@Model.CourseLockReason</span>
+            }
+            else
+            {
+                <select asp-for="CourseId" class="form-select" id="traineeCourse">
+                    <option value="">اختر الدورة</option>
+                    @foreach (var course in Model.Courses)
+                    {
+                        <option value="@course.CourseId" selected="@(Model.CourseId == course.CourseId)" data-requires-academic="@(course.RequiresAcademicDetails ? "true" : "false")">
+                            @(course.CourseNameArabic ?? course.CourseName)
+                        </option>
+                    }
+                </select>
+            }
+            <span asp-validation-for="CourseId" class="a-error"></span>
+        </div>
+
+        @if (!isEdit)
+        {
+            <div class="a-field">
+                <label class="tf-check">
+                    <input asp-for="AcceptImmediately" type="checkbox" />
+                    <span>اعتماد المتدرب مباشرة وإنشاء الفاتورة</span>
+                </label>
+                <span class="a-hint">بدون هذا الخيار يُسجَّل المتدرب كطلب معلق يراجعه الموظف لاحقاً.</span>
+            </div>
+        }
+    </div>
+
+    <h3 class="tf-legend">البيانات الجامعية <span class="tf-legend__optional">اختيارية إلا إذا كانت الدورة تتطلبها</span></h3>
+    <div class="a-form__grid a-form__grid--2" data-academic-chain>
+        <div class="a-field">
+            <label asp-for="UniversityId" class="a-label"></label>
+            <select asp-for="UniversityId" class="form-select" id="traineeUniversity" data-chain-root>
+                <option value="">بدون بيانات جامعية</option>
+                @foreach (var university in Model.Universities)
+                {
+                    <option value="@university.UniversityId" selected="@(Model.UniversityId == university.UniversityId)">
+                        @university.UniversityName@(university.IsActive ? string.Empty : " (غير مفعّل)")
+                    </option>
+                }
+            </select>
+            <span asp-validation-for="UniversityId" class="a-error"></span>
+        </div>
+        <div class="a-field">
+            <label asp-for="CollegeId" class="a-label"></label>
+            <select asp-for="CollegeId" class="form-select" id="traineeCollege">
+                <option value="">اختر الكلية</option>
+                @foreach (var college in Model.Colleges)
+                {
+                    <option value="@college.CollegeId" data-university-id="@college.UniversityId" selected="@(Model.CollegeId == college.CollegeId)">
+                        @college.CollegeName@(college.IsActive ? string.Empty : " (غير مفعّل)")
+                    </option>
+                }
+            </select>
+            <span asp-validation-for="CollegeId" class="a-error"></span>
+        </div>
+        <div class="a-field">
+            <label asp-for="AcademicSpecializationId" class="a-label"></label>
+            <select asp-for="AcademicSpecializationId" class="form-select" id="traineeSpecialization">
+                <option value="">اختر التخصص</option>
+                @foreach (var specialization in Model.Specializations)
+                {
+                    <option value="@specialization.AcademicSpecializationId" data-college-id="@specialization.CollegeId" selected="@(Model.AcademicSpecializationId == specialization.AcademicSpecializationId)">
+                        @specialization.SpecializationName@(specialization.IsActive ? string.Empty : " (غير مفعّل)")
+                    </option>
+                }
+            </select>
+            <span asp-validation-for="AcademicSpecializationId" class="a-error"></span>
+        </div>
+        <div class="a-field">
+            <label asp-for="AcademicLevel" class="a-label"></label>
+            <select asp-for="AcademicLevel" class="form-select" id="traineeLevel">
+                <option value="">اختر المستوى الدراسي</option>
+                @foreach (var level in Model.Levels)
+                {
+                    <option value="@level.LevelName" data-specialization-id="@level.AcademicSpecializationId" selected="@(Model.AcademicLevel == level.LevelName)">
+                        @level.LevelName@(level.IsActive ? string.Empty : " (غير مفعّل)")
+                    </option>
+                }
+            </select>
+            <span asp-validation-for="AcademicLevel" class="a-error"></span>
+        </div>
+    </div>
+    <p class="a-hint" data-academic-hint hidden>هذه الدورة تتطلب البيانات الجامعية كاملة: الجامعة والكلية والتخصص والمستوى.</p>
+
+    <div class="a-form__actions">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check2" aria-hidden="true"></i>
+            @(isEdit ? "حفظ التغييرات" : "إضافة المتدرب")
+        </button>
+        <a href="@backUrl" class="btn btn-outline-secondary">إلغاء</a>
+    </div>
+</form>

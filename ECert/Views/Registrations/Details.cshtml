@@ -18,6 +18,12 @@
 <div class="page-header">
     <partial name="_PageHeader" />
     <div class="page-actions">
+        @if (canManage)
+        {
+            <a asp-action="Edit" asp-route-id="@Model.RegistrationId" asp-route-returnUrl="@Url.Action("Details", "Registrations", new { id = Model.RegistrationId })" class="btn btn-primary">
+                <i class="bi bi-pencil-square" aria-hidden="true"></i> تعديل البيانات
+            </a>
+        }
         <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للتسجيلات</a>
     </div>
 </div>
@@ -52,6 +58,21 @@
 
                 <span class="a-dl__label">كيف سمع عنا</span>
                 <p class="a-dl__value">@(Model.HeardFrom ?? "-")</p>
+
+                @if (Model.UniversityId.HasValue || !string.IsNullOrWhiteSpace(Model.UniversityNameSnapshot))
+                {
+                    <span class="a-dl__label">الجامعة</span>
+                    <p class="a-dl__value">@(Model.UniversityNameSnapshot ?? "-")</p>
+
+                    <span class="a-dl__label">الكلية</span>
+                    <p class="a-dl__value">@(Model.CollegeNameSnapshot ?? "-")</p>
+
+                    <span class="a-dl__label">التخصص</span>
+                    <p class="a-dl__value">@(Model.SpecializationNameSnapshot ?? "-")</p>
+
+                    <span class="a-dl__label">المستوى الدراسي</span>
+                    <p class="a-dl__value">@(Model.AcademicLevel ?? "-")</p>
+                }
 
                 <span class="a-dl__label">الدورة</span>
                 <p class="a-dl__value">@Model.Course?.CourseName</p>

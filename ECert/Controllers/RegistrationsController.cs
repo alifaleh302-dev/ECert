@@ -13,6 +13,9 @@ namespace ECert.Controllers;
 [Authorize]
 public class RegistrationsController : Controller
 {
+    /// <summary>Registrations are always recorded against this country (Yemen).</summary>
+    private const string DefaultCountryCode = "+967";
+
     private readonly ECertDbContext _db;
     private readonly AuditLogService _audit;
     private readonly NotificationService _notify;
@@ -105,6 +108,348 @@ public class RegistrationsController : Controller
         ViewBag.CertificateEligibility = await _eligibility.EvaluateAsync(reg);
         return View(reg);
     }
+
+    [HttpGet]
+    public async Task<IActionResult> Create(int? courseId, string? returnUrl)
+    {
+        if (!HasPermission(AdminPermissions.ManageRegistrations)) return Forbid();
+
+        var model = new TraineeFormViewModel
+        {
+            CourseId = courseId,
+            ReturnUrl = SafeReturnUrl(returnUrl)
+        };
+        await BuildTraineeFormAsync(model);
+        return View(model);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(TraineeFormViewModel model)
+    {
+        if (!HasPermission(AdminPermissions.ManageRegistrations)) return Forbid();
+
+        model.ReturnUrl = SafeReturnUrl(model.ReturnUrl);
+        var course = await FindCourseForTraineeAsync(model);
+        if (!await ValidateTraineeAsync(model, null, course))
+        {
+            await BuildTraineeFormAsync(model);
+            return View(model);
+        }
+
+        var processedBy = User.Identity?.Name ?? "System";
+        var now = DateTime.Now;
+        var academic = await ResolveAcademicAsync(model);
+
+        var registration = new Registration
+        {
+            RequestNumber = await GenerateRequestNumberAsync(),
+            FullName = model.FullNameArabic!.Trim(),
+            FullNameArabic = model.FullNameArabic.Trim(),
+            FullNameEnglish = model.FullNameEnglish!.Trim(),
+            Gender = model.Gender,
+            Phone = model.Phone!,
+            Email = NullIfBlank(model.Email),
+            HeardFrom = NullIfBlank(model.HeardFrom),
+            CourseId = course!.CourseId,
+            Course = course,
+            Status = model.AcceptImmediately ? "Accepted" : "Pending",
+            RegistrationDate = now,
+            AcceptedDate = model.AcceptImmediately ? now : null,
+            ProcessedBy = model.AcceptImmediately ? processedBy : null
+        };
+        ApplyAcademic(registration, academic);
+
+        _db.Registrations.Add(registration);
+        await _db.SaveChangesAsync();
+
+        Invoice? invoice = null;
+        if (model.AcceptImmediately)
+        {
+            invoice = await _invoiceService.EnsureForAcceptedAsync(registration, processedBy);
+            await _db.SaveChangesAsync();
+        }
+
+        await _audit.LogAsync(processedBy, "Create", "Registration", registration.RegistrationId, null,
+            $"Manual entry {registration.RequestNumber}; status {registration.Status}");
+
+        if (model.AcceptImmediately)
+        {
+            await _notify.SendAsync(registration.FullName, registration.Phone, registration.Email, "RegistrationAccepted",
+                $"عزيزي {registration.FullName}، تم قبولك في دورة {course.CourseName}. سيتم التواصل معك قريباً.",
+                "SMS", "Registration", registration.RegistrationId);
+        }
+
+        TempData["Success"] = model.AcceptImmediately
+            ? $"تمت إضافة المتدرب {registration.FullName} واعتماده، وأنشئت الفاتورة {invoice!.InvoiceNumber}."
+            : $"تمت إضافة المتدرب {registration.FullName} كطلب معلق.";
+
+        return RedirectToAction(nameof(Details), new { id = registration.RegistrationId });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Edit(int id, string? returnUrl)
+    {
+        if (!HasPermission(AdminPermissions.ManageRegistrations)) return Forbid();
+
+        var registration = await _db.Registrations
+            .Include(r => r.Course)
+            .Include(r => r.Fees)
+            .Include(r => r.Invoice)
+            .FirstOrDefaultAsync(r => r.RegistrationId == id);
+        if (registration == null) return NotFound();
+        if (!CanAccess(registration)) return Forbid();
+
+        var model = new TraineeFormViewModel
+        {
+            RegistrationId = registration.RegistrationId,
+            RequestNumber = registration.RequestNumber,
+            Status = registration.Status,
+            ReturnUrl = SafeReturnUrl(returnUrl),
+            FullNameArabic = registration.FullNameArabic ?? registration.FullName,
+            FullNameEnglish = registration.FullNameEnglish ?? registration.FullName,
+            Phone = registration.Phone,
+            Gender = registration.Gender,
+            Email = registration.Email,
+            HeardFrom = registration.HeardFrom,
+            CourseId = registration.CourseId,
+            UniversityId = registration.UniversityId,
+            CollegeId = registration.CollegeId,
+            AcademicSpecializationId = registration.AcademicSpecializationId,
+            AcademicLevel = registration.AcademicLevel
+        };
+        ApplyCourseLock(model, registration);
+        await BuildTraineeFormAsync(model);
+        return View(model);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(int id, TraineeFormViewModel model)
+    {
+        if (!HasPermission(AdminPermissions.ManageRegistrations)) return Forbid();
+
+        var registration = await _db.Registrations
+            .Include(r => r.Course)
+            .Include(r => r.Fees)
+            .Include(r => r.Invoice)
+            .FirstOrDefaultAsync(r => r.RegistrationId == id);
+        if (registration == null) return NotFound();
+        if (!CanAccess(registration)) return Forbid();
+
+        model.RegistrationId = registration.RegistrationId;
+        model.RequestNumber = registration.RequestNumber;
+        model.Status = registration.Status;
+        model.ReturnUrl = SafeReturnUrl(model.ReturnUrl);
+        ApplyCourseLock(model, registration);
+        if (model.CourseLocked) model.CourseId = registration.CourseId;
+
+        var course = await FindCourseForTraineeAsync(model);
+        if (!await ValidateTraineeAsync(model, registration, course))
+        {
+            await BuildTraineeFormAsync(model);
+            return View(model);
+        }
+
+        var previous = $"{registration.FullNameArabic} | {registration.Phone} | course {registration.CourseId}";
+        var academic = await ResolveAcademicAsync(model);
+
+        registration.FullName = model.FullNameArabic!.Trim();
+        registration.FullNameArabic = model.FullNameArabic.Trim();
+        registration.FullNameEnglish = model.FullNameEnglish!.Trim();
+        registration.Gender = model.Gender;
+        registration.Phone = model.Phone!;
+        registration.Email = NullIfBlank(model.Email);
+        registration.HeardFrom = NullIfBlank(model.HeardFrom);
+        registration.CourseId = course!.CourseId;
+        ApplyAcademic(registration, academic);
+
+        await _db.SaveChangesAsync();
+
+        await _audit.LogAsync(User.Identity?.Name ?? "", "Update", "Registration", registration.RegistrationId,
+            previous, $"{registration.FullNameArabic} | {registration.Phone} | course {registration.CourseId}");
+
+        TempData["Success"] = $"تم تحديث بيانات المتدرب {registration.FullName}.";
+        return model.ReturnUrl is { } safeReturn
+            ? LocalRedirect(safeReturn)
+            : RedirectToAction(nameof(Details), new { id = registration.RegistrationId });
+    }
+
+    /// <summary>
+    /// The course can only be swapped while nothing financial or academic depends on it: no fee
+    /// snapshot, no invoice, no certificate, and the request is still pending.
+    /// </summary>
+    private static void ApplyCourseLock(TraineeFormViewModel model, Registration registration)
+    {
+        var locked = registration.Invoice != null || registration.Fees.Count > 0 ||
+                     registration.CertificateIssued ||
+                     !string.Equals(registration.Status, "Pending", StringComparison.OrdinalIgnoreCase);
+        model.CourseLocked = locked;
+        if (!locked) return;
+
+        model.LockedCourseName = registration.Course?.CourseName;
+        model.CourseLockReason = registration.CertificateIssued
+            ? "الدورة غير قابلة للتغيير بعد إصدار الشهادة."
+            : registration.Invoice != null || registration.Fees.Count > 0
+                ? "الدورة غير قابلة للتغيير لوجود فاتورة أو رسوم مسجلة."
+                : "الدورة غير قابلة للتغيير بعد معالجة الطلب (مقبول أو مرفوض أو مؤرشف).";
+    }
+
+    private async Task<Course?> FindCourseForTraineeAsync(TraineeFormViewModel model)
+    {
+        if (!model.CourseId.HasValue)
+        {
+            ModelState.AddModelError(nameof(model.CourseId), "اختر الدورة.");
+            return null;
+        }
+
+        var course = await _db.Courses.InScope(User).FirstOrDefaultAsync(c => c.CourseId == model.CourseId.Value);
+        if (course == null)
+            ModelState.AddModelError(nameof(model.CourseId), "الدورة غير متاحة أو خارج نطاق صلاحياتك.");
+        return course;
+    }
+
+    private async Task<bool> ValidateTraineeAsync(TraineeFormViewModel model, Registration? existing, Course? course)
+    {
+        if (model.Gender is not ("Male" or "Female"))
+            ModelState.AddModelError(nameof(model.Gender), "اختر الجنس من القائمة.");
+
+        var phone = NormalizePhone(model.Phone);
+        if (phone == null)
+            ModelState.AddModelError(nameof(model.Phone), "أدخل رقم هاتف صحيحاً: أرقام فقط، من 7 إلى 15 رقماً.");
+        else
+            model.Phone = phone;
+
+        if (course != null && phone != null)
+        {
+            var existingId = existing?.RegistrationId ?? 0;
+            var duplicate = await _db.Registrations.AnyAsync(r =>
+                r.CourseId == course.CourseId &&
+                r.RegistrationId != existingId &&
+                r.Phone == phone &&
+                r.Status != "Rejected" &&
+                r.Status != "Archived");
+            if (duplicate)
+                ModelState.AddModelError(nameof(model.Phone), "يوجد متدرب آخر مسجل بنفس رقم الهاتف في هذه الدورة.");
+        }
+
+        var hasAcademicValue = model.UniversityId.HasValue || model.CollegeId.HasValue ||
+                               model.AcademicSpecializationId.HasValue || !string.IsNullOrWhiteSpace(model.AcademicLevel);
+        if (course?.RequiresAcademicDetails == true && !hasAcademicValue)
+            ModelState.AddModelError(string.Empty, "هذه الدورة تتطلب البيانات الجامعية: الجامعة والكلية والتخصص والمستوى.");
+        else if (hasAcademicValue)
+            await ResolveAcademicAsync(model);
+
+        return ModelState.IsValid;
+    }
+
+    /// <summary>
+    /// Resolves the university → college → specialization → level chain and adds a validation error
+    /// when the chain is incomplete or inconsistent. Returns null when no academic data was entered.
+    /// </summary>
+    private async Task<AcademicChain?> ResolveAcademicAsync(TraineeFormViewModel model)
+    {
+        var level = model.AcademicLevel?.Trim();
+        var hasAny = model.UniversityId.HasValue || model.CollegeId.HasValue ||
+                     model.AcademicSpecializationId.HasValue || !string.IsNullOrWhiteSpace(level);
+        if (!hasAny) return null;
+
+        if (!model.UniversityId.HasValue) ModelState.AddModelError(nameof(model.UniversityId), "اختر الجامعة.");
+        if (!model.CollegeId.HasValue) ModelState.AddModelError(nameof(model.CollegeId), "اختر الكلية.");
+        if (!model.AcademicSpecializationId.HasValue) ModelState.AddModelError(nameof(model.AcademicSpecializationId), "اختر التخصص.");
+        if (string.IsNullOrWhiteSpace(level)) ModelState.AddModelError(nameof(model.AcademicLevel), "اختر المستوى الدراسي.");
+        if (!model.UniversityId.HasValue || !model.CollegeId.HasValue ||
+            !model.AcademicSpecializationId.HasValue || string.IsNullOrWhiteSpace(level))
+            return null;
+
+        var university = await _db.Universities.FirstOrDefaultAsync(u => u.UniversityId == model.UniversityId);
+        var college = await _db.Colleges.FirstOrDefaultAsync(c => c.CollegeId == model.CollegeId);
+        var specialization = await _db.AcademicSpecializations
+            .FirstOrDefaultAsync(s => s.AcademicSpecializationId == model.AcademicSpecializationId);
+
+        if (university == null)
+        {
+            ModelState.AddModelError(nameof(model.UniversityId), "الجامعة المختارة غير موجودة.");
+            return null;
+        }
+        if (college == null || college.UniversityId != university.UniversityId)
+        {
+            ModelState.AddModelError(nameof(model.CollegeId), "الكلية المختارة لا تنتمي إلى الجامعة.");
+            return null;
+        }
+        if (specialization == null || specialization.CollegeId != college.CollegeId)
+        {
+            ModelState.AddModelError(nameof(model.AcademicSpecializationId), "التخصص المختار لا ينتمي إلى الكلية.");
+            return null;
+        }
+
+        var levelExists = await _db.AcademicLevelOptions.AnyAsync(l =>
+            l.AcademicSpecializationId == specialization.AcademicSpecializationId && l.LevelName == level);
+        if (!levelExists)
+        {
+            ModelState.AddModelError(nameof(model.AcademicLevel), "المستوى المختار غير متاح لهذا التخصص.");
+            return null;
+        }
+
+        return new AcademicChain(university, college, specialization, level!);
+    }
+
+    private static void ApplyAcademic(Registration registration, AcademicChain? chain)
+    {
+        registration.UniversityId = chain?.University.UniversityId;
+        registration.CollegeId = chain?.College.CollegeId;
+        registration.AcademicSpecializationId = chain?.Specialization.AcademicSpecializationId;
+        registration.AcademicLevel = chain?.Level;
+        registration.UniversityNameSnapshot = chain?.University.UniversityName;
+        registration.CollegeNameSnapshot = chain?.College.CollegeName;
+        registration.SpecializationNameSnapshot = chain?.Specialization.SpecializationName;
+    }
+
+    private async Task BuildTraineeFormAsync(TraineeFormViewModel model)
+    {
+        model.Courses = await _db.Courses
+            .InScope(User)
+            .Where(c => c.Status != "Archived")
+            .OrderBy(c => c.CourseNameArabic ?? c.CourseName)
+            .ToListAsync();
+        model.Universities = await _db.Universities
+            .OrderByDescending(u => u.IsActive).ThenBy(u => u.UniversityName).ToListAsync();
+        model.Colleges = await _db.Colleges
+            .OrderByDescending(c => c.IsActive).ThenBy(c => c.CollegeName).ToListAsync();
+        model.Specializations = await _db.AcademicSpecializations
+            .OrderByDescending(s => s.IsActive).ThenBy(s => s.SpecializationName).ToListAsync();
+        model.Levels = await _db.AcademicLevelOptions
+            .OrderByDescending(l => l.IsActive).ThenBy(l => l.SortOrder).ThenBy(l => l.LevelName).ToListAsync();
+
+        model.CourseRequiresAcademicDetails =
+            model.Courses.FirstOrDefault(c => c.CourseId == model.CourseId)?.RequiresAcademicDetails == true;
+    }
+
+    /// <summary>
+    /// Normalizes a typed number into the stored <c>+country</c> form. A number typed with <c>+</c>
+    /// or <c>00</c> keeps its own country code; anything else is treated as a local Yemeni number.
+    /// </summary>
+    private static string? NormalizePhone(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+
+        var trimmed = raw.Trim();
+        var digits = new string(trimmed.Where(char.IsDigit).ToArray());
+        if (digits.Length == 0) return null;
+
+        string international;
+        if (trimmed.StartsWith('+')) international = digits;
+        else if (digits.StartsWith("00", StringComparison.Ordinal)) international = digits[2..];
+        else international = DefaultCountryCode.TrimStart('+') + digits.TrimStart('0');
+
+        return international.Length is >= 7 and <= 15 ? "+" + international : null;
+    }
+
+    private static string? NullIfBlank(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed record AcademicChain(University University, College College,
+        AcademicSpecialization Specialization, string Level);
 
     [HttpPost]
     [ValidateAntiForgeryToken]

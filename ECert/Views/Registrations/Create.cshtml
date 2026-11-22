@@ -1,0 +1,35 @@
+@model TraineeFormViewModel
+@{
+    ViewData["Title"] = "إضافة متدرب";
+    ViewData["PageIcon"] = "bi-person-plus";
+    ViewData["PageDesc"] = "سجّل متدرباً جديداً في إحدى الدورات دون المرور بنموذج التسجيل العام";
+    Layout = "_AdminLayout";
+}
+
+<div class="page-header">
+    <partial name="_PageHeader" />
+    <div class="page-actions">
+        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للتسجيلات</a>
+    </div>
+</div>
+
+<div class="a-card">
+    <div class="a-card__header">
+        <h2 class="a-card__title"><i class="bi bi-person-plus" aria-hidden="true"></i> بيانات المتدرب الجديد</h2>
+    </div>
+    <div class="a-card__body">
+        <div class="a-note a-note--info mb-4">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            <div>يُسجَّل المتدرب كطلب معلق ما لم تختر الاعتماد المباشر. رقم الطلب يُولَّد تلقائياً.</div>
+        </div>
+        <partial name="_TraineeForm" model="Model" />
+    </div>
+</div>
+
+@section Styles {
+    <link href="~/css/registrations.css" rel="stylesheet" asp-append-version="true" />
+}
+
+@section Scripts {
+    <script src="~/js/trainee-form.js" asp-append-version="true"></script>
+}

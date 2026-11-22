@@ -8,7 +8,7 @@
 .registrations-page-header { display: flex; flex-direction: column; gap: .15rem; }
 .registration-filter-card, .registration-list-card { background: var(--a-surface); border: 1px solid var(--registration-border); border-radius: 16px; box-shadow: var(--a-e2); }
 .registration-filter-card { padding: .8rem; }
-.registration-filter-form { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(150px, 190px) auto auto auto; align-items: center; gap: .55rem; }
+.registration-filter-form { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(150px, 190px) auto auto auto auto auto; align-items: center; gap: .55rem; }
 .registration-search-field, .registration-status-field { position: relative; }
 .registration-search-field > i, .registration-status-field > i { position: absolute; right: .75rem; top: 50%; transform: translateY(-50%); color: var(--a-text-3); z-index: 2; }
 .registration-search-field .form-control, .registration-status-field .form-select { padding-right: 2.3rem; border-color: var(--a-border-strong); min-height: 38px; font-size: .875rem; }
@@ -17,7 +17,7 @@
 .registration-filter-toggle { border-color: var(--a-border-strong); position: relative; }
 .registration-filter-toggle.is-active { border-color: var(--a-brand); color: var(--registration-primary); background: var(--a-brand-soft); }
 .filter-indicator { width: 6px; height: 6px; border-radius: 50%; background: var(--a-brand); position: absolute; top: 6px; left: 7px; }
-.registration-reset-button { color: var(--registration-muted); text-decoration: none; font-size: .8rem; padding-inline: .25rem; white-space: nowrap; }
+.registration-reset-button { color: var(--registration-muted); text-decoration: none; font-size: .8rem; padding-inline: .25rem; white-space: nowrap; justify-self: start; }
 .registration-reset-button:hover { color: var(--a-danger); }
 .registration-advanced-filters { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(200px, 1fr) minmax(145px, 180px) minmax(145px, 180px); gap: .65rem; padding-top: .7rem; margin-top: .2rem; border-top: 1px dashed var(--a-border); }
 .registration-advanced-filters .form-label { margin-bottom: .25rem; color: var(--a-text-2); font-size: .75rem; font-weight: 700; }
@@ -105,3 +105,11 @@
     .bulk-action-buttons .btn { padding-inline: .45rem; }
     .registration-table td::before { flex-basis: 65px; }
 }
+
+/* ---------- Trainee form (add / edit) ---------- */
+.tf-legend { display: flex; align-items: baseline; flex-wrap: wrap; gap: .5rem; margin: 1.35rem 0 .85rem; padding-bottom: .45rem; border-bottom: 1px solid var(--a-border); font-size: .95rem; font-weight: 800; color: var(--a-text); }
+.tf-legend:first-of-type { margin-top: 0; }
+.tf-legend__optional { font-size: .72rem; font-weight: 600; color: var(--a-text-3); }
+.tf-check { display: flex; align-items: center; gap: .55rem; padding: .55rem .7rem; border: 1px solid var(--a-border-strong); border-radius: 12px; cursor: pointer; font-weight: 600; }
+.tf-check input { flex: 0 0 auto; margin: 0; }
+.tf-check:hover { border-color: var(--a-brand); background: var(--a-brand-soft); }
