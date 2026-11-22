@@ -43,6 +43,19 @@ recursive partial (`Views/AcademicCatalog/_TreeNode.cshtml`), and every create o
 save redirects back to the affected node instead of the bare list. Styles live in
 the `ac-*` block at the end of `wwwroot/css/settings.css`.
 
+## Trainee add / edit (إضافة وتعديل المتدرب)
+
+`RegistrationsController.Create` and `Edit` share `TraineeFormViewModel` and
+`Views/Registrations/_TraineeForm.cshtml`; both require `manage-registrations`
+(there is no separate "manage-trainees" permission) and honour `InScope`/`CanAccess`
+course confinement. The form owns personal, contact, academic and course fields only —
+status, invoice and fees keep their own actions on the details page. The course select
+is locked (`ApplyCourseLock`) once an invoice, fee snapshot, certificate or a
+non-pending status exists. Phone numbers are normalized to `+967…` and must be unique
+inside a course. `wwwroot/js/trainee-form.js` only filters the pre-rendered
+university → college → specialization → level options by `data-*` parent ids, so the
+form still submits without JavaScript; the server re-validates the chain.
+
 ## GitHub credentials in this environment
 
 Three credential env vars are injected; only two are usable:
