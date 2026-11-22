@@ -69,6 +69,14 @@ public class PublicRegistrationViewModel
     public string? CourseName { get; set; }
     public string? CourseNameEnglish { get; set; }
     public string? CourseNameArabic { get; set; }
+
+    /// <summary>The applicant opted in to the course's certificate fee.</summary>
+    [Display(Name = "أرغب في الحصول على شهادة")]
+    public bool WantsCertificate { get; set; }
+
+    // Display-only, rebuilt from the course on every render; never trusted from the request.
+    public decimal BasePrice { get; set; }
+    public CourseFee? CertificateFee { get; set; }
 }
 
 public class DashboardViewModel

@@ -17,16 +17,21 @@ public class RegistrationsController : Controller
     private readonly AuditLogService _audit;
     private readonly NotificationService _notify;
     private readonly RegistrationInvoiceService _invoiceService;
+    private readonly RegistrationFeeService _feeService;
+    private readonly CertificateEligibilityService _eligibility;
     private readonly FinancialLedgerService _ledger;
     private readonly SystemSettingsService _settings;
 
     public RegistrationsController(ECertDbContext db, AuditLogService audit, NotificationService notify,
-        RegistrationInvoiceService invoiceService, FinancialLedgerService ledger, SystemSettingsService settings)
+        RegistrationInvoiceService invoiceService, RegistrationFeeService feeService,
+        CertificateEligibilityService eligibility, FinancialLedgerService ledger, SystemSettingsService settings)
     {
         _db = db;
         _audit = audit;
         _notify = notify;
         _invoiceService = invoiceService;
+        _feeService = feeService;
+        _eligibility = eligibility;
         _ledger = ledger;
         _settings = settings;
     }
@@ -85,14 +90,48 @@ public class RegistrationsController : Controller
 
     public async Task<IActionResult> Details(int id)
     {
-        if (!User.HasAnyPermission(AdminPermissions.ManageRegistrations, AdminPermissions.ViewRegistrations)) return Forbid();
+        if (!User.HasAnyPermission(AdminPermissions.ManageRegistrations, AdminPermissions.ViewRegistrations, AdminPermissions.ManageFinance)) return Forbid();
         var reg = await _db.Registrations
-            .Include(r => r.Course)
+            .Include(r => r.Course).ThenInclude(c => c!.Fees)
+            .Include(r => r.Fees)
             .Include(r => r.Invoice).ThenInclude(i => i!.Payments)
+            .Include(r => r.Invoice).ThenInclude(i => i!.Items)
             .FirstOrDefaultAsync(r => r.RegistrationId == id);
         if (reg == null) return NotFound();
         if (!CanAccess(reg)) return Forbid();
+
+        ViewBag.CanManage = User.HasPermission(AdminPermissions.ManageRegistrations);
+        ViewBag.CanManageFees = User.HasAnyPermission(AdminPermissions.ManageRegistrations, AdminPermissions.ManageFinance);
+        ViewBag.CertificateEligibility = await _eligibility.EvaluateAsync(reg);
         return View(reg);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ActivateCertificateFee(int id)
+    {
+        if (!User.HasAnyPermission("manage-registrations", "manage-finance")) return Forbid();
+        var reg = await _db.Registrations.Include(r => r.Course).FirstOrDefaultAsync(r => r.RegistrationId == id);
+        if (reg == null) return NotFound();
+        if (!CanAccess(reg)) return Forbid();
+
+        var result = await _feeService.ActivateCertificateFeeAsync(reg, User.Identity?.Name ?? "System");
+        TempData[result.Success ? "Success" : "Error"] = result.Message;
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CancelCertificateFee(int id)
+    {
+        if (!User.HasAnyPermission("manage-registrations", "manage-finance")) return Forbid();
+        var reg = await _db.Registrations.Include(r => r.Course).FirstOrDefaultAsync(r => r.RegistrationId == id);
+        if (reg == null) return NotFound();
+        if (!CanAccess(reg)) return Forbid();
+
+        var result = await _feeService.CancelCertificateFeeAsync(reg, User.Identity?.Name ?? "System");
+        TempData[result.Success ? "Success" : "Error"] = result.Message;
+        return RedirectToAction(nameof(Details), new { id });
     }
 
     [HttpPost]

@@ -147,7 +147,8 @@ public class PaymentsApiController : ControllerBase
         invoice.PaidAmount = net;
         invoice.Status = invoice.Status == "Cancelled"
             ? "Cancelled"
-            : net >= invoice.TotalAmount && invoice.TotalAmount > 0 ? "Paid"
+            : invoice.TotalAmount <= 0 ? "Paid"
+            : net >= invoice.TotalAmount ? "Paid"
             : net > 0 ? "PartiallyPaid"
             : "Unpaid";
     }

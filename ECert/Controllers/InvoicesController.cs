@@ -82,7 +82,7 @@ public class InvoicesController : Controller
     {
         // Same gate as the listing: the finance umbrella also opens an invoice's detail page.
         if (!User.CanAccessSection("Invoices")) return Forbid();
-        var invoice = await _db.Invoices.Include(i => i.Payments).Include(i => i.Registration).ThenInclude(r => r!.Course).FirstOrDefaultAsync(i => i.InvoiceId == id);
+        var invoice = await _db.Invoices.Include(i => i.Payments).Include(i => i.Items).Include(i => i.Registration).ThenInclude(r => r!.Course).FirstOrDefaultAsync(i => i.InvoiceId == id);
         if (invoice == null) return NotFound();
         if (!CanAccess(invoice)) return Forbid();
         return View(invoice);

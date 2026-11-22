@@ -107,6 +107,9 @@ public class Registration
     [Display(Name = "تاريخ تطبيق الإعفاء")]
     public DateTime? ExemptionAppliedAt { get; set; }
 
+    /// <summary>Fee choices captured when the applicant registered (a snapshot, never re-priced).</summary>
+    public ICollection<RegistrationFee> Fees { get; set; } = new List<RegistrationFee>();
+
     public Invoice? Invoice { get; set; }
     public Certificate? Certificate { get; set; }
 }

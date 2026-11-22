@@ -117,12 +117,43 @@ public class Course
     /// <summary>Supporting organisations credited on this course's certificates, each with a logo and signature.</summary>
     public ICollection<CoursePartner> Partners { get; set; } = new List<CoursePartner>();
 
+    /// <summary>The optional certificate fee, when the course defines one.</summary>
+    public ICollection<CourseFee> Fees { get; set; } = new List<CourseFee>();
+
     [NotMapped]
     public List<int> SelectedInstructorIds { get; set; } = new();
 
     /// <summary>Form binding for the partner rows (name + uploaded artwork), in display order.</summary>
     [NotMapped]
     public List<CoursePartnerFormRow> PartnerRows { get; set; } = new();
+
+    /// <summary>Certificate fee amount bound by the course form; zero means no fee.</summary>
+    [NotMapped]
+    [Range(0, 999999999, ErrorMessage = "مبلغ رسوم الشهادة يجب أن يكون موجباً.")]
+    public decimal CertificateFeeAmount { get; set; }
+
+    /// <summary>Optional display name for the certificate fee; defaults to "رسوم الشهادة".</summary>
+    [NotMapped]
+    [StringLength(150, ErrorMessage = "اسم الرسم يتجاوز 150 حرفاً.")]
+    public string? CertificateFeeName { get; set; }
+
+    /// <summary>Optional note shown to applicants next to the certificate fee.</summary>
+    [NotMapped]
+    [StringLength(500, ErrorMessage = "وصف رسوم الشهادة يتجاوز 500 حرف.")]
+    public string? CertificateFeeDescription { get; set; }
+
+    [NotMapped]
+    public CourseFee? CertificateFee => Fees
+        .Where(f => f.IsActive && CourseFeeTypes.IsCertificate(f.FeeType))
+        .OrderBy(f => f.CourseFeeId)
+        .FirstOrDefault();
+
+    [NotMapped]
+    public bool HasCertificateFee => CertificateFee != null;
+
+    /// <summary>True when the base price is zero, regardless of the optional certificate fee.</summary>
+    [NotMapped]
+    public bool IsFree => FinalPrice <= 0;
 
     [NotMapped]
     public IReadOnlyList<Instructor> AssignedInstructors

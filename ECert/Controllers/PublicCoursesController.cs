@@ -34,7 +34,7 @@ public class PublicCoursesController : Controller
 
     public async Task<IActionResult> Details(int id)
     {
-        var course = await _db.Courses.Include(c => c.Instructor).Include(c => c.CourseInstructors).ThenInclude(ci => ci.Instructor).Include(c => c.Category)
+        var course = await _db.Courses.Include(c => c.Instructor).Include(c => c.CourseInstructors).ThenInclude(ci => ci.Instructor).Include(c => c.Category).Include(c => c.Fees)
             .FirstOrDefaultAsync(c => c.CourseId == id);
         if (course == null || course.Status == "Draft" || course.Status == "Archived") return NotFound();
         ViewData["OgImage"] = course.ImageUrl;

@@ -82,6 +82,7 @@
                         <span class="a-hint">يمكن تخصيص قالب مستقل لهذه الدورة. عند تركه فارغاً سيُستخدم القالب العام المنشور.</span>
                     </div>
                     <partial name="_PartnerRows" model="Model" />
+                    <partial name="_CertificateFee" model="Model" />
                     <div class="a-field a-field--full">
                         <label class="a-label" for="instructorSearch">المدربون</label>
                         <div class="search-select">
@@ -98,7 +99,7 @@
 
             <section class="a-form__section">
                 <h3 class="a-form__section-title"><i class="bi bi-cash-coin" aria-hidden="true"></i> الرسوم والخصم</h3>
-                <p class="a-form__section-desc">حدّد سعر الدورة وقيمة الخصم إن وُجد.</p>
+                <p class="a-form__section-desc">حدّد سعر الدورة وقيمة الخصم إن وُجد. اترك السعر 0 لجعل الدورة مجانية.</p>
                 <div class="a-form__grid">
                     <div class="a-field">
                         <label asp-for="Price" class="a-label"></label>

@@ -387,6 +387,53 @@ public class CoursesManageController : Controller
             .Distinct()
             .ToList();
 
+    /// <summary>
+    /// Keeps exactly one optional certificate fee in sync with the course form. A zero amount
+    /// removes it; any legacy non-certificate rows are removed.
+    /// </summary>
+    private async Task<(bool Ok, string? Error)> SyncCertificateFeeAsync(Course course, decimal amount, string? name, string? description)
+    {
+        var existing = await _db.CourseFees.Where(f => f.CourseId == course.CourseId).ToListAsync();
+        var certificate = existing.FirstOrDefault(f => CourseFeeTypes.IsCertificate(f.FeeType));
+
+        // The product now supports the certificate fee only; drop any legacy rows.
+        foreach (var other in existing.Where(f => f != certificate).ToList())
+            _db.CourseFees.Remove(other);
+
+        if (amount < 0)
+            return (false, "مبلغ رسوم الشهادة لا يمكن أن يكون سالباً.");
+
+        amount = Math.Round(amount, 2, MidpointRounding.AwayFromZero);
+        var displayName = string.IsNullOrWhiteSpace(name) ? "رسوم الشهادة" : name.Trim();
+        if (displayName.Length > 150)
+            return (false, "اسم الرسم يتجاوز 150 حرفاً.");
+        var note = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        if (note is { Length: > 500 })
+            return (false, "وصف رسوم الشهادة يتجاوز 500 حرف.");
+
+        if (amount == 0)
+        {
+            if (certificate != null)
+                _db.CourseFees.Remove(certificate);
+            return (true, null);
+        }
+
+        if (certificate == null)
+        {
+            certificate = new CourseFee { CourseId = course.CourseId };
+            _db.CourseFees.Add(certificate);
+        }
+
+        certificate.Name = displayName;
+        certificate.FeeType = CourseFeeTypes.Certificate;
+        certificate.Description = note;
+        certificate.Amount = Math.Round(amount, 2, MidpointRounding.AwayFromZero);
+        certificate.IsOptional = true;
+        certificate.IsActive = true;
+        certificate.SortOrder = 0;
+        return (true, null);
+    }
+
     private async Task ValidateSelectedInstructorsAsync(IReadOnlyCollection<int> instructorIds)
     {
         if (instructorIds.Count == 0)
@@ -546,6 +593,14 @@ public class CoursesManageController : Controller
             return View(course);
         }
 
+        var (feesOk, feeError) = await SyncCertificateFeeAsync(course, course.CertificateFeeAmount, course.CertificateFeeName, course.CertificateFeeDescription);
+        if (!feesOk)
+        {
+            ModelState.AddModelError(string.Empty, feeError ?? "تعذر حفظ رسوم الشهادة.");
+            await LoadCourseFormOptions();
+            return View(course);
+        }
+
         await SyncCourseInstructorsAsync(course.CourseId, course.SelectedInstructorIds);
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? "", "Create", "Course", course.CourseId, null, $"{course.CourseNameEnglish} / {course.CourseNameArabic}");
@@ -561,6 +616,7 @@ public class CoursesManageController : Controller
             .Include(c => c.Instructor)
             .Include(c => c.CourseInstructors).ThenInclude(ci => ci.Instructor)
             .Include(c => c.Partners)
+            .Include(c => c.Fees)
             .FirstOrDefaultAsync(c => c.CourseId == id);
         if (course == null) return NotFound();
         course.SelectedInstructorIds = course.CourseInstructors
@@ -576,6 +632,9 @@ public class CoursesManageController : Controller
             .ThenBy(p => p.CoursePartnerId)
             .Select(p => new CoursePartnerFormRow { Name = p.Name })
             .ToList();
+        course.CertificateFeeAmount = course.CertificateFee?.Amount ?? 0;
+        course.CertificateFeeName = course.CertificateFee?.Name;
+        course.CertificateFeeDescription = course.CertificateFee?.Description;
         await LoadCourseFormOptions();
         return View(course);
     }
@@ -626,6 +685,10 @@ public class CoursesManageController : Controller
         if (imgError != null)
         {
             ModelState.AddModelError(string.Empty, imgError);
+            existing.CertificateFeeAmount = course.CertificateFeeAmount;
+            existing.CertificateFeeName = course.CertificateFeeName;
+            existing.CertificateFeeDescription = course.CertificateFeeDescription;
+            existing.PartnerRows = course.PartnerRows;
             await LoadCourseFormOptions();
             return View(existing);
         }
@@ -644,6 +707,22 @@ public class CoursesManageController : Controller
         if (!partnersOk)
         {
             ModelState.AddModelError(string.Empty, partnerError ?? "تعذر حفظ الجهات الداعمة.");
+            existing.CertificateFeeAmount = course.CertificateFeeAmount;
+            existing.CertificateFeeName = course.CertificateFeeName;
+            existing.CertificateFeeDescription = course.CertificateFeeDescription;
+            existing.PartnerRows = course.PartnerRows;
+            await LoadCourseFormOptions();
+            return View(existing);
+        }
+
+        var (feesOk, feeError) = await SyncCertificateFeeAsync(existing, course.CertificateFeeAmount, course.CertificateFeeName, course.CertificateFeeDescription);
+        if (!feesOk)
+        {
+            ModelState.AddModelError(string.Empty, feeError ?? "تعذر حفظ رسوم الشهادة.");
+            existing.CertificateFeeAmount = course.CertificateFeeAmount;
+            existing.CertificateFeeName = course.CertificateFeeName;
+            existing.CertificateFeeDescription = course.CertificateFeeDescription;
+            existing.PartnerRows = course.PartnerRows;
             await LoadCourseFormOptions();
             return View(existing);
         }

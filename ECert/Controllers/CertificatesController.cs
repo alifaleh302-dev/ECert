@@ -26,6 +26,7 @@ public class CertificatesController : Controller
     private readonly CertificatePdfService _pdfService;
     private readonly CertificateExportSettingsService _exportSettings;
     private readonly CertificateQrService _qrService;
+    private readonly CertificateEligibilityService _eligibility;
 
     public CertificatesController(
         ECertDbContext db,
@@ -38,7 +39,8 @@ public class CertificatesController : Controller
         CertificateRenderService renderService,
         CertificatePdfService pdfService,
         CertificateExportSettingsService exportSettings,
-        CertificateQrService qrService)
+        CertificateQrService qrService,
+        CertificateEligibilityService eligibility)
     {
         _db = db;
         _audit = audit;
@@ -51,6 +53,7 @@ public class CertificatesController : Controller
         _pdfService = pdfService;
         _exportSettings = exportSettings;
         _qrService = qrService;
+        _eligibility = eligibility;
     }
 
     private bool HasPermission(string perm) => User.HasClaim(c => c.Type == "Permission" && c.Value == perm);
@@ -123,6 +126,7 @@ public class CertificatesController : Controller
         var query = _db.Registrations
             .InScope(User)
             .Include(r => r.Course)
+            .Include(r => r.Invoice).ThenInclude(i => i!.Items)
             .Where(r => r.Status == "Accepted" && !r.CertificateIssued && r.Course != null && r.Course.Status == "Completed")
             .AsQueryable();
 
@@ -149,6 +153,12 @@ public class CertificatesController : Controller
             Courses = await _db.Courses.InScope(User).Where(c => c.Status == "Completed").OrderBy(c => c.CourseNameArabic).ToListAsync(),
             EligibleRegistrations = await query.OrderByDescending(r => r.RegistrationDate).ThenBy(r => r.FullName).ToListAsync()
         };
+
+        var certificateFeeCourses = await _eligibility.CourseIdsWithCertificateFeeAsync(
+            model.EligibleRegistrations.Select(r => r.CourseId).Distinct().ToList());
+        model.EligibleRegistrations = model.EligibleRegistrations
+            .Where(r => _eligibility.Evaluate(r, certificateFeeCourses.Contains(r.CourseId)).Eligible)
+            .ToList();
 
         return View(model);
     }
@@ -190,13 +200,24 @@ public class CertificatesController : Controller
         var registrations = await _db.Registrations
             .InScope(User)
             .Include(r => r.Course)
+            .Include(r => r.Invoice).ThenInclude(i => i!.Items)
             .Where(r => idList.Contains(r.RegistrationId) && r.Status == "Accepted" && !r.CertificateIssued && r.Course != null && r.Course.Status == "Completed")
             .OrderBy(r => r.RegistrationId)
             .ToListAsync();
 
+        var certificateFeeCourses = await _eligibility.CourseIdsWithCertificateFeeAsync(
+            registrations.Select(r => r.CourseId).Distinct().ToList());
+        var blockedCount = registrations.Count(r =>
+            !_eligibility.Evaluate(r, certificateFeeCourses.Contains(r.CourseId)).Eligible);
+        registrations = registrations
+            .Where(r => _eligibility.Evaluate(r, certificateFeeCourses.Contains(r.CourseId)).Eligible)
+            .ToList();
+
         if (!registrations.Any())
         {
-            TempData["Error"] = "العناصر المحددة غير مؤهلة لإصدار الشهادات أو تم إصدارها مسبقاً.";
+            TempData["Error"] = blockedCount > 0
+                ? "لا يمكن إصدار الشهادات المحددة: لم تُفعّل رسوم الشهادة أو لم تُسدد الفاتورة بالكامل."
+                : "العناصر المحددة غير مؤهلة لإصدار الشهادات أو تم إصدارها مسبقاً.";
             return RedirectToAction(nameof(Issue));
         }
 
@@ -254,6 +275,8 @@ public class CertificatesController : Controller
         }
 
         TempData["Success"] = $"تم إصدار {issuedCertificates.Count} شهادة بنجاح بالبادئة {normalizedCertificatePrefix}.";
+        if (blockedCount > 0)
+            TempData["Warning"] = $"تم تجاهل {blockedCount} تسجيلاً لعدم تفعيل رسوم الشهادة أو لعدم سداد الفاتورة بالكامل.";
         return RedirectToAction(nameof(Index));
     }
 

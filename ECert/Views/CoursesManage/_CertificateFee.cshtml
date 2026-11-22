@@ -1,0 +1,18 @@
+@model ECert.Models.Course
+<div class="a-field a-field--full">
+    <label asp-for="CertificateFeeName" class="a-label">اسم الرسم (اختياري)</label>
+    <input asp-for="CertificateFeeName" class="form-control" maxlength="150" placeholder="رسوم الشهادة" />
+    <span class="a-hint">الاسم الذي يظهر للمتدرب في صفحة الدورة ونموذج التسجيل والفاتورة. اتركه فارغاً لاستخدام «رسوم الشهادة».</span>
+    <span asp-validation-for="CertificateFeeName" class="a-error"></span>
+</div>
+<div class="a-field a-field--full">
+    <label asp-for="CertificateFeeAmount" class="a-label">مبلغ رسوم الشهادة (اختياري)</label>
+    <input asp-for="CertificateFeeAmount" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" />
+    <span class="a-hint">اتركها صفراً إذا لم تكن الدورة تفرض رسوم شهادة. يختار المتدرب دفعها عند التسجيل، ولا تُصدر الشهادة إلا بعد سداد كامل الفاتورة.</span>
+    <span asp-validation-for="CertificateFeeAmount" class="a-error"></span>
+</div>
+<div class="a-field a-field--full">
+    <label asp-for="CertificateFeeDescription" class="a-label">وصف رسوم الشهادة (اختياري)</label>
+    <input asp-for="CertificateFeeDescription" class="form-control" maxlength="500" placeholder="مثال: رسم إصدار الشهادة المعتمدة" />
+    <span asp-validation-for="CertificateFeeDescription" class="a-error"></span>
+</div>

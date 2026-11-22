@@ -111,6 +111,58 @@
                         </div>
                     </section>
 
+                    @{
+                        var certificateFee = Model.CertificateFee;
+                    }
+                    @if (Model.BasePrice > 0 || certificateFee != null)
+                    {
+                        <section class="mb-4" id="feesSection">
+                            <h5 class="mb-2"><i class="bi bi-receipt"></i> الرسوم</h5>
+                            <div class="border rounded-3 p-3 bg-light">
+                                <div class="d-flex justify-content-between small mb-2">
+                                    <span>رسوم الدورة</span>
+                                    <strong>@(Model.BasePrice <= 0 ? "مجانية" : $"{Model.BasePrice.ToString("N0")} {Currency.Symbol}")</strong>
+                                </div>
+                                @if (certificateFee != null)
+                                {
+                                    <div class="form-check border-top pt-2 mt-2">
+                                        <input class="form-check-input fee-choice" type="checkbox" asp-for="WantsCertificate"
+                                               id="wantsCertificate" data-amount="@certificateFee.Amount" />
+                                        <label class="form-check-label" for="wantsCertificate">
+                                            <strong>@certificateFee.Name</strong>
+                                            <span class="badge text-bg-secondary">اختياري</span>
+                                            <span class="d-block small text-muted">
+                                                أرغب في استلام شهادة الدورة — @certificateFee.Amount.ToString("N0") @Currency.Symbol.
+                                                @if (!string.IsNullOrWhiteSpace(certificateFee.Description))
+                                                {
+                                                    <span class="d-block">@certificateFee.Description</span>
+                                                }
+                                                لن تُصدر الشهادة إلا بعد سداد كامل الفاتورة.
+                                            </span>
+                                        </label>
+                                    </div>
+                                }
+                                <hr class="my-2" />
+                                <div class="d-flex justify-content-between fw-bold">
+                                    <span>الإجمالي المتوقع</span>
+                                    <span id="expectedTotal" data-base="@Model.BasePrice" data-currency="@Currency.Symbol">
+                                        @Model.BasePrice.ToString("N0") @Currency.Symbol
+                                    </span>
+                                </div>
+                                <small class="text-muted d-block mt-1">
+                                    @if (certificateFee != null)
+                                    {
+                                        <span>تُضاف رسوم الشهادة فقط عند تحديدها. يمكنك تعديل قرار الشهادة لاحقاً في مقر الدورة قبل سدادها.</span>
+                                    }
+                                    else
+                                    {
+                                        <span>تُسدد رسوم الدورة عند اعتماد التسجيل.</span>
+                                    }
+                                </small>
+                            </div>
+                        </section>
+                    }
+
                     <div class="d-none" aria-hidden="true">
                         <label asp-for="WebsiteUrl">موقع الويب</label>
                         <input asp-for="WebsiteUrl" tabindex="-1" autocomplete="off" />
@@ -307,5 +359,22 @@
             }
         });
     });
+</script>
+<script>
+(function () {
+    var totalEl = document.getElementById('expectedTotal');
+    if (!totalEl) return;
+    var base = parseFloat(totalEl.dataset.base) || 0;
+    var symbol = totalEl.dataset.currency || '';
+    var choices = document.querySelectorAll('.fee-choice');
+    function fmt(n) { return (Math.round(n * 100) / 100).toLocaleString('en-US'); }
+    function update() {
+        var total = base;
+        choices.forEach(function (c) { if (c.checked) total += parseFloat(c.dataset.amount) || 0; });
+        totalEl.textContent = fmt(total) + ' ' + symbol;
+    }
+    choices.forEach(function (c) { c.addEventListener('change', update); });
+    update();
+})();
 </script>
 }
