@@ -86,6 +86,9 @@ public class Invoice
     public DateTime? RestoredAt { get; set; }
 
     public ICollection<Payment> Payments { get; set; } = new List<Payment>();
+
+    /// <summary>The priced lines this invoice total is built from.</summary>
+    public ICollection<InvoiceItem> Items { get; set; } = new List<InvoiceItem>();
 }
 
 public class Payment

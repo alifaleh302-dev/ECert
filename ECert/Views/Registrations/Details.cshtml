@@ -4,6 +4,15 @@
     ViewData["PageIcon"] = "bi-clipboard-check";
     ViewData["PageDesc"] = "بيانات المتدرب والفاتورة والإعفاء المالي";
     Layout = "_AdminLayout";
+    var canManage = ViewBag.CanManage as bool? ?? false;
+    var canManageFees = ViewBag.CanManageFees as bool? ?? false;
+    var eligibility = ViewBag.CertificateEligibility as CertificateEligibilityResult;
+    var certificateFee = Model.Course?.CertificateFee;
+    var certificateChoice = Model.Fees.FirstOrDefault(f =>
+        f.IsSelected && string.Equals(f.FeeType, CourseFeeTypes.Certificate, StringComparison.OrdinalIgnoreCase));
+    var certificateItem = Model.Invoice?.Items.FirstOrDefault(i =>
+        string.Equals(i.FeeType, CourseFeeTypes.Certificate, StringComparison.OrdinalIgnoreCase));
+    var certificateActive = certificateChoice != null || certificateItem != null;
 }
 
 <div class="page-header">
@@ -106,7 +115,100 @@
             </div>
         </section>
 
-        @if (Model.Status is "Pending" or "Accepted")
+        <section class="a-card mb-4">
+            <div class="a-card__header">
+                <h2 class="a-card__title"><i class="bi bi-wallet2" aria-hidden="true"></i> رسوم الشهادة</h2>
+            </div>
+            <div class="a-card__body">
+                @if (certificateFee != null)
+                {
+                    <div class="border rounded-3 p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center gap-2">
+                            <div>
+                                <strong>@certificateFee.Name</strong>
+                                <span class="badge text-bg-secondary">اختياري</span>
+                                <span class="badge @(certificateActive ? "text-bg-success" : "text-bg-light")">
+                                    @(certificateActive ? "مفعّلة" : "غير مفعّلة")
+                                </span>
+                            </div>
+                            <strong class="text-nowrap">@certificateFee.Amount.ToString("N0") @Currency.Symbol</strong>
+                        </div>
+
+                        @if (canManageFees && Model.Status is "Pending" or "Accepted")
+                        {
+                            <div class="mt-2">
+                                @if (certificateActive)
+                                {
+                                    <form asp-action="CancelCertificateFee" method="post" class="d-inline"
+                                          data-confirm="سيتم إلغاء رسوم الشهادة من الفاتورة إن أمكن. هل تريد المتابعة؟">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@Model.RegistrationId" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-x-circle"></i> إلغاء رسوم الشهادة
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form asp-action="ActivateCertificateFee" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@Model.RegistrationId" />
+                                        <button type="submit" class="btn btn-sm btn-success">
+                                            <i class="bi bi-plus-circle"></i> تفعيل رسوم الشهادة
+                                        </button>
+                                    </form>
+                                }
+                            </div>
+                        }
+
+                        <div class="small mt-2 @(eligibility != null && !eligibility.Eligible && certificateActive ? "text-danger" : "text-muted")">
+                            @if (Model.Invoice == null)
+                            {
+                                <span>سيتم إضافة رسوم الشهادة إلى الفاتورة عند قبول التسجيل.</span>
+                            }
+                            else if (certificateItem == null)
+                            {
+                                <span>لن تُضاف رسوم الشهادة إلى الفاتورة حتى يفعّلها الموظف.</span>
+                            }
+                            else if (Model.Invoice.TotalAmount > 0 && Model.Invoice.PaidAmount < Model.Invoice.TotalAmount)
+                            {
+                                <span><i class="bi bi-exclamation-triangle"></i> لا يمكن إصدار الشهادة قبل سداد كامل الفاتورة.</span>
+                            }
+                            else
+                            {
+                                <span><i class="bi bi-check2-circle"></i> الفاتورة مسددة — تصدر الشهادة بعد إكمال الدورة.</span>
+                            }
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted small mb-3">هذه الدورة لا تفرض رسوم شهادة.</p>
+                }
+
+                @if (Model.Invoice != null && Model.Invoice.Items.Any())
+                {
+                    <h6 class="mb-2">بنود الفاتورة</h6>
+                    <ul class="list-unstyled small mb-0">
+                        @foreach (var item in Model.Invoice.Items.OrderBy(i => i.SortOrder).ThenBy(i => i.InvoiceItemId))
+                        {
+                            <li class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                <span>
+                                    @item.Name
+                                    @if (item.IsOptional)
+                                    {
+                                        <span class="badge text-bg-secondary">اختياري</span>
+                                    }
+                                </span>
+                                <strong class="text-nowrap">@item.Amount.ToString("N0") @Currency.Symbol</strong>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </section>
+
+        @if (canManage && Model.Status is "Pending" or "Accepted")
         {
             var originalFee = Model.Invoice?.OriginalAmount > 0 ? Model.Invoice.OriginalAmount : (Model.Course?.FinalPrice ?? 0);
             var currentExemption = Model.ExemptionAmount;
@@ -154,7 +256,7 @@
             </section>
         }
 
-        @if (Model.Status == "Pending")
+        @if (canManage && Model.Status == "Pending")
         {
             <div class="d-flex flex-wrap gap-2">
                 <form asp-action="Accept" method="post">

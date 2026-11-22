@@ -67,7 +67,11 @@
                 <p><i class="bi bi-calendar"></i> <strong>البداية:</strong> @Model.StartDate?.ToString("yyyy-MM-dd")</p>
                 <p><i class="bi bi-hourglass-split"></i> <strong>المدة:</strong> @Model.DurationText</p>
                 <p><i class="bi bi-geo-alt"></i> <strong>المكان:</strong> @Model.Location</p>
-                @if (!string.IsNullOrEmpty(Model.DiscountType) && Model.DiscountValue > 0)
+                @if (Model.IsFree)
+                {
+                    <p class="fs-4 fw-bold text-success"><i class="bi bi-gift"></i> الدورة مجانية</p>
+                }
+                else if (!string.IsNullOrEmpty(Model.DiscountType) && Model.DiscountValue > 0)
                 {
                     <p class="fs-5"><i class="bi bi-tag"></i> <span class="text-muted text-decoration-line-through">@Model.Price.ToString("N0") @Currency.Symbol</span> <span class="fw-bold text-danger fs-4">@Model.FinalPrice.ToString("N0") @Currency.Symbol</span></p>
                     <small class="text-danger">(خصم @Model.DiscountValue.ToString("N0")@(Model.DiscountType == "Percentage" ? "%" : $" {Currency.Symbol}"))</small>
@@ -75,6 +79,22 @@
                 else
                 {
                     <p class="fs-4 fw-bold text-primary"><i class="bi bi-tag"></i> @Model.Price.ToString("N0") @Currency.Symbol</p>
+                }
+                @if (Model.CertificateFee is { } certificateFee)
+                {
+                    <hr />
+                    <div class="d-flex justify-content-between align-items-start gap-2 small">
+                        <span>
+                            <strong>@certificateFee.Name</strong>
+                            <span class="badge text-bg-secondary">اختياري</span>
+                            @if (!string.IsNullOrWhiteSpace(certificateFee.Description))
+                            {
+                                <span class="d-block text-muted">@certificateFee.Description</span>
+                            }
+                        </span>
+                        <strong class="text-nowrap">@certificateFee.Amount.ToString("N0") @Currency.Symbol</strong>
+                    </div>
+                    <small class="text-muted d-block mt-2">تُضاف رسوم الشهادة فقط عند اختيارها أثناء التسجيل، ولا تُصدر الشهادة إلا بعد سداد كامل الفاتورة.</small>
                 }
                 <hr />
                 @if (Model.Status == "OpenForRegistration")

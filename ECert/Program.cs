@@ -61,8 +61,12 @@ builder.Services.AddScoped<CourseInstructorSchemaMigrationService>();
 builder.Services.AddScoped<CoursePartnerSchemaMigrationService>();
 builder.Services.AddScoped<RegistrationNameSchemaMigrationService>();
 builder.Services.AddScoped<RegistrationInvoiceService>();
+builder.Services.AddScoped<InvoiceBalanceService>();
+builder.Services.AddScoped<RegistrationFeeService>();
+builder.Services.AddScoped<CertificateEligibilityService>();
 builder.Services.AddScoped<InvoiceSchemaMigrationService>();
 builder.Services.AddScoped<FeeExemptionSchemaMigrationService>();
+builder.Services.AddScoped<CourseFeeSchemaMigrationService>();
 builder.Services.AddScoped<CertificateDesignService>();
 builder.Services.AddScoped<CertificateRenderService>();
 builder.Services.AddScoped<CertificatePdfService>();
@@ -268,6 +272,10 @@ using (var scope = app.Services.CreateScope())
         await invoiceMigration.EnsureAsync();
         var feeExemptionMigration = scope.ServiceProvider.GetRequiredService<FeeExemptionSchemaMigrationService>();
         await feeExemptionMigration.EnsureAsync();
+        // Fee tables and the invoice-line backfill. Must run after the invoice/exemption columns
+        // exist (the backfill reads OriginalAmount) and before any query includes the new lines.
+        var courseFeeMigration = scope.ServiceProvider.GetRequiredService<CourseFeeSchemaMigrationService>();
+        await courseFeeMigration.EnsureAsync();
         var academicMigration = scope.ServiceProvider.GetRequiredService<AcademicSchemaMigrationService>();
         await academicMigration.EnsureAsync();
         var cashboxMigration = scope.ServiceProvider.GetRequiredService<CashboxSchemaMigrationService>();

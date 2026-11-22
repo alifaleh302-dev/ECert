@@ -22,7 +22,10 @@ public class ECertDbContext : DbContext, IDataProtectionKeyContext
     public DbSet<CoursePartner> CoursePartners => Set<CoursePartner>();
     public DbSet<Registration> Registrations => Set<Registration>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<CourseFee> CourseFees => Set<CourseFee>();
+    public DbSet<RegistrationFee> RegistrationFees => Set<RegistrationFee>();
     public DbSet<Certificate> Certificates => Set<Certificate>();
     public DbSet<CertificateDesign> CertificateDesigns => Set<CertificateDesign>();
     public DbSet<CertificateDesignElement> CertificateDesignElements => Set<CertificateDesignElement>();
@@ -63,7 +66,46 @@ public class ECertDbContext : DbContext, IDataProtectionKeyContext
 
         // Ignore computed properties
         modelBuilder.Entity<Course>().Ignore(c => c.FinalPrice);
+        modelBuilder.Entity<Course>().Ignore(c => c.CertificateFeeAmount);
+        modelBuilder.Entity<Course>().Ignore(c => c.CertificateFeeName);
+        modelBuilder.Entity<Course>().Ignore(c => c.CertificateFeeDescription);
+        modelBuilder.Entity<Course>().Ignore(c => c.CertificateFee);
+        modelBuilder.Entity<Course>().Ignore(c => c.HasCertificateFee);
+        modelBuilder.Entity<Course>().Ignore(c => c.IsFree);
         modelBuilder.Entity<Invoice>().Ignore(i => i.RemainingAmount);
+
+        modelBuilder.Entity<CourseFee>()
+            .HasOne(f => f.Course)
+            .WithMany(c => c.Fees)
+            .HasForeignKey(f => f.CourseId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<CourseFee>()
+            .HasIndex(f => new { f.CourseId, f.SortOrder });
+
+        modelBuilder.Entity<RegistrationFee>()
+            .HasOne(f => f.Registration)
+            .WithMany(r => r.Fees)
+            .HasForeignKey(f => f.RegistrationId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<RegistrationFee>()
+            .HasOne(f => f.CourseFee)
+            .WithMany()
+            .HasForeignKey(f => f.CourseFeeId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<RegistrationFee>()
+            .HasIndex(f => f.RegistrationId);
+
+        modelBuilder.Entity<InvoiceItem>()
+            .HasOne(i => i.Invoice)
+            .WithMany(v => v.Items)
+            .HasForeignKey(i => i.InvoiceId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<InvoiceItem>()
+            .HasIndex(i => new { i.InvoiceId, i.SortOrder });
 
         // User Roles
         modelBuilder.Entity<UserRole>()

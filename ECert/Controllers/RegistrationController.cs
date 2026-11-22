@@ -25,7 +25,7 @@ public class RegistrationController : Controller
     [HttpGet]
     public async Task<IActionResult> Register(int courseId)
     {
-        var course = await _db.Courses.FindAsync(courseId);
+        var course = await _db.Courses.Include(c => c.Fees).FirstOrDefaultAsync(c => c.CourseId == courseId);
         if (course == null) return NotFound();
         if (course.Status != "OpenForRegistration")
         {
@@ -40,6 +40,7 @@ public class RegistrationController : Controller
             CourseNameArabic = course.CourseNameArabic,
             IncludeAcademicDetails = course.RequiresAcademicDetails
         };
+        PopulateFeeOptions(vm, course);
         await PopulateRegistrationFormAsync(course);
         return View(vm);
     }
@@ -49,8 +50,14 @@ public class RegistrationController : Controller
     [EnableRateLimiting("public-registration")]
     public async Task<IActionResult> Register(PublicRegistrationViewModel model)
     {
-        var course = await _db.Courses.FindAsync(model.CourseId);
+        var course = await _db.Courses.Include(c => c.Fees).FirstOrDefaultAsync(c => c.CourseId == model.CourseId);
         if (course == null) return NotFound();
+
+        if (course.Status != "OpenForRegistration")
+        {
+            TempData["Error"] = "التسجيل غير متاح لهذه الدورة حالياً.";
+            return RedirectToAction("Details", "PublicCourses", new { id = model.CourseId });
+        }
 
         if (!string.IsNullOrWhiteSpace(model.WebsiteUrl))
         {
@@ -138,7 +145,8 @@ public class RegistrationController : Controller
             AcademicLevel = academic?.AcademicLevel,
             UniversityNameSnapshot = academic?.University.UniversityName,
             CollegeNameSnapshot = academic?.College.CollegeName,
-            SpecializationNameSnapshot = academic?.Specialization.SpecializationName
+            SpecializationNameSnapshot = academic?.Specialization.SpecializationName,
+            Fees = BuildRegistrationFees(model, course)
         };
 
         _db.Registrations.Add(registration);
@@ -209,10 +217,42 @@ public class RegistrationController : Controller
         model.CourseNameEnglish = course.CourseNameEnglish;
         model.CourseNameArabic = course.CourseNameArabic;
         model.IncludeAcademicDetails = course.RequiresAcademicDetails || model.IncludeAcademicDetails;
+        PopulateFeeOptions(model, course);
         await PopulateAcademicDisplayNamesAsync(model);
         await PopulateRegistrationFormAsync(course);
         return View(model);
     }
+
+    /// <summary>
+    /// Rebuilds the certificate-fee option from the database for display. The submitted amount is
+    /// never used: only the opt-in flag is read, and the amount comes from the course definition.
+    /// </summary>
+    private static void PopulateFeeOptions(PublicRegistrationViewModel model, Course course)
+    {
+        model.BasePrice = course.FinalPrice;
+        model.CertificateFee = course.CertificateFee;
+    }
+
+    private static List<RegistrationFee> BuildRegistrationFees(PublicRegistrationViewModel model, Course course)
+    {
+        var fees = new List<RegistrationFee>();
+
+        if (model.WantsCertificate && course.CertificateFee is { } certificateFee)
+            fees.Add(ToRegistrationFee(certificateFee));
+
+        return fees;
+    }
+
+    private static RegistrationFee ToRegistrationFee(CourseFee fee) => new()
+    {
+        CourseFeeId = fee.CourseFeeId,
+        Name = fee.Name,
+        FeeType = CourseFeeTypes.Certificate,
+        Description = fee.Description,
+        Amount = fee.Amount,
+        IsOptional = true,
+        IsSelected = true
+    };
 
     private async Task PopulateRegistrationFormAsync(Course course)
     {
