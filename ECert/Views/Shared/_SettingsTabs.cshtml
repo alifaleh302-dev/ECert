@@ -1,0 +1,19 @@
+@using ECert.Services
+@model IReadOnlyList<ECert.Services.SettingsSection>
+@{
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+    var current = SystemSettingsSections.Find(currentController, currentAction);
+}
+<nav class="settings-tabs" aria-label="أقسام إعدادات النظام">
+    @foreach (var tab in Model)
+    {
+        var isActive = current is not null && string.Equals(current.Key, tab.Key, StringComparison.Ordinal);
+        var cssClass = isActive ? "settings-tab is-active" : "settings-tab";
+        var ariaCurrent = isActive ? "page" : null;
+        <a class="@cssClass" href="@tab.Url" aria-current="@ariaCurrent">
+            <i class="bi @tab.Icon" aria-hidden="true"></i>
+            <span>@tab.Label</span>
+        </a>
+    }
+</nav>

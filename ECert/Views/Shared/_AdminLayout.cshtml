@@ -13,6 +13,8 @@
     var displayName = User.Identity?.Name ?? "مستخدم";
     var initial = string.IsNullOrWhiteSpace(displayName) ? "?" : displayName.Trim().Substring(0, 1);
     var pageTitle = ViewData["Title"]?.ToString() ?? "";
+    var breadcrumbParent = ViewData["BreadcrumbParent"]?.ToString();
+    var breadcrumbParentController = ViewData["BreadcrumbParentController"]?.ToString();
 
     // Navigation is declared as data so the markup below stays readable and the
     // permission rules live in one place instead of being duplicated per link.
@@ -41,7 +43,6 @@
             ("Cashbox", "الصندوق", "bi-safe"),
             ("Reports", "تقارير الإيرادات", "bi-graph-up-arrow"),
             ("FinancialAudit", "سجل التدقيق المالي", "bi-shield-check"),
-            ("FinanceSettings", "إعدادات النظام المالية", "bi-sliders"),
         }),
         ("content", "المحتوى الإعلامي", "bi-megaphone", new()
         {
@@ -54,17 +55,21 @@
             ("Users", "المستخدمون", "bi-people"),
             ("Roles", "الأدوار والصلاحيات", "bi-shield-lock"),
             ("AuditLog", "سجل العمليات", "bi-journal-text"),
-            ("SecuritySettings", "الأمان والنسخ الاحتياطي", "bi-shield-lock"),
-            ("CertificateExportSettings", "إعدادات تصدير الشهادات", "bi-file-earmark-pdf"),
-            ("AcademicCatalog", "البيانات الجامعية", "bi-mortarboard"),
-            ("PhoneCountries", "مفاتيح الهواتف", "bi-phone"),
+            ("SystemSettings", "إعدادات النظام", "bi-gear-wide-connected"),
         }),
     };
 
     // A section is visible when the signed-in role holds any of its permissions. The map in
     // AdminPermissions is the single source of truth, mirrored by the controller guards — the
     // main fund (الصندوق) is unlocked by view-cashbox / manage-cashbox like any other section.
-    bool CanSee(string ctrl) => User.CanAccessSection(ctrl);
+    // Settings live behind one sidebar entry: it is visible when the role can open any tab, and it
+    // stays highlighted while the user is inside any of the settings controllers.
+    bool CanSeeSettings = SystemSettingsSections.VisibleFor(User).Count > 0;
+    bool IsSettingsActive = SystemSettingsSections.Find(currentController,
+        ViewContext.RouteData.Values["action"]?.ToString()) is not null;
+
+    bool CanSee(string ctrl) => ctrl == "SystemSettings" ? CanSeeSettings : User.CanAccessSection(ctrl);
+    bool ItemActive(string ctrl) => ctrl == "SystemSettings" ? IsSettingsActive : IsActive(ctrl);
 
     var visibleGroups = groups
         .Select(g => (g.Key, g.Label, g.Icon, Items: g.Items.Where(i => CanSee(i.Ctrl)).ToList()))
@@ -119,7 +124,7 @@
 
                 @foreach (var group in visibleGroups)
                 {
-                    bool groupActive = group.Items.Any(i => IsActive(i.Ctrl));
+                    bool groupActive = group.Items.Any(i => ItemActive(i.Ctrl));
                     <button type="button" class="admin-nav__toggle" data-nav-group="@group.Key"
                             aria-expanded="@(groupActive ? "true" : "false")" aria-controls="navGroup-@group.Key">
                         <i class="bi @group.Icon" aria-hidden="true"></i>
@@ -130,7 +135,7 @@
                         <div>
                             @foreach (var item in group.Items)
                             {
-                                <a class="admin-nav__link @(IsActive(item.Ctrl) ? "is-active" : "")"
+                                <a class="admin-nav__link @(ItemActive(item.Ctrl) ? "is-active" : "")"
                                    asp-controller="@item.Ctrl" asp-action="Index">
                                     <i class="bi @item.Icon" aria-hidden="true"></i> @item.Label
                                 </a>
@@ -160,6 +165,11 @@
 
                     <nav class="admin-crumbs" aria-label="مسار التنقل">
                         <a asp-controller="@dashController" asp-action="Index">الرئيسية</a>
+                        @if (!string.IsNullOrEmpty(breadcrumbParent) && !string.IsNullOrEmpty(breadcrumbParentController))
+                        {
+                            <i class="bi bi-chevron-left admin-crumbs__sep" aria-hidden="true"></i>
+                            <a asp-controller="@breadcrumbParentController" asp-action="Index">@breadcrumbParent</a>
+                        }
                         @if (!string.IsNullOrEmpty(pageTitle))
                         {
                             <i class="bi bi-chevron-left admin-crumbs__sep" aria-hidden="true"></i>

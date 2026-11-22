@@ -1,4 +1,3 @@
-using ECert.Data;
 using ECert.Models;
 using ECert.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -7,10 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 namespace ECert.Controllers;
 
 /// <summary>
-/// The security control panel (إعدادات الأمان والنسخ الاحتياطي), restricted to SuperAdmin through
-/// the <c>manage-security-settings</c> permission. It edits the single <see cref="SecuritySettings"/>
-/// row the security services read at runtime, so policy — lockout thresholds, Telegram channels,
-/// the backup key and 2FA — can be changed here without touching the code.
+/// The security and backup control panels (تبويبا الأمان والنسخ الاحتياطي), restricted to the built-in
+/// SuperAdmin. Both tabs edit the single <see cref="SecuritySettings"/> row the security services read
+/// at runtime, but each tab only writes its own fields so a form never clobbers the other tab.
 /// </summary>
 [Authorize]
 public class SecuritySettingsController : Controller
@@ -44,9 +42,15 @@ public class SecuritySettingsController : Controller
         return View(await _settings.GetAsync());
     }
 
+    public async Task<IActionResult> Backup()
+    {
+        if (!IsSuperAdmin) return Forbid();
+        return View(await _settings.GetAsync());
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Save(SecuritySettings model)
+    public async Task<IActionResult> SaveSecurity(SecuritySettings model)
     {
         if (!IsSuperAdmin) return Forbid();
 
@@ -59,11 +63,25 @@ public class SecuritySettingsController : Controller
         var settings = await _settings.GetAsync();
         settings.TelegramBotToken = model.TelegramBotToken?.Trim();
         settings.SecurityAlertChannelId = model.SecurityAlertChannelId?.Trim();
-        settings.BackupChannelId = model.BackupChannelId?.Trim();
         settings.TwoFactorEnabled = model.TwoFactorEnabled;
         settings.MaxFailedLoginAttempts = model.MaxFailedLoginAttempts;
         settings.LockoutMinutes = model.LockoutMinutes;
         settings.IdleTimeoutMinutes = model.IdleTimeoutMinutes;
+
+        await _settings.SaveAsync(settings, Actor);
+        await _audit.LogAsync(Actor, "Update", "SecuritySettings", null, null, "Security settings updated");
+        TempData["Success"] = "تم حفظ الإعدادات الأمنية.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveBackup(SecuritySettings model)
+    {
+        if (!IsSuperAdmin) return Forbid();
+
+        var settings = await _settings.GetAsync();
+        settings.BackupChannelId = model.BackupChannelId?.Trim();
         settings.BackupEnabled = model.BackupEnabled;
         settings.BackupHourUtc = Math.Clamp(model.BackupHourUtc, 0, 23);
 
@@ -73,9 +91,9 @@ public class SecuritySettingsController : Controller
             settings.BackupEncryptionKey = model.BackupEncryptionKey.Trim();
 
         await _settings.SaveAsync(settings, Actor);
-        await _audit.LogAsync(Actor, "Update", "SecuritySettings", null, null, "Security settings updated");
-        TempData["Success"] = "تم حفظ الإعدادات الأمنية.";
-        return RedirectToAction(nameof(Index));
+        await _audit.LogAsync(Actor, "Update", "SecuritySettings", null, null, "Backup settings updated");
+        TempData["Success"] = "تم حفظ إعدادات النسخ الاحتياطي.";
+        return RedirectToAction(nameof(Backup));
     }
 
     [HttpPost]
@@ -86,7 +104,7 @@ public class SecuritySettingsController : Controller
         var result = await _backup.RunAsync();
         await _audit.LogAsync(Actor, "Backup", "Database", null, null, result);
         TempData[result.Contains("تم") ? "Success" : "Error"] = result;
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Backup));
     }
 
     [HttpPost]
@@ -96,7 +114,7 @@ public class SecuritySettingsController : Controller
         if (!IsSuperAdmin) return Forbid();
         var linked = await _link.PollOnceAsync(0);
         TempData["Success"] = linked > 0 ? $"تم ربط {linked} حساب." : "لا توجد طلبات ربط جديدة.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Backup));
     }
 
     /// <summary>Recomputes the audit hash chain and reports the first row that fails.</summary>

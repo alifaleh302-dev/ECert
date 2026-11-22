@@ -29,31 +29,44 @@ public class SecurityHardeningTests
     }
 
     [Fact]
-    public async Task Security_settings_page_loads_for_super_admin()
+    public async Task Security_tab_renders_its_own_fields_and_form()
     {
         var admin = await SignInAdminAsync();
         var html = await admin.GetStringAsync("/SecuritySettings");
 
         // Arabic renders as HTML numeric entities, so assert on the stable ASCII markers.
         Assert.Contains("name=\"TelegramBotToken\"", html);
+        Assert.Contains("name=\"SecurityAlertChannelId\"", html);
+        Assert.Contains("/SecuritySettings/SaveSecurity", html);
+
+        // The backup fields moved to their own tab; the security form must not post them.
+        Assert.DoesNotContain("name=\"BackupEncryptionKey\"", html);
+    }
+
+    [Fact]
+    public async Task Backup_tab_renders_its_own_fields_and_form()
+    {
+        var admin = await SignInAdminAsync();
+        var html = await admin.GetStringAsync("/SecuritySettings/Backup");
+
         Assert.Contains("name=\"BackupChannelId\"", html);
-        Assert.Contains("/SecuritySettings/Save", html);
+        Assert.Contains("name=\"BackupEncryptionKey\"", html);
+        Assert.Contains("/SecuritySettings/SaveBackup", html);
+        Assert.DoesNotContain("name=\"TelegramBotToken\"", html);
     }
 
     [Fact]
     public async Task Saving_security_settings_persists_them()
     {
         var admin = await SignInAdminAsync();
-        var response = await admin.PostFormAsync("/SecuritySettings", "/SecuritySettings/Save",
+        var response = await admin.PostFormAsync("/SecuritySettings", "/SecuritySettings/SaveSecurity",
             new Dictionary<string, string>
             {
                 ["MaxFailedLoginAttempts"] = "7",
                 ["LockoutMinutes"] = "20",
                 ["IdleTimeoutMinutes"] = "45",
-                ["BackupHourUtc"] = "3",
                 ["SecurityAlertChannelId"] = "-1005550001",
-                ["TwoFactorEnabled"] = "false",
-                ["BackupEnabled"] = "true"
+                ["TwoFactorEnabled"] = "false"
             });
         response.EnsureSuccessStatusCode();
 
@@ -63,6 +76,43 @@ public class SecurityHardeningTests
         Assert.Equal(20, settings.LockoutMinutes);
         Assert.Equal(45, settings.IdleTimeoutMinutes);
         Assert.Equal("-1005550001", settings.SecurityAlertChannelId);
+    }
+
+    [Fact]
+    public async Task Saving_backup_settings_does_not_touch_security_fields()
+    {
+        var admin = await SignInAdminAsync();
+
+        var security = await admin.PostFormAsync("/SecuritySettings", "/SecuritySettings/SaveSecurity",
+            new Dictionary<string, string>
+            {
+                ["MaxFailedLoginAttempts"] = "6",
+                ["LockoutMinutes"] = "12",
+                ["IdleTimeoutMinutes"] = "33",
+                ["SecurityAlertChannelId"] = "-1007770001",
+                ["TwoFactorEnabled"] = "false"
+            });
+        security.EnsureSuccessStatusCode();
+
+        var backup = await admin.PostFormAsync("/SecuritySettings/Backup", "/SecuritySettings/SaveBackup",
+            new Dictionary<string, string>
+            {
+                ["BackupChannelId"] = "-1008880002",
+                ["BackupHourUtc"] = "4",
+                ["BackupEnabled"] = "true"
+            });
+        backup.EnsureSuccessStatusCode();
+
+        var settings = await _fixture.Factory.WithDbAsync(db =>
+            db.SecuritySettings.AsNoTracking().FirstAsync(s => s.SecuritySettingsId == 1));
+        Assert.Equal(6, settings.MaxFailedLoginAttempts);
+        Assert.Equal(12, settings.LockoutMinutes);
+        Assert.Equal(33, settings.IdleTimeoutMinutes);
+        Assert.Equal("-1007770001", settings.SecurityAlertChannelId);
+        Assert.False(settings.TwoFactorEnabled);
+        Assert.Equal("-1008880002", settings.BackupChannelId);
+        Assert.Equal(4, settings.BackupHourUtc);
+        Assert.True(settings.BackupEnabled);
     }
 
     [Fact]

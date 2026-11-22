@@ -1,16 +1,11 @@
 @model PhoneCountry
 @{
     ViewData["Title"] = "تعديل دولة";
-    ViewData["PageIcon"] = "bi-pencil-square";
-    ViewData["PageDesc"] = "حدّث رمز الدولة وقواعد التحقق من أرقام الهواتف";
-    Layout = "_AdminLayout";
+    Layout = "_SettingsLayout";
 }
 
-<div class="page-header">
-    <partial name="_PageHeader" />
-    <div class="page-actions">
-        <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للدول</a>
-    </div>
+<div class="settings-toolbar">
+    <a asp-action="Index" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> العودة للدول</a>
 </div>
 
 <div class="a-card a-card--narrow">
