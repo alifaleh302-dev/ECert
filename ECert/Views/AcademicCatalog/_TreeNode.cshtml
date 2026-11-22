@@ -1,0 +1,43 @@
+@model ECert.Controllers.AcademicNode
+@{
+    var selectedKey = ViewData["SelectedKey"] as string;
+    var isSelected = string.Equals(selectedKey, Model.Key, StringComparison.Ordinal);
+    var hasChildren = Model.Children.Count > 0;
+    var isOpen = Model.IsOpen;
+}
+<li class="ac-node @(isOpen ? "is-open" : "")" role="treeitem"
+    aria-expanded="@(hasChildren ? (isOpen ? "true" : "false") : null)">
+    <div class="ac-node__row @(isSelected ? "is-selected" : "")">
+        <button type="button" class="ac-node__caret @(hasChildren ? "" : "is-leaf")"
+                data-ac-toggle tabindex="-1" aria-label="توسيع أو طي @Model.Name">
+            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+        </button>
+        <i class="bi @Model.Icon ac-node__icon" aria-hidden="true"></i>
+        <a class="ac-node__name" asp-action="Index" asp-route-selected="@Model.Key"
+           aria-current="@(isSelected ? "true" : null)">@Model.Name</a>
+        <span class="ac-dot @(Model.IsActive ? "" : "ac-dot--off")"
+              title="@(Model.IsActive ? "مفعّل" : "موقوف")"></span>
+        @if (hasChildren)
+        {
+            <span class="ac-node__count" title="@Model.ChildrenCountText">@Model.Children.Count</span>
+        }
+        @if (Model.ChildKind is not null)
+        {
+            <a class="ac-node__add" asp-action="Index" asp-route-selected="@Model.Key"
+               asp-route-add="@Model.ChildKind" asp-route-parentId="@Model.Id"
+               title="إضافة @Model.ChildLabel داخل @Model.Name"
+               aria-label="إضافة @Model.ChildLabel داخل @Model.Name">
+                <i class="bi bi-plus-lg" aria-hidden="true"></i>
+            </a>
+        }
+    </div>
+    @if (hasChildren)
+    {
+        <ul class="ac-node__children" role="group">
+            @foreach (var child in Model.Children)
+            {
+                <partial name="_TreeNode" model="child" />
+            }
+        </ul>
+    }
+</li>

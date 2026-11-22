@@ -1,243 +1,267 @@
 @model ECert.Controllers.AcademicCatalogPageViewModel
-
+@using ECert.Controllers
 @{
     Layout = "_SettingsLayout";
     ViewData["Title"] = "البيانات الجامعية";
+    ViewData["SelectedKey"] = Model.Selected?.Key;
+
+    var selected = Model.Selected;
+    var addKind = Model.AddKind;
+    var addParent = Model.AddParent;
+
+    // One tuple per kind: the four add forms and the four edit forms differ only in field and
+    // action names, so they are described once here instead of duplicated four times below.
+    var addForm = addKind switch
+    {
+        AcademicNode.University => (Action: "CreateUniversity", ParentField: (string?)null, NameField: "universityName", Label: "الجامعة", MaxLength: 160),
+        AcademicNode.College => (Action: "CreateCollege", ParentField: "universityId", NameField: "collegeName", Label: "الكلية", MaxLength: 160),
+        AcademicNode.Specialization => (Action: "CreateSpecialization", ParentField: "collegeId", NameField: "specializationName", Label: "التخصص", MaxLength: 160),
+        _ => (Action: "CreateLevel", ParentField: "academicSpecializationId", NameField: "levelName", Label: "المستوى", MaxLength: 80)
+    };
+
+    var updateForm = selected?.Kind switch
+    {
+        AcademicNode.University => (Action: "UpdateUniversity", IdField: "universityId", ParentField: (string?)null, NameField: "universityName", Label: "الجامعة", MaxLength: 160, Delete: "DeleteUniversity"),
+        AcademicNode.College => (Action: "UpdateCollege", IdField: "collegeId", ParentField: "universityId", NameField: "collegeName", Label: "الكلية", MaxLength: 160, Delete: "DeleteCollege"),
+        AcademicNode.Specialization => (Action: "UpdateSpecialization", IdField: "academicSpecializationId", ParentField: "collegeId", NameField: "specializationName", Label: "التخصص", MaxLength: 160, Delete: "DeleteSpecialization"),
+        _ => (Action: "UpdateLevel", IdField: "academicLevelOptionId", ParentField: "academicSpecializationId", NameField: "levelName", Label: "المستوى", MaxLength: 80, Delete: "DeleteLevel")
+    };
+
+    string Count(int value, string one, string two, string many) => value switch
+    {
+        1 => $"1 {one}",
+        2 => two,
+        _ => $"{value} {many}"
+    };
+
+    var newNodeLabel = addKind switch
+    {
+        AcademicNode.University => "جامعة جديدة",
+        AcademicNode.College => "كلية جديدة",
+        AcademicNode.Specialization => "تخصص جديد",
+        _ => "مستوى جديد"
+    };
 }
 
+@* Keeps the page postable even when it renders no form at all (empty catalog). *@
+@Html.AntiForgeryToken()
 
-<div class="a-grid-2">
-    <section class="a-card">
-        <div class="a-card__header">
-            <h2 class="a-card__title"><i class="bi bi-building" aria-hidden="true"></i> الجامعات</h2>
-            <span class="a-badge a-badge--neutral a-badge--none">@Model.Universities.Count</span>
-        </div>
-        <div class="a-card__body">
-            <form asp-action="CreateUniversity" method="post" class="input-group mb-3">
-                @Html.AntiForgeryToken()
-                <input name="universityName" class="form-control" maxlength="160" placeholder="اسم الجامعة" required />
-                <button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg ms-1"></i>إضافة</button>
-            </form>
-            <div class="vstack gap-2">
-                @foreach (var university in Model.Universities)
-                {
-                    <div class="a-item">
-                        <form asp-action="UpdateUniversity" method="post" class="d-flex flex-wrap gap-2 align-items-center">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="universityId" value="@university.UniversityId" />
-                            <input name="universityName" value="@university.UniversityName" class="form-control flex-grow-1" maxlength="160" required />
-                            <div class="form-check form-switch mb-0" title="تفعيل الجامعة">
-                                <input class="form-check-input" type="checkbox" name="isActive" value="true" checked="@university.IsActive" aria-label="تفعيل الجامعة" />
-                            </div>
-                            <button class="btn btn-sm btn-outline-primary" type="submit" title="حفظ"><i class="bi bi-check-lg"></i></button>
-                        </form>
-                        <form asp-action="DeleteUniversity" method="post" class="mt-2" data-confirm="هل تريد حذف هذه الجامعة؟ لا يمكن حذفها إذا كانت مرتبطة بكليات أو تسجيلات." data-confirm-tone="danger">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="id" value="@university.UniversityId" />
-                            <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash ms-1"></i>حذف</button>
-                        </form>
-                    </div>
-                }
-                @if (!Model.Universities.Any())
-                {
-                    <div class="text-muted small">لا توجد جامعات. أضف أول جامعة للبدء.</div>
-                }
-            </div>
-        </div>
-    </section>
-
-    <section class="a-card">
-        <div class="a-card__header">
-            <h2 class="a-card__title"><i class="bi bi-bank" aria-hidden="true"></i> الكليات</h2>
-            <span class="a-badge a-badge--neutral a-badge--none">@Model.Colleges.Count</span>
-        </div>
-        <div class="a-card__body">
-            <form asp-action="CreateCollege" method="post" class="row g-2 mb-3">
-                @Html.AntiForgeryToken()
-                <div class="col-12">
-                    <select name="universityId" class="form-select" required>
-                        <option value="">اختر الجامعة</option>
-                        @foreach (var university in Model.Universities.Where(u => u.IsActive))
-                        {
-                            <option value="@university.UniversityId">@university.UniversityName</option>
-                        }
-                    </select>
-                </div>
-                <div class="col">
-                    <input name="collegeName" class="form-control" maxlength="160" placeholder="اسم الكلية" required />
-                </div>
-                <div class="col-auto"><button class="btn btn-success" type="submit"><i class="bi bi-plus-lg ms-1"></i>إضافة</button></div>
-            </form>
-            <div class="vstack gap-2">
-                @foreach (var college in Model.Colleges)
-                {
-                    <div class="a-item">
-                        <form asp-action="UpdateCollege" method="post" class="row g-2 align-items-center">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="collegeId" value="@college.CollegeId" />
-                            <div class="col-12">
-                                <select name="universityId" class="form-select form-select-sm" required>
-                                    @foreach (var university in Model.Universities)
-                                    {
-                                        <option value="@university.UniversityId" selected="@(university.UniversityId == college.UniversityId)">@university.UniversityName</option>
-                                    }
-                                </select>
-                            </div>
-                            <div class="col">
-                                <input name="collegeName" value="@college.CollegeName" class="form-control form-control-sm" maxlength="160" required />
-                            </div>
-                            <div class="col-auto form-check form-switch mb-0"><input class="form-check-input" type="checkbox" name="isActive" value="true" checked="@college.IsActive" aria-label="تفعيل الكلية" /></div>
-                            <div class="col-auto"><button class="btn btn-sm btn-outline-success" type="submit" title="حفظ"><i class="bi bi-check-lg"></i></button></div>
-                        </form>
-                        <form asp-action="DeleteCollege" method="post" class="mt-2" data-confirm="هل تريد حذف هذه الكلية؟ لا يمكن حذفها إذا كانت مرتبطة بتخصصات أو تسجيلات." data-confirm-tone="danger">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="id" value="@college.CollegeId" />
-                            <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash ms-1"></i>حذف</button>
-                        </form>
-                    </div>
-                }
-                @if (!Model.Colleges.Any())
-                {
-                    <div class="text-muted small">تظهر الكليات هنا بعد إضافتها وربطها بجامعة.</div>
-                }
-            </div>
-        </div>
-    </section>
-
-    <section class="a-card">
-        <div class="a-card__header">
-            <h2 class="a-card__title"><i class="bi bi-diagram-3" aria-hidden="true"></i> التخصصات</h2>
-            <span class="a-badge a-badge--neutral a-badge--none">@Model.Specializations.Count</span>
-        </div>
-        <div class="a-card__body">
-            <form asp-action="CreateSpecialization" method="post" class="row g-2 mb-3">
-                @Html.AntiForgeryToken()
-                <div class="col-12">
-                    <select name="collegeId" class="form-select" required>
-                        <option value="">اختر الكلية</option>
-                        @foreach (var college in Model.Colleges.Where(c => c.IsActive && c.University?.IsActive == true))
-                        {
-                            <option value="@college.CollegeId">@college.University!.UniversityName — @college.CollegeName</option>
-                        }
-                    </select>
-                </div>
-                <div class="col"><input name="specializationName" class="form-control" maxlength="160" placeholder="اسم التخصص" required /></div>
-                <div class="col-auto"><button class="btn btn-warning" type="submit"><i class="bi bi-plus-lg ms-1"></i>إضافة</button></div>
-            </form>
-            <div class="vstack gap-2">
-                @foreach (var specialization in Model.Specializations)
-                {
-                    <div class="a-item">
-                        <form asp-action="UpdateSpecialization" method="post" class="row g-2 align-items-center">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="academicSpecializationId" value="@specialization.AcademicSpecializationId" />
-                            <div class="col-12">
-                                <select name="collegeId" class="form-select form-select-sm" required>
-                                    @foreach (var college in Model.Colleges)
-                                    {
-                                        <option value="@college.CollegeId" selected="@(college.CollegeId == specialization.CollegeId)">@college.University!.UniversityName — @college.CollegeName</option>
-                                    }
-                                </select>
-                            </div>
-                            <div class="col"><input name="specializationName" value="@specialization.SpecializationName" class="form-control form-control-sm" maxlength="160" required /></div>
-                            <div class="col-auto form-check form-switch mb-0"><input class="form-check-input" type="checkbox" name="isActive" value="true" checked="@specialization.IsActive" aria-label="تفعيل التخصص" /></div>
-                            <div class="col-auto"><button class="btn btn-sm btn-outline-warning" type="submit" title="حفظ"><i class="bi bi-check-lg"></i></button></div>
-                        </form>
-                        <form asp-action="DeleteSpecialization" method="post" class="mt-2" data-confirm="هل تريد حذف هذا التخصص؟ سيتم حذف مستوياته التابعة أيضًا." data-confirm-tone="danger">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="id" value="@specialization.AcademicSpecializationId" />
-                            <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash ms-1"></i>حذف</button>
-                        </form>
-                    </div>
-                }
-                @if (!Model.Specializations.Any())
-                {
-                    <div class="text-muted small">أضف التخصصات بعد إنشاء الكليات.</div>
-                }
-            </div>
-        </div>
-    </section>
-
-    <section class="a-card">
-        <div class="a-card__header">
-            <h2 class="a-card__title"><i class="bi bi-list-ol" aria-hidden="true"></i> المستويات الدراسية</h2>
-            <span class="a-badge a-badge--neutral a-badge--none">@Model.Levels.Count</span>
-        </div>
-        <div class="a-card__body">
-            <form asp-action="CreateLevel" method="post" class="row g-2 mb-3">
-                @Html.AntiForgeryToken()
-                <div class="col-12">
-                    <select name="academicSpecializationId" class="form-select" required>
-                        <option value="">اختر التخصص</option>
-                        @foreach (var specialization in Model.Specializations.Where(s => s.IsActive && s.College?.IsActive == true && s.College.University?.IsActive == true))
-                        {
-                            <option value="@specialization.AcademicSpecializationId">@specialization.SpecializationName — @specialization.College?.CollegeName</option>
-                        }
-                    </select>
-                </div>
-                <div class="col"><input name="levelName" class="form-control" maxlength="80" placeholder="اسم المستوى" required /></div>
-                <div class="col-auto"><input name="sortOrder" type="number" min="0" max="999" value="0" class="form-control" style="width:85px" title="الترتيب" aria-label="الترتيب" /></div>
-                <div class="col-auto"><button class="btn btn-info text-white" type="submit"><i class="bi bi-plus-lg ms-1"></i>إضافة</button></div>
-            </form>
-
-            <div class="mb-3">
-                <label for="levelFilter" class="form-label small text-muted mb-1">تصفية حسب التخصص</label>
-                <select id="levelFilter" class="form-select form-select-sm">
-                    <option value="">كل التخصصات</option>
-                    @foreach (var specialization in Model.Specializations)
-                    {
-                        <option value="@specialization.AcademicSpecializationId">@specialization.SpecializationName — @specialization.College?.CollegeName</option>
-                    }
-                </select>
-            </div>
-
-            <div id="levelsEmpty" class="a-note a-note--info small d-none">لا توجد مستويات مطابقة للتصفية الحالية.</div>
-            <div class="vstack gap-2" id="levelsList">
-                @foreach (var level in Model.Levels)
-                {
-                    <div class="a-item level-item" data-specialization-id="@level.AcademicSpecializationId">
-                        <form asp-action="UpdateLevel" method="post" class="row g-2 align-items-center">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="academicLevelOptionId" value="@level.AcademicLevelOptionId" />
-                            <div class="col-12 small text-muted">@level.AcademicSpecialization?.SpecializationName — @level.AcademicSpecialization?.College?.CollegeName</div>
-                            <div class="col"><input name="levelName" value="@level.LevelName" class="form-control form-control-sm" maxlength="80" required /></div>
-                            <div class="col-auto"><input name="sortOrder" type="number" min="0" max="999" value="@level.SortOrder" class="form-control form-control-sm" style="width:70px" title="الترتيب" aria-label="الترتيب" /></div>
-                            <div class="col-auto form-check form-switch mb-0"><input class="form-check-input" type="checkbox" name="isActive" value="true" checked="@level.IsActive" aria-label="تفعيل المستوى" /></div>
-                            <div class="col-auto"><button class="btn btn-sm btn-outline-info" type="submit" title="حفظ"><i class="bi bi-check-lg"></i></button></div>
-                        </form>
-                        <form asp-action="DeleteLevel" method="post" class="mt-2" data-confirm="هل تريد حذف هذا المستوى؟" data-confirm-tone="danger">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="id" value="@level.AcademicLevelOptionId" />
-                            <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash ms-1"></i>حذف</button>
-                        </form>
-                    </div>
-                }
-            </div>
-        </div>
-    </section>
+<div class="ac-toolbar">
+    <div class="ac-search">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <label class="visually-hidden" for="acSearch">بحث في الجامعات والكليات والتخصصات</label>
+        <input id="acSearch" type="search" class="form-control" autocomplete="off"
+               placeholder="ابحث عن جامعة، كلية، تخصص…" />
+    </div>
+    <span class="ac-search__hint" id="acSearchHint" role="status"></span>
+    <a class="btn btn-primary" asp-action="Index" asp-route-add="@AcademicNode.University">
+        <i class="bi bi-plus-lg" aria-hidden="true"></i> إضافة جامعة
+    </a>
 </div>
 
-<div class="a-note a-note--info mt-3 mb-0 small">
-    <i class="bi bi-info-circle" aria-hidden="true"></i>
-    <div>إذا كان العنصر مرتبطًا بسجلات أو عناصر تابعة، سيمنع النظام الحذف ويعرض السبب. استخدم مفتاح التفعيل لإخفائه من التسجيلات الجديدة.</div>
+<div class="ac-split">
+    <section class="a-card ac-tree" aria-label="الهيكل الأكاديمي">
+        <div class="ac-tree__head">
+            <div class="ac-tree__heading">
+                <h2 class="a-card__title"><i class="bi bi-diagram-3" aria-hidden="true"></i> الهيكل الأكاديمي</h2>
+                <p class="ac-tree__counts">
+                    @Count(Model.UniversityCount, "جامعة", "جامعتان", "جامعات")
+                    ·
+                    @Count(Model.CollegeCount, "كلية", "كليتان", "كليات")
+                    ·
+                    @Count(Model.SpecializationCount, "تخصص", "تخصصان", "تخصصات")
+                    ·
+                    @Count(Model.LevelCount, "مستوى", "مستويان", "مستويات")
+                </p>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-ac-expand>توسيع الكل</button>
+        </div>
+        <div class="ac-tree__body" id="acTree" role="tree">
+            @if (Model.Roots.Count == 0)
+            {
+                <p class="ac-empty-line">لا توجد جامعات بعد. ابدأ بإضافة جامعة.</p>
+            }
+            else
+            {
+                <ul class="ac-tree__root">
+                    @foreach (var node in Model.Roots)
+                    {
+                        <partial name="_TreeNode" model="node" />
+                    }
+                </ul>
+            }
+        </div>
+        <p class="ac-tree__foot">اضغط عنصراً لعرضه وتعديله · زر + يضيف عنصراً بداخله</p>
+    </section>
+
+    <section class="a-card ac-detail" id="acDetail">
+        @if (addKind is not null)
+        {
+            <div class="ac-detail__head">
+                <nav class="ac-path" aria-label="المسار">
+                    <span>الجامعات</span>
+                    <span class="ac-path__sep" aria-hidden="true">/</span>
+                    @if (addParent is not null)
+                    {
+                        <span>@addParent.Path</span>
+                        <span class="ac-path__sep" aria-hidden="true">/</span>
+                    }
+                    <strong>@newNodeLabel</strong>
+                </nav>
+                <span class="a-badge a-badge--success">جديد</span>
+            </div>
+            <div class="ac-detail__body">
+                <h2 class="ac-detail__title">إضافة @(addKind == AcademicNode.University ? "جامعة" : addParent!.ChildLabel)</h2>
+                @if (addParent is not null)
+                {
+                    <p class="ac-hint">سيُضاف داخل «@addParent.Name» تلقائياً — بلا حاجة لاختيار الأب من قائمة.</p>
+                }
+                <form method="post" asp-action="@addForm.Action" class="ac-form">
+                    @Html.AntiForgeryToken()
+                    @if (addForm.ParentField is not null)
+                    {
+                        <input type="hidden" name="@addForm.ParentField" value="@addParent!.Id" />
+                    }
+                    <label class="form-label" for="acNewName">اسم @addForm.Label</label>
+                    <input id="acNewName" name="@addForm.NameField" class="form-control"
+                           maxlength="@addForm.MaxLength" required autofocus
+                           placeholder="مثال: @(addKind == AcademicNode.University ? "جامعة صنعاء" : addKind == AcademicNode.College ? "كلية الهندسة" : addKind == AcademicNode.Specialization ? "هندسة مدنية" : "المستوى الأول")" />
+                    @if (addKind == AcademicNode.Level)
+                    {
+                        <label class="form-label mt-3" for="acNewOrder">ترتيب العرض</label>
+                        <input id="acNewOrder" name="sortOrder" type="number" min="0" max="999" value="0"
+                               class="form-control ac-input--short" />
+                        <p class="ac-hint">الأرقام الأصغر تظهر أولاً.</p>
+                    }
+                    <div class="ac-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg" aria-hidden="true"></i> إضافة
+                        </button>
+                        <a class="btn btn-outline-secondary" asp-action="Index" asp-route-selected="@addParent?.Key">إلغاء</a>
+                    </div>
+                </form>
+            </div>
+        }
+        else if (selected is not null)
+        {
+            <div class="ac-detail__head">
+                <nav class="ac-path" aria-label="المسار">
+                    <span>الجامعات</span>
+                    <span class="ac-path__sep" aria-hidden="true">/</span>
+                    <span>@selected.Path</span>
+                </nav>
+                <span class="a-badge @(selected.IsActive ? "a-badge--success" : "a-badge--neutral")">
+                    @(selected.IsActive ? "مفعّل" : "موقوف")
+                </span>
+            </div>
+            <div class="ac-detail__body">
+                <form method="post" asp-action="@updateForm.Action" class="ac-form">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="@updateForm.IdField" value="@selected.Id" />
+                    @if (updateForm.ParentField is not null)
+                    {
+                        <input type="hidden" name="@updateForm.ParentField" value="@selected.Parent!.Id" />
+                    }
+                    <label class="form-label" for="acName">اسم @updateForm.Label</label>
+                    <input id="acName" name="@updateForm.NameField" value="@selected.Name" class="form-control"
+                           maxlength="@updateForm.MaxLength" required />
+                    @if (selected.Kind == AcademicNode.Level)
+                    {
+                        <p class="ac-hint">يظهر هذا الاسم في قائمة المستويات أثناء تسجيل الطالب.</p>
+                        <label class="form-label mt-3" for="acOrder">ترتيب العرض</label>
+                        <input id="acOrder" name="sortOrder" type="number" min="0" max="999"
+                               value="@selected.SortOrder" class="form-control ac-input--short" />
+                        <p class="ac-hint">الأرقام الأصغر تظهر أولاً.</p>
+                    }
+
+                    <div class="ac-switch">
+                        <div>
+                            <strong>مفعّل</strong>
+                            <p class="ac-hint mb-0">
+                                @(selected.IsActive
+                                    ? "يظهر في التسجيلات والقوائم المنسدلة."
+                                    : "مخفي عن التسجيلات الجديدة، وبياناته محفوظة.")
+                            </p>
+                        </div>
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   id="acActive" name="isActive" value="true" checked="@selected.IsActive" />
+                            <label class="visually-hidden" for="acActive">تفعيل @updateForm.Label</label>
+                        </div>
+                    </div>
+
+                    <div class="ac-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg" aria-hidden="true"></i> حفظ التغييرات
+                        </button>
+                    </div>
+                </form>
+
+                @if (selected.ChildKind is not null)
+                {
+                    <hr class="ac-divider" />
+                    <div class="ac-children__head">
+                        <h3>@selected.Plural <span class="ac-muted">(@selected.Children.Count)</span></h3>
+                        <a class="btn btn-sm btn-outline-primary"
+                           asp-action="Index" asp-route-selected="@selected.Key"
+                           asp-route-add="@selected.ChildKind" asp-route-parentId="@selected.Id">
+                            <i class="bi bi-plus-lg" aria-hidden="true"></i> إضافة @selected.ChildLabel
+                        </a>
+                    </div>
+                    @if (selected.Children.Count == 0)
+                    {
+                        <p class="ac-empty-line">لا توجد @selected.ChildPlural بعد. أضف أول @selected.ChildLabel من الزر أعلاه.</p>
+                    }
+                    else
+                    {
+                        <ul class="ac-children">
+                            @foreach (var child in selected.Children)
+                            {
+                                <li>
+                                    <a class="ac-child" asp-action="Index" asp-route-selected="@child.Key">
+                                        <span class="ac-dot @(child.IsActive ? "" : "ac-dot--off")" aria-hidden="true"></span>
+                                        <span class="ac-child__name">@child.Name</span>
+                                        @if (child.Children.Count > 0)
+                                        {
+                                            <span class="ac-child__meta">@child.ChildrenCountText</span>
+                                        }
+                                        <i class="bi bi-chevron-left" aria-hidden="true"></i>
+                                    </a>
+                                </li>
+                            }
+                        </ul>
+                    }
+                }
+
+                <form method="post" asp-action="@updateForm.Delete" class="ac-danger"
+                      data-confirm="هل تريد حذف @updateForm.Label «@selected.Name»؟ لا يمكن التراجع."
+                      data-confirm-tone="danger">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@selected.Id" />
+                    <div class="ac-danger__text">
+                        <strong>حذف @updateForm.Label</strong>
+                        <span>لا يمكن التراجع. يُمنع الحذف إذا كان العنصر مرتبطاً بسجلات أو عناصر تابعة.</span>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-trash" aria-hidden="true"></i> حذف
+                    </button>
+                </form>
+            </div>
+        }
+        else
+        {
+            <div class="ac-empty">
+                <span class="ac-empty__icon"><i class="bi bi-diagram-3" aria-hidden="true"></i></span>
+                <h3>لا يوجد عنصر محدد</h3>
+                <p>اختر عنصراً من الهيكل الأكاديمي، أو أضف جامعة جديدة للبدء.</p>
+                <a class="btn btn-primary" asp-action="Index" asp-route-add="@AcademicNode.University">
+                    <i class="bi bi-plus-lg" aria-hidden="true"></i> إضافة جامعة
+                </a>
+            </div>
+        }
+    </section>
 </div>
 
 @section Scripts {
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const filter = document.getElementById('levelFilter');
-        const items = Array.from(document.querySelectorAll('.level-item'));
-        const empty = document.getElementById('levelsEmpty');
-        filter?.addEventListener('change', function () {
-            const selected = filter.value;
-            let visible = 0;
-            items.forEach(function (item) {
-                const show = !selected || item.dataset.specializationId === selected;
-                item.classList.toggle('d-none', !show);
-                if (show) visible++;
-            });
-            empty?.classList.toggle('d-none', visible > 0);
-        });
-    });
-</script>
+    <script src="~/js/academic-catalog.js" asp-append-version="true"></script>
 }

@@ -21,18 +21,88 @@ public class AcademicCatalogController : Controller
 
     private bool CanManage() => User.HasPermission(AdminPermissions.ManageAcademicCatalog);
 
-    public async Task<IActionResult> Index()
+    /// <summary>
+    /// Renders the catalog as one tree plus a detail panel. <paramref name="selected"/> is
+    /// "kind:id" (for example <c>college:3</c>) and <paramref name="add"/> names the kind of child
+    /// to create under <paramref name="parentId"/>, so selection and "add here" are plain links
+    /// that survive a reload and work without JavaScript.
+    /// </summary>
+    public async Task<IActionResult> Index(string? selected = null, string? add = null, int? parentId = null)
     {
         if (!CanManage()) return Forbid();
 
-        var model = new AcademicCatalogPageViewModel
+        var universities = await _db.Universities.AsNoTracking().OrderBy(u => u.UniversityName).ToListAsync();
+        var colleges = await _db.Colleges.AsNoTracking().OrderBy(c => c.CollegeName).ToListAsync();
+        var specializations = await _db.AcademicSpecializations.AsNoTracking()
+            .OrderBy(s => s.SpecializationName).ToListAsync();
+        var levels = await _db.AcademicLevelOptions.AsNoTracking()
+            .OrderBy(l => l.SortOrder).ThenBy(l => l.LevelName).ToListAsync();
+
+        var nodes = new Dictionary<string, AcademicNode>(StringComparer.Ordinal);
+        var roots = new List<AcademicNode>();
+
+        foreach (var university in universities)
         {
-            Universities = await _db.Universities.OrderBy(u => u.UniversityName).ToListAsync(),
-            Colleges = await _db.Colleges.Include(c => c.University).OrderBy(c => c.University!.UniversityName).ThenBy(c => c.CollegeName).ToListAsync(),
-            Specializations = await _db.AcademicSpecializations.Include(s => s.College).ThenInclude(c => c!.University).OrderBy(s => s.College!.University!.UniversityName).ThenBy(s => s.College!.CollegeName).ThenBy(s => s.SpecializationName).ToListAsync(),
-            Levels = await _db.AcademicLevelOptions.Include(l => l.AcademicSpecialization).ThenInclude(s => s!.College).ThenInclude(c => c!.University).OrderBy(l => l.AcademicSpecialization!.SpecializationName).ThenBy(l => l.SortOrder).ThenBy(l => l.LevelName).ToListAsync()
-        };
-        return View(model);
+            var node = new AcademicNode(AcademicNode.University, university.UniversityId, university.UniversityName, university.IsActive);
+            roots.Add(node);
+            nodes[node.Key] = node;
+        }
+        foreach (var college in colleges)
+        {
+            if (!nodes.TryGetValue(AcademicNode.MakeKey(AcademicNode.University, college.UniversityId), out var parent))
+                continue;
+            var node = new AcademicNode(AcademicNode.College, college.CollegeId, college.CollegeName, college.IsActive, parent);
+            parent.Children.Add(node);
+            nodes[node.Key] = node;
+        }
+        foreach (var specialization in specializations)
+        {
+            if (!nodes.TryGetValue(AcademicNode.MakeKey(AcademicNode.College, specialization.CollegeId), out var parent))
+                continue;
+            var node = new AcademicNode(AcademicNode.Specialization, specialization.AcademicSpecializationId,
+                specialization.SpecializationName, specialization.IsActive, parent);
+            parent.Children.Add(node);
+            nodes[node.Key] = node;
+        }
+        foreach (var level in levels)
+        {
+            if (!nodes.TryGetValue(AcademicNode.MakeKey(AcademicNode.Specialization, level.AcademicSpecializationId), out var parent))
+                continue;
+            var node = new AcademicNode(AcademicNode.Level, level.AcademicLevelOptionId, level.LevelName,
+                level.IsActive, parent, level.SortOrder);
+            parent.Children.Add(node);
+            nodes[node.Key] = node;
+        }
+
+        var selectedNode = selected is not null && nodes.TryGetValue(selected, out var match)
+            ? match
+            : roots.FirstOrDefault();
+
+        // Only the path to the selection is expanded on first paint; the rest is one click away.
+        for (var node = selectedNode; node is not null; node = node.Parent)
+            node.IsOpen = true;
+
+        var parentKind = AcademicNode.ParentKindOf(add);
+        AcademicNode? addParent = null;
+        if (parentKind is not null && parentId is int id)
+            nodes.TryGetValue(AcademicNode.MakeKey(parentKind, id), out addParent);
+
+        var addKind = add is not null && AcademicNode.IsKind(add)
+            && (add == AcademicNode.University || addParent is not null)
+                ? add
+                : null;
+
+        return View(new AcademicCatalogPageViewModel
+        {
+            Roots = roots,
+            Selected = selectedNode,
+            AddKind = addKind,
+            AddParent = addParent,
+            UniversityCount = universities.Count,
+            CollegeCount = colleges.Count,
+            SpecializationCount = specializations.Count,
+            LevelCount = levels.Count
+        });
     }
 
     [HttpPost]
@@ -50,7 +120,7 @@ public class AcademicCatalogController : Controller
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? string.Empty, "Create", "University", university.UniversityId, null, university.UniversityName);
         TempData["Success"] = "تمت إضافة الجامعة بنجاح.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { selected = AcademicNode.MakeKey(AcademicNode.University, university.UniversityId) });
     }
 
     [HttpPost]
@@ -69,7 +139,7 @@ public class AcademicCatalogController : Controller
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? string.Empty, "Update", "University", universityId, null, universityName);
         TempData["Success"] = "تم تحديث بيانات الجامعة.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { selected = AcademicNode.MakeKey(AcademicNode.University, universityId) });
     }
 
     [HttpPost]
@@ -87,7 +157,7 @@ public class AcademicCatalogController : Controller
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? string.Empty, "Create", "College", college.CollegeId, null, college.CollegeName);
         TempData["Success"] = "تمت إضافة الكلية بنجاح.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { selected = AcademicNode.MakeKey(AcademicNode.College, college.CollegeId) });
     }
 
     [HttpPost]
@@ -108,7 +178,7 @@ public class AcademicCatalogController : Controller
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? string.Empty, "Update", "College", collegeId, null, collegeName);
         TempData["Success"] = "تم تحديث بيانات الكلية.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { selected = AcademicNode.MakeKey(AcademicNode.College, collegeId) });
     }
 
     [HttpPost]
@@ -126,7 +196,7 @@ public class AcademicCatalogController : Controller
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? string.Empty, "Create", "AcademicSpecialization", specialization.AcademicSpecializationId, null, specialization.SpecializationName);
         TempData["Success"] = "تمت إضافة التخصص بنجاح.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { selected = AcademicNode.MakeKey(AcademicNode.Specialization, specialization.AcademicSpecializationId) });
     }
 
     [HttpPost]
@@ -147,7 +217,7 @@ public class AcademicCatalogController : Controller
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? string.Empty, "Update", "AcademicSpecialization", academicSpecializationId, null, specializationName);
         TempData["Success"] = "تم تحديث بيانات التخصص.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { selected = AcademicNode.MakeKey(AcademicNode.Specialization, academicSpecializationId) });
     }
 
     [HttpPost]
@@ -168,7 +238,7 @@ public class AcademicCatalogController : Controller
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? string.Empty, "Create", "AcademicLevelOption", level.AcademicLevelOptionId, null, levelName);
         TempData["Success"] = "تمت إضافة المستوى للتخصص بنجاح.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { selected = AcademicNode.MakeKey(AcademicNode.Level, level.AcademicLevelOptionId) });
     }
 
     [HttpPost]
@@ -191,7 +261,7 @@ public class AcademicCatalogController : Controller
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? string.Empty, "Update", "AcademicLevelOption", academicLevelOptionId, null, levelName);
         TempData["Success"] = "تم تحديث المستوى الدراسي.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { selected = AcademicNode.MakeKey(AcademicNode.Level, academicLevelOptionId) });
     }
 
     [HttpPost]
@@ -205,7 +275,7 @@ public class AcademicCatalogController : Controller
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? string.Empty, "Delete", "AcademicLevelOption", id);
         TempData["Success"] = "تم حذف المستوى الدراسي.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { selected = AcademicNode.MakeKey(AcademicNode.Specialization, level.AcademicSpecializationId) });
     }
 
     [AllowAnonymous]
@@ -250,7 +320,7 @@ public class AcademicCatalogController : Controller
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? string.Empty, "Delete", "College", id);
         TempData["Success"] = "تم حذف الكلية.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { selected = AcademicNode.MakeKey(AcademicNode.University, college.UniversityId) });
     }
 
     [HttpPost]
@@ -266,7 +336,7 @@ public class AcademicCatalogController : Controller
         await _db.SaveChangesAsync();
         await _audit.LogAsync(User.Identity?.Name ?? string.Empty, "Delete", "AcademicSpecialization", id);
         TempData["Success"] = "تم حذف التخصص.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { selected = AcademicNode.MakeKey(AcademicNode.College, specialization.CollegeId) });
     }
 
     [AllowAnonymous]
@@ -323,8 +393,139 @@ public class AcademicCatalogController : Controller
 
 public class AcademicCatalogPageViewModel
 {
-    public List<University> Universities { get; set; } = new();
-    public List<College> Colleges { get; set; } = new();
-    public List<AcademicSpecialization> Specializations { get; set; } = new();
-    public List<AcademicLevelOption> Levels { get; set; } = new();
+    public List<AcademicNode> Roots { get; init; } = new();
+    public AcademicNode? Selected { get; init; }
+    public string? AddKind { get; init; }
+    public AcademicNode? AddParent { get; init; }
+    public int UniversityCount { get; init; }
+    public int CollegeCount { get; init; }
+    public int SpecializationCount { get; init; }
+    public int LevelCount { get; init; }
+}
+
+/// <summary>
+/// One node of the university → college → specialization → level tree, built once per request so
+/// the view, the tree partial and the tests share the same shape instead of re-deriving parents.
+/// </summary>
+public sealed class AcademicNode
+{
+    public const string University = "university";
+    public const string College = "college";
+    public const string Specialization = "specialization";
+    public const string Level = "level";
+
+    public AcademicNode(string kind, int id, string name, bool isActive,
+        AcademicNode? parent = null, int sortOrder = 0)
+    {
+        Kind = kind;
+        Id = id;
+        Name = name;
+        IsActive = isActive;
+        Parent = parent;
+        SortOrder = sortOrder;
+    }
+
+    public string Kind { get; }
+    public int Id { get; }
+    public string Name { get; }
+    public bool IsActive { get; }
+    public int SortOrder { get; }
+    public AcademicNode? Parent { get; }
+    public List<AcademicNode> Children { get; } = new();
+    public bool IsOpen { get; set; }
+
+    public string Key => MakeKey(Kind, Id);
+
+    public static string MakeKey(string kind, int id) => $"{kind}:{id}";
+
+    public static bool IsKind(string? kind)
+        => kind is University or College or Specialization or Level;
+
+    /// <summary>The kind of node this one can contain, or null for levels.</summary>
+    public string? ChildKind => Kind switch
+    {
+        University => College,
+        College => Specialization,
+        Specialization => Level,
+        _ => null
+    };
+
+    public static string? ParentKindOf(string? childKind) => childKind switch
+    {
+        College => University,
+        Specialization => College,
+        Level => Specialization,
+        _ => null
+    };
+
+    public string Label => Kind switch
+    {
+        University => "جامعة",
+        College => "كلية",
+        Specialization => "تخصص",
+        _ => "مستوى"
+    };
+
+    public string LabelDef => Kind switch
+    {
+        University => "الجامعة",
+        College => "الكلية",
+        Specialization => "التخصص",
+        _ => "المستوى"
+    };
+
+    public string Plural => Kind switch
+    {
+        University => "الجامعات",
+        College => "الكليات",
+        Specialization => "التخصصات",
+        _ => "المستويات"
+    };
+
+    public string ChildLabel => ChildKind switch
+    {
+        College => "كلية",
+        Specialization => "تخصص",
+        Level => "مستوى",
+        _ => ""
+    };
+
+    public string ChildPlural => ChildKind switch
+    {
+        College => "الكليات",
+        Specialization => "التخصصات",
+        Level => "المستويات",
+        _ => ""
+    };
+
+    public string Icon => Kind switch
+    {
+        University => "bi-building",
+        College => "bi-bank",
+        Specialization => "bi-mortarboard",
+        _ => "bi-layers"
+    };
+
+    public string Path => Parent is null ? Name : $"{Parent.Path} / {Name}";
+
+    /// <summary>"3 تخصصات" / "تخصص واحد" / "تخصصان" for this node's children.</summary>
+    public string ChildrenCountText => Children.Count switch
+    {
+        0 => "",
+        1 => ChildKind switch
+        {
+            College => "كلية واحدة",
+            Specialization => "تخصص واحد",
+            Level => "مستوى واحد",
+            _ => "عنصر واحد"
+        },
+        2 => ChildKind switch
+        {
+            College => "كليتان",
+            Specialization => "تخصصان",
+            Level => "مستويان",
+            _ => "عنصران"
+        },
+        _ => $"{Children.Count} {ChildPlural}"
+    };
 }
