@@ -1,8 +1,6 @@
 @{
-    ViewData["Title"] = "إعدادات النظام المالية";
-    ViewData["PageIcon"] = "bi-sliders";
-    ViewData["PageDesc"] = "العملة، حد اعتماد الاسترداد، وإقفال الفترات المالية — لمدير النظام فقط";
-    Layout = "_AdminLayout";
+    ViewData["Title"] = "الإعدادات المالية";
+    Layout = "_SettingsLayout";
     var currencyName = ViewBag.CurrencyName as string;
     var currencySymbol = ViewBag.CurrencySymbol as string;
     var threshold = ViewBag.RefundThreshold as decimal?;
@@ -13,10 +11,6 @@
     var history = ViewBag.History as List<AccountingPeriodLock> ?? new();
     int usage = ViewBag.CurrencyUsage is int u ? u : 0;
 }
-
-<div class="page-header">
-    <partial name="_PageHeader" />
-</div>
 
 
 <div class="row g-4">

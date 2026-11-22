@@ -20,6 +20,18 @@ per-feature idempotent `*SchemaMigrationService` classes for existing databases.
 
 Run the app: `/tmp/runapp.sh` (port 12000). Login at `/Auth/Login`, user `admin`.
 
+## Unified system settings (إعدادات النظام)
+
+One sidebar entry (`SystemSettings`) opens `/SystemSettings`, which redirects to the
+first tab the signed-in role may open. Tabs are declared once in
+`ECert/Services/SystemSettingsSections.cs` (label, icon, controller/action, URL,
+permission); the tab strip (`Views/Shared/_SettingsTabs.cshtml`), the sidebar entry
+and the hub redirect all read from it. Settings pages set
+`Layout = "_SettingsLayout"`, which renders the shared header, tab strip and
+breadcrumb — don't add a `page-header` to them. Security and backup are two tabs of
+`SecuritySettingsController` (`Index` / `Backup`) with separate POST actions
+(`SaveSecurity` / `SaveBackup`) so one form never overwrites the other's fields.
+
 ## GitHub credentials in this environment
 
 Three credential env vars are injected; only two are usable:

@@ -1,0 +1,65 @@
+@using ECert.Services
+@{
+    Layout = "_AdminLayout";
+
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString();
+    var action = ViewContext.RouteData.Values["action"]?.ToString();
+    var tab = SystemSettingsSections.Find(controller, action);
+    var tabs = SystemSettingsSections.VisibleFor(User);
+    var icon = tab?.Icon ?? "bi-gear-wide-connected";
+    var isSuperAdminTab = tab?.SuperAdminOnly == true;
+
+    // The shell owns the page identity: one H1 for the whole area, with the active tab as the
+    // subtitle, so every settings page reads as part of the same screen.
+    if (tab is not null)
+    {
+        ViewData["Title"] = tab.Label;
+    }
+
+    ViewData["BreadcrumbParent"] = "إعدادات النظام";
+    ViewData["BreadcrumbParentController"] = "SystemSettings";
+}
+@section Styles {
+    <link href="~/css/settings.css" rel="stylesheet" asp-append-version="true" />
+    @await RenderSectionAsync("Styles", required: false)
+}
+
+<div class="settings-shell">
+    <div class="page-header">
+        <div class="page-header__title-row">
+            <div class="page-header-icon" aria-hidden="true">
+                <i class="bi @icon"></i>
+            </div>
+            <div>
+                <h1 class="page-header__title">إعدادات النظام</h1>
+                <p class="page-desc">
+                    @if (tab is not null)
+                    {
+                        <strong>@tab.Label:</strong>
+                        <text> </text>
+                        @tab.Description
+                    }
+                    else
+                    {
+                        <text>اضبط الأمان والنسخ الاحتياطي وتصدير الشهادات والبيانات الجامعية والإعدادات المالية.</text>
+                    }
+                </p>
+            </div>
+        </div>
+        @if (isSuperAdminTab)
+        {
+            <div class="page-actions">
+                <span class="a-badge a-badge--brand">مدير النظام</span>
+            </div>
+        }
+    </div>
+
+    <partial name="_SettingsTabs" model="tabs" />
+
+    @RenderBody()
+</div>
+
+@section Scripts {
+    <script src="~/js/settings.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+}

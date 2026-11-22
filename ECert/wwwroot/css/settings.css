@@ -1,0 +1,84 @@
+/* ==========================================================================
+   ECert — Unified system settings
+   The tab strip that sits under the shared settings header.
+   ========================================================================== */
+
+.settings-shell {
+    max-width: 1180px;
+    margin-inline: auto;
+}
+
+.settings-tabs {
+    position: sticky;
+    top: var(--a-topbar-h, 68px);
+    z-index: 1020;
+    display: flex;
+    gap: var(--a-1);
+    padding: 5px;
+    margin-bottom: var(--a-6);
+    background: var(--a-surface-3);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-r);
+    box-shadow: var(--a-e1);
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.settings-tabs::-webkit-scrollbar { height: 4px; }
+.settings-tabs::-webkit-scrollbar-thumb {
+    background: var(--a-border-strong);
+    border-radius: var(--a-r-full);
+}
+
+.settings-tab {
+    flex: 1 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--a-2);
+    padding: 10px 14px;
+    border-radius: var(--a-r-sm);
+    color: var(--a-text-3);
+    font-size: 0.86rem;
+    font-weight: 700;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: background var(--a-t-fast), color var(--a-t-fast), box-shadow var(--a-t-fast);
+}
+
+.settings-tab i {
+    font-size: 1rem;
+    opacity: 0.9;
+}
+
+.settings-tab:hover {
+    background: var(--a-surface-2);
+    color: var(--a-text-2);
+}
+
+.settings-tab.is-active {
+    background: var(--a-surface);
+    color: var(--a-brand);
+    box-shadow: var(--a-e2);
+}
+
+.settings-tab:focus-visible {
+    outline: 2px solid var(--a-brand-ring);
+    outline-offset: 2px;
+}
+
+/* A small toolbar for sections whose primary action lives above the content
+   (for example "add country") rather than in the shared header. */
+.settings-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--a-2);
+    margin-bottom: var(--a-4);
+}
+
+@media (max-width: 900px) {
+    .settings-tabs { top: 0; }
+    .settings-shell { max-width: none; }
+}
